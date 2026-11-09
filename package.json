@@ -1,0 +1,16 @@
+{
+  "name": "wachimoles-zepp-heart-rate-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prueba de concepto Zepp OS: frecuencia cardiaca al backend",
+  "scripts": {
+    "server": "node server/server.js",
+    "test": "node --test server/server.test.js api/samples.test.js"
+  },
+  "devDependencies": {
+    "@zeppos/device-types": "^2.0.0"
+  },
+  "dependencies": {
+    "@zeppos/zml": "^0.0.22"
+  }
+}

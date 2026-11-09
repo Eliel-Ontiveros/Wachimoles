@@ -1,0 +1,140 @@
+const http = require("node:http");
+const path = require("node:path");
+const { appendFile, mkdir } = require("node:fs/promises");
+const { isValidSample, MAX_BODY_BYTES } = require("./sample-validation");
+
+function sendJson(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  response.end(JSON.stringify(body));
+}
+
+function readJsonBody(request) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    let receivedBytes = 0;
+    let settled = false;
+
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      receivedBytes += Buffer.byteLength(chunk);
+      if (receivedBytes > MAX_BODY_BYTES) {
+        settled = true;
+        reject(new Error("Request body exceeds the allowed size."));
+        request.resume();
+        return;
+      }
+
+      body += chunk;
+    });
+    request.on("end", () => {
+      if (!settled) {
+        resolve(body);
+      }
+    });
+    request.on("error", (error) => {
+      if (!settled) {
+        reject(error);
+      }
+    });
+  });
+}
+
+function createServer(options = {}) {
+  const dataFile =
+    options.dataFile || path.join(__dirname, "data", "samples.jsonl");
+  const knownSampleIds = new Set();
+
+  return http.createServer(async (request, response) => {
+    const requestUrl = new URL(request.url, "http://localhost");
+
+    if (request.method === "GET" && requestUrl.pathname === "/health") {
+      sendJson(response, 200, { ok: true });
+      return;
+    }
+
+    if (request.method !== "POST" || requestUrl.pathname !== "/samples") {
+      sendJson(response, 404, { ok: false, error: "Route not found." });
+      return;
+    }
+
+    let body;
+    try {
+      body = await readJsonBody(request);
+    } catch (error) {
+      sendJson(response, 413, {
+        ok: false,
+        error: error.message || "Could not read request body."
+      });
+      return;
+    }
+
+    let sample;
+    try {
+      sample = JSON.parse(body);
+    } catch {
+      sendJson(response, 400, { ok: false, error: "Invalid JSON." });
+      return;
+    }
+
+    if (!isValidSample(sample)) {
+      sendJson(response, 400, {
+        ok: false,
+        error: "Expected a valid heart-rate, SpO2, or stress sample."
+      });
+      return;
+    }
+
+    if (knownSampleIds.has(sample.sampleId)) {
+      sendJson(response, 200, {
+        ok: true,
+        duplicate: true,
+        sampleId: sample.sampleId
+      });
+      return;
+    }
+
+    const record = {
+      ...sample,
+      receivedAt: Date.now()
+    };
+    knownSampleIds.add(sample.sampleId);
+
+    try {
+      await mkdir(path.dirname(dataFile), { recursive: true });
+      await appendFile(dataFile, `${JSON.stringify(record)}\n`, "utf8");
+    } catch (error) {
+      knownSampleIds.delete(sample.sampleId);
+      console.error("Could not persist sample:", error);
+      sendJson(response, 500, {
+        ok: false,
+        error: "Could not persist sample."
+      });
+      return;
+    }
+
+    sendJson(response, 201, {
+      ok: true,
+      duplicate: false,
+      sampleId: record.sampleId,
+      receivedAt: record.receivedAt
+    });
+  });
+}
+
+if (require.main === module) {
+  const port = Number(process.env.PORT || 3000);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("PORT must be an integer between 1 and 65535.");
+  }
+
+  const server = createServer();
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Sample API listening on port ${port}`);
+    console.log("Use this server only on a trusted local network.");
+  });
+}
+
+module.exports = { createServer, isValidSample };
