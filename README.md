@@ -52,6 +52,8 @@ npx vercel --prod
 
 La API queda disponible en `https://<dominio-vercel>/api/samples`; la comprobación de salud es `https://<dominio-vercel>/api/health`. La función no necesita un servidor Node ejecutándose en tu computadora. No se debe configurar CORS para que el Side Service realice su petición servidor-a-servidor.
 
+La API resta 8 horas a `measured_at` y `received_at` antes de guardar cada muestra. Esto es un ajuste fijo y altera el instante real registrado; no se adapta al horario de verano.
+
 ### 3. Conectar la miniaplicación
 
 Cuando Vercel asigne el dominio definitivo, actualiza `SAMPLE_API_URL` en [`app-side/config.js`](./app-side/config.js):

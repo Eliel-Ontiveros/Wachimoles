@@ -35,12 +35,15 @@ const env = {
   SUPABASE_URL: "https://example.supabase.co",
   SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
 };
+const eightHours = 8 * 60 * 60 * 1000;
 
 test("inserts a validated sample into Supabase and confirms persistence", async () => {
+  const now = 1794190000000;
   let fetchUrl;
   let fetchOptions;
   const handler = createHandler({
     env,
+    now: () => now,
     fetchImpl: async (url, options) => {
       fetchUrl = url;
       fetchOptions = options;
@@ -50,7 +53,7 @@ test("inserts a validated sample into Supabase and confirms persistence", async 
         json: async () => [
           {
             sample_id: "heart_rate-1794190000000",
-            received_at: "2026-11-09T20:00:00.000Z"
+            received_at: new Date(now - eightHours).toISOString()
           }
         ]
       };
@@ -72,14 +75,15 @@ test("inserts a validated sample into Supabase and confirms persistence", async 
     metric: "heart_rate",
     value: 72,
     unit: "bpm",
-    measured_at: new Date(1794190000000).toISOString()
+    measured_at: new Date(1794190000000 - eightHours).toISOString(),
+    received_at: new Date(now - eightHours).toISOString()
   });
   assert.equal(response.statusCode, 201);
   assert.deepEqual(response.body, {
     ok: true,
     duplicate: false,
     sampleId: "heart_rate-1794190000000",
-    receivedAt: Date.parse("2026-11-09T20:00:00.000Z")
+    receivedAt: now - eightHours
   });
 });
 
