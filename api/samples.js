@@ -1,5 +1,4 @@
 const { isValidSample } = require("../server/sample-validation");
-const TIME_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 function sendJson(response, statusCode, body) {
   response.status(statusCode).json(body);
@@ -69,14 +68,13 @@ function createHandler({
       return;
     }
 
-    const measuredAt = new Date(sample.measuredAt - TIME_OFFSET_MS).toISOString();
     const databaseSample = {
       sample_id: sample.sampleId,
       metric: sample.metric,
       value: sample.value,
       unit: sample.unit,
-      measured_at: measuredAt,
-      received_at: new Date(now() - TIME_OFFSET_MS).toISOString()
+      measured_at: new Date(sample.measuredAt).toISOString(),
+      received_at: new Date(now()).toISOString()
     };
     if (sample.sensorTime !== undefined) {
       databaseSample.sensor_time = sample.sensorTime;

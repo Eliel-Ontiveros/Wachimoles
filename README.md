@@ -14,7 +14,7 @@ La pantalla permite iniciar y detener el servicio; al iniciarlo se puede salir d
 
 - **Ritmo cardíaco en vivo:** incluido.
 - **Medición en segundo plano:** `app-service/health_monitor` mantiene los listeners de sensores; `Time.onPerMinute` activa un ciclo de envío cada minuto desde el App Service. El servicio se inicia explícitamente desde la pantalla y se detiene con **Detener monitoreo**.
-- **Ritmo cardíaco:** para reducir el consumo y evitar mantener una medición continua activa, se consulta `HeartRate.getToday()` en cada ciclo. Solo se envían lecturas del sistema de los últimos cinco minutos; si no hay una reciente, se omite el envío de ritmo cardíaco y el estrés continúa de forma independiente. La disponibilidad depende de la medición automática configurada en el reloj.
+- **Ritmo cardíaco:** el servicio consulta `HeartRate.getToday()` al iniciar y en cada ciclo por minuto, y además escucha `HeartRate.onLastChange` para enviar las nuevas lecturas automáticas en cuanto el reloj las registra. No activa el muestreo continuo de alta frecuencia. Solo se envían lecturas de los últimos cinco minutos; si no hay una reciente, se omite el envío.
 - **Estrés actual:** el servicio lee `Stress.getCurrent()` al comenzar, en cada cambio y en cada ciclo de envío. La API no inicia una medición manual, por lo que un valor disponible puede no ser una medición nueva de ese minuto.
 - **Pasos diarios:** el servicio consulta el total acumulado con `Step.getCurrent()` al iniciar y cada minuto. Cada día usa un `sample_id` local de formato `steps-YYYY-MM-DD`; las nuevas lecturas actualizan esa misma fila en vez de insertar otra.
 - **SpO₂ histórico:** cada minuto consulta `BloodOxygen.getLastFewHour(24)` y envía las mediciones nuevas que ya registró el reloj. No llama `BloodOxygen.start()` ni inicia un análisis; al iniciar el servicio solo considera lecturas de los últimos 10 minutos y luego procesa las nuevas en orden.
@@ -54,7 +54,7 @@ npx vercel --prod
 
 La API queda disponible en `https://<dominio-vercel>/api/samples`; la comprobación de salud es `https://<dominio-vercel>/api/health`. La función no necesita un servidor Node ejecutándose en tu computadora. El Side Service del teléfono realiza las solicitudes reenviadas por BLE desde el reloj.
 
-La API resta 8 horas a `measured_at` y `received_at` antes de guardar cada muestra. Esto es un ajuste fijo y altera el instante real registrado; no se adapta al horario de verano.
+La API guarda `measured_at` y `received_at` como instantes UTC reales, sin aplicar desplazamientos fijos. El panel de Supabase suele mostrar `timestamptz` en UTC; para comparar con la hora local del reloj, convierte el valor a la zona horaria del dispositivo al consultarlo. Las filas guardadas por versiones anteriores tienen un desplazamiento fijo de 8 horas y no se corrigen automáticamente.
 
 ### 3. Conectar la miniaplicación
 

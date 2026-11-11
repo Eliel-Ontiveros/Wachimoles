@@ -85,6 +85,13 @@ function uploadSample(service, sample) {
 }
 
 function stopSensors(state) {
+  if (state.heartRateSensor && state.heartRateCallback) {
+    try {
+      state.heartRateSensor.offLastChange(state.heartRateCallback);
+    } catch (error) {
+      logger.error("Could not stop background heart-rate listener:", error);
+    }
+  }
   if (state.stressSensor && state.stressCallback) {
     try {
       state.stressSensor.offChange(state.stressCallback);
@@ -93,6 +100,7 @@ function stopSensors(state) {
     }
   }
   state.heartRateSensor = null;
+  state.heartRateCallback = null;
   state.stressSensor = null;
   state.stressCallback = null;
 }
@@ -101,6 +109,7 @@ AppService(
   BasePage({
     state: {
       heartRateSensor: null,
+      heartRateCallback: null,
       stepSensor: null,
       spo2Sensor: null,
       stressSensor: null,
@@ -143,9 +152,20 @@ AppService(
 
       try {
         const sensor = new HeartRate();
+        const callback = () => {
+          const sample = this.captureHeartRateReading("sensor change");
+          if (sample) {
+            this.uploadSampleIfNeeded(sample, true);
+          }
+        };
         this.state.heartRateSensor = sensor;
-        this.captureHeartRateReading("initial");
-        logger.log("Background heart-rate history reader initialized");
+        this.state.heartRateCallback = callback;
+        sensor.onLastChange(callback);
+        const initialHeartRate = this.captureHeartRateReading("initial");
+        if (initialHeartRate) {
+          this.uploadSampleIfNeeded(initialHeartRate, true);
+        }
+        logger.log("Background heart-rate history listener initialized");
       } catch (error) {
         logger.error("Could not start background heart-rate sensor:", error);
       }
@@ -217,7 +237,7 @@ AppService(
     },
     captureHeartRateReading(source) {
       if (!this.state.heartRateSensor) {
-        return;
+        return null;
       }
 
       try {
@@ -250,7 +270,7 @@ AppService(
             metric: "heart_rate"
           });
           logger.log(`No recent system heart-rate reading is available (${source})`);
-          return;
+          return null;
         }
 
         const measuredAt =
@@ -267,11 +287,13 @@ AppService(
         logger.log(
           `System heart rate read: ${sample.value} bpm for minute ${latestMinute}`
         );
+        return sample;
       } catch (error) {
         logger.error(
           `Could not read system heart-rate history (${source}):`,
           error
         );
+        return null;
       }
     },
     captureStressReading(source) {
