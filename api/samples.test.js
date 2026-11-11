@@ -33,7 +33,8 @@ function createSample() {
 
 const env = {
   SUPABASE_URL: "https://example.supabase.co",
-  SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
+  SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+  DASHBOARD_USER_ID: "43235979-2b38-4a17-9a38-632484accad9"
 };
 test("inserts a validated sample into Supabase and confirms persistence", async () => {
   const now = 1794190000000;
@@ -69,6 +70,7 @@ test("inserts a validated sample into Supabase and confirms persistence", async 
     `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
   );
   assert.deepEqual(JSON.parse(fetchOptions.body), {
+    user_id: env.DASHBOARD_USER_ID,
     sample_id: "heart_rate-1794190000000",
     metric: "heart_rate",
     value: 72,
@@ -187,6 +189,32 @@ test("returns a configuration error when Supabase secrets are missing", async ()
 
   assert.equal(response.statusCode, 500);
   assert.equal(response.body.ok, false);
+});
+
+test("rejects an invalid configured dashboard user ID without contacting Supabase", async () => {
+  let fetchCalled = false;
+  const handler = createHandler({
+    env: { ...env, DASHBOARD_USER_ID: "not-a-user-id" },
+    fetchImpl: async () => {
+      fetchCalled = true;
+    }
+  });
+  const response = createResponse();
+  const originalConsoleError = console.error;
+  console.error = () => {};
+
+  try {
+    await handler({ method: "POST", body: createSample() }, response);
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  assert.equal(fetchCalled, false);
+  assert.equal(response.statusCode, 500);
+  assert.deepEqual(response.body, {
+    ok: false,
+    error: "The sample database is not configured."
+  });
 });
 
 test("rejects methods other than POST", async () => {

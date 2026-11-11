@@ -31,6 +31,9 @@ La API serverless vive en `api/` y Supabase conserva una fila por muestra, excep
 1. Crea un proyecto en Supabase.
 2. En **SQL Editor**, ejecuta el contenido de [`supabase/schema.sql`](./supabase/schema.sql).
    Si ya existe la tabla, ejecuta una vez [`supabase/migrations/20261111_add_daily_steps.sql`](./supabase/migrations/20261111_add_daily_steps.sql) para permitir los totales diarios de pasos.
+   Para una tabla existente, ejecuta también la migración
+   [`20261111_add_user_ownership_to_samples.sql`](../Wachimoles_Movil/supabase/migrations/20261111_add_user_ownership_to_samples.sql)
+   para agregar `user_id`.
 3. La tabla activa Row Level Security sin políticas públicas. La API accede desde el servidor con `SUPABASE_SERVICE_ROLE_KEY`; no copies esa clave a la miniaplicación ni a `app-side/config.js`.
 
 ### 2. Desplegar la API en Vercel
@@ -45,6 +48,7 @@ En **Project Settings → Environment Variables**, agrega para Production (y Pre
 
 - `SUPABASE_URL`: URL del proyecto Supabase, por ejemplo `https://<project-ref>.supabase.co`.
 - `SUPABASE_SERVICE_ROLE_KEY`: clave `service_role` del proyecto. Trátala como contraseña; solo debe existir como variable de entorno de Vercel.
+- `DASHBOARD_USER_ID`: UUID de la cuenta Supabase que será propietaria de las nuevas muestras. Se puede consultar en **Authentication → Users**. La API lo asigna desde el servidor; no acepta un propietario indicado por el reloj.
 
 Despliega después de guardar las variables:
 
@@ -55,6 +59,11 @@ npx vercel --prod
 La API queda disponible en `https://<dominio-vercel>/api/samples`; la comprobación de salud es `https://<dominio-vercel>/api/health`. La función no necesita un servidor Node ejecutándose en tu computadora. El Side Service del teléfono realiza las solicitudes reenviadas por BLE desde el reloj.
 
 La API guarda `measured_at` y `received_at` como instantes UTC reales, sin aplicar desplazamientos fijos. El panel de Supabase suele mostrar `timestamptz` en UTC; para comparar con la hora local del reloj, convierte el valor a la zona horaria del dispositivo al consultarlo. Las filas guardadas por versiones anteriores tienen un desplazamiento fijo de 8 horas y no se corrigen automáticamente.
+
+Las nuevas muestras enviadas a esta API quedan asociadas al UUID configurado en
+`DASHBOARD_USER_ID`. Esto solo aplica a inserciones futuras; las muestras
+existentes conservan `user_id` nulo hasta asignarlas explícitamente después de
+verificar su propietario.
 
 ### 3. Conectar la miniaplicación
 

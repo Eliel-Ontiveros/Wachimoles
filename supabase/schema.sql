@@ -1,5 +1,6 @@
 create table if not exists public.samples (
   id bigint generated always as identity primary key,
+  user_id uuid references auth.users (id) on delete cascade,
   sample_id text not null unique
     check (char_length(sample_id) between 1 and 120),
   metric text not null
@@ -22,5 +23,8 @@ create index if not exists samples_measured_at_idx
 
 create index if not exists samples_metric_measured_at_idx
   on public.samples (metric, measured_at desc);
+
+create index if not exists samples_user_measured_at_idx
+  on public.samples (user_id, measured_at desc);
 
 alter table public.samples enable row level security;

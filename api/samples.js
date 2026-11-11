@@ -37,9 +37,30 @@ function createHandler({
       return;
     }
 
-    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = env;
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    const {
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+      DASHBOARD_USER_ID
+    } = env;
+    if (
+      !SUPABASE_URL ||
+      !SUPABASE_SERVICE_ROLE_KEY ||
+      !DASHBOARD_USER_ID
+    ) {
       console.error("Supabase server environment is not configured.");
+      sendJson(response, 500, {
+        ok: false,
+        error: "The sample database is not configured."
+      });
+      return;
+    }
+
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        DASHBOARD_USER_ID
+      )
+    ) {
+      console.error("DASHBOARD_USER_ID is invalid.");
       sendJson(response, 500, {
         ok: false,
         error: "The sample database is not configured."
@@ -69,6 +90,7 @@ function createHandler({
     }
 
     const databaseSample = {
+      user_id: DASHBOARD_USER_ID,
       sample_id: sample.sampleId,
       metric: sample.metric,
       value: sample.value,
