@@ -1,0 +1,60 @@
+{
+  "configVersion": "v3",
+  "app": {
+    "appId": 1135503,
+    "appName": "WachiMoles Background Test",
+    "appType": "app",
+    "version": {
+      "code": 2,
+      "name": "0.1.1"
+    },
+    "icon": "icon.png",
+    "vender": "WachiMoles",
+    "description": "Prueba aislada de App Service y sensores en segundo plano"
+  },
+  "runtime": {
+    "apiVersion": {
+      "compatible": "3.0",
+      "target": "3.0",
+      "minVersion": "3.0"
+    }
+  },
+  "permissions": [
+    "device:os.bg_service",
+    "data:os.device.info",
+    "data:user.hd.heart_rate",
+    "data:user.hd.stress"
+  ],
+  "targets": {
+    "default": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index"
+          ]
+        },
+        "app-service": {
+          "services": [
+            "app-service/health_monitor"
+          ]
+        }
+      },
+      "platforms": [
+        {
+          "st": "r",
+          "dw": 480
+        },
+        {
+          "st": "s",
+          "dw": 390
+        }
+      ]
+    }
+  },
+  "i18n": {
+    "es-ES": {
+      "appName": "WachiMoles Background Test"
+    }
+  },
+  "defaultLanguage": "es-ES"
+}

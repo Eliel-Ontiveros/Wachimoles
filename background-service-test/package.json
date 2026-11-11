@@ -1,0 +1,7 @@
+{
+  "name": "wachimoles-background-service-test",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prueba aislada de App Services de Zepp OS",
+  "main": "app.js"
+}

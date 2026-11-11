@@ -33,7 +33,7 @@ function createHandler({
     if (!isValidSample(sample)) {
       sendJson(response, 400, {
         ok: false,
-        error: "Expected a valid heart-rate, SpO2, or stress sample."
+        error: "Expected a valid heart-rate, SpO2, stress, or steps sample."
       });
       return;
     }
@@ -85,14 +85,19 @@ function createHandler({
     let databaseResponse;
     try {
       databaseResponse = await fetchImpl(
-        `${projectUrl.origin}/rest/v1/samples`,
+        `${projectUrl.origin}/rest/v1/samples${
+          sample.metric === "steps" ? "?on_conflict=sample_id" : ""
+        }`,
         {
           method: "POST",
           headers: {
             apikey: SUPABASE_SERVICE_ROLE_KEY,
             Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
             "Content-Type": "application/json",
-            Prefer: "return=representation"
+            Prefer:
+              sample.metric === "steps"
+                ? "resolution=merge-duplicates,return=representation"
+                : "return=representation"
           },
           body: JSON.stringify(databaseSample)
         }
@@ -149,9 +154,12 @@ function createHandler({
       return;
     }
 
-    sendJson(response, 201, {
+    const updatedSteps =
+      sample.metric === "steps" && databaseResponse.status === 200;
+    sendJson(response, updatedSteps ? 200 : 201, {
       ok: true,
       duplicate: false,
+      ...(sample.metric === "steps" ? { updated: updatedSteps } : {}),
       sampleId: record.sample_id,
       receivedAt: Date.parse(record.received_at)
     });

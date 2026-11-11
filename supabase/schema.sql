@@ -3,7 +3,7 @@ create table if not exists public.samples (
   sample_id text not null unique
     check (char_length(sample_id) between 1 and 120),
   metric text not null
-    check (metric in ('heart_rate', 'stress', 'spo2')),
+    check (metric in ('heart_rate', 'stress', 'spo2', 'steps')),
   value double precision not null,
   unit text not null,
   measured_at timestamptz not null,
@@ -13,6 +13,7 @@ create table if not exists public.samples (
     (metric = 'heart_rate' and value > 0 and value <= 250 and unit = 'bpm')
     or (metric = 'stress' and value >= 0 and unit = 'score')
     or (metric = 'spo2' and value > 0 and value <= 100 and unit = '%')
+    or (metric = 'steps' and value >= 0 and value = trunc(value) and unit = 'steps')
   )
 );
 

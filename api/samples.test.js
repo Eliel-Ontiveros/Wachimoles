@@ -87,6 +87,54 @@ test("inserts a validated sample into Supabase and confirms persistence", async 
   });
 });
 
+test("upserts daily step totals by sample ID", async () => {
+  const now = 1794190600000;
+  const sample = {
+    sampleId: "steps-2026-11-11",
+    metric: "steps",
+    value: 1850,
+    unit: "steps",
+    measuredAt: now
+  };
+  const requests = [];
+  const handler = createHandler({
+    env,
+    now: () => now,
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return {
+        ok: true,
+        status: requests.length === 1 ? 201 : 200,
+        json: async () => [
+          {
+            sample_id: sample.sampleId,
+            received_at: new Date(now - eightHours).toISOString()
+          }
+        ]
+      };
+    }
+  });
+
+  const inserted = createResponse();
+  await handler({ method: "POST", body: sample }, inserted);
+  assert.equal(inserted.statusCode, 201);
+  assert.equal(inserted.body.updated, false);
+
+  const updated = createResponse();
+  await handler({ method: "POST", body: sample }, updated);
+  assert.equal(updated.statusCode, 200);
+  assert.equal(updated.body.updated, true);
+  assert.equal(
+    requests[0].url,
+    "https://example.supabase.co/rest/v1/samples?on_conflict=sample_id"
+  );
+  assert.equal(
+    requests[0].options.headers.Prefer,
+    "resolution=merge-duplicates,return=representation"
+  );
+  assert.equal(requests.length, 2);
+});
+
 test("acknowledges duplicate sample IDs without adding another row", async () => {
   const handler = createHandler({
     env,

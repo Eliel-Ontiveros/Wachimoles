@@ -34,6 +34,15 @@ function isValidSample(sample) {
     return sample.value >= 0 && sample.unit === "score";
   }
 
+  if (sample.metric === "steps") {
+    return (
+      Number.isSafeInteger(sample.value) &&
+      sample.value >= 0 &&
+      sample.unit === "steps" &&
+      /^steps-\d{4}-\d{2}-\d{2}$/.test(sample.sampleId)
+    );
+  }
+
   return false;
 }
 

@@ -1,34 +1,36 @@
 # Prueba de lectura y envío de métricas fisiológicas
 
-Miniaplicación Zepp OS para obtener ritmo cardíaco y estrés en un Amazfit Active 2:
+Miniaplicación Zepp OS para registrar ritmo cardíaco, estrés, pasos y SpO₂ en un Amazfit Active 2:
 
-1. El reloj obtiene ritmo cardíaco en vivo con `HeartRate.onCurrentChange`.
-2. La app escucha actualizaciones de estrés con `Stress.onChange`; no solicita históricos.
-3. Cada minuto, la miniaplicación envía las últimas lecturas por BLE al Side Service de Zepp App.
+1. Un App Service consulta el historial de ritmo cardíaco del sistema con `HeartRate.getToday()` y escucha cambios de estrés con `Stress.onChange`.
+2. El sensor de hora (`Time.onPerMinute`) ejecuta un ciclo cada minuto, también desde el App Service.
+3. Las lecturas se envían por BLE al Side Service de Zepp App usando el proxy HTTP de ZML.
 4. El Side Service realiza un `POST` a la API de Vercel.
-5. La API valida y guarda las muestras en una tabla de Supabase para análisis histórico.
+5. La API valida y guarda las muestras en Supabase para análisis histórico. Los pasos se actualizan en una sola fila por día.
 
-La pantalla presenta los valores en paneles diferenciados y solo ofrece **Iniciar monitoreo** y **Detener monitoreo**. Al iniciar, se activan los listeners de ritmo cardíaco y estrés y cada minuto se envían las últimas lecturas disponibles por BLE al Side Service de Zepp App, que las reenvía por HTTP al backend. Durante la sesión se prolonga el tiempo de pantalla encendida; al detenerla se restaura el ajuste normal y se apagan ambos sensores. Los iconos de las variantes redonda y cuadrada usan un motivo de pulso y exploración espacial.
+La pantalla permite iniciar y detener el servicio; al iniciarlo se puede salir de la miniaplicación y apagar la pantalla. El servicio mantiene los sensores y el temporizador activos, y al detenerlo cancela el temporizador y ambos listeners.
 
 ## Alcance actual
 
 - **Ritmo cardíaco en vivo:** incluido.
-- **Medición continua de prueba:** el modo reutiliza el mismo ciclo de vida de sensores que el modo manual (`onCurrentChange` para ritmo cardíaco y `onChange` para estrés). Los sensores permanecen activos durante la prueba y se detienen al pulsar **Detener monitoreo**. Esto evita reiniciar el sensor cardíaco cada minuto, pero consume más batería que una medición puntual.
-- **Pantalla durante la prueba:** `setPageBrightTime` mantiene la pantalla encendida mientras la medición continua está activa. El valor se renueva en cada ciclo; al detener la medición se restaura el tiempo predeterminado. Pantalla encendida y sensores activos aceleran el consumo de batería.
-- **Estrés actual:** al iniciar la escucha, la app lee inmediatamente `Stress.getCurrent()` y registra el listener `Stress.onChange` para cambios posteriores. La API no inicia una medición manual; si no hay valor actual, la pantalla informa que espera una actualización.
-- **Estrés en el modo continuo:** se conserva el listener `Stress.onChange`, y además se consulta `Stress.getCurrent()` al enviar cada ciclo. La API no ofrece una operación para iniciar una medición de estrés, por lo que un valor disponible podría no ser una medición nueva de ese minuto.
+- **Medición en segundo plano:** `app-service/health_monitor` mantiene los listeners de sensores; `Time.onPerMinute` activa un ciclo de envío cada minuto desde el App Service. El servicio se inicia explícitamente desde la pantalla y se detiene con **Detener monitoreo**.
+- **Ritmo cardíaco:** para reducir el consumo y evitar mantener una medición continua activa, se consulta `HeartRate.getToday()` en cada ciclo. Solo se envían lecturas del sistema de los últimos cinco minutos; si no hay una reciente, se omite el envío de ritmo cardíaco y el estrés continúa de forma independiente. La disponibilidad depende de la medición automática configurada en el reloj.
+- **Estrés actual:** el servicio lee `Stress.getCurrent()` al comenzar, en cada cambio y en cada ciclo de envío. La API no inicia una medición manual, por lo que un valor disponible puede no ser una medición nueva de ese minuto.
+- **Pasos diarios:** el servicio consulta el total acumulado con `Step.getCurrent()` al iniciar y cada minuto. Cada día usa un `sample_id` local de formato `steps-YYYY-MM-DD`; las nuevas lecturas actualizan esa misma fila en vez de insertar otra.
+- **SpO₂ histórico:** cada minuto consulta `BloodOxygen.getLastFewHour(24)` y envía las mediciones nuevas que ya registró el reloj. No llama `BloodOxygen.start()` ni inicia un análisis; al iniciar el servicio solo considera lecturas de los últimos 10 minutos y luego procesa las nuevas en orden.
+- **Red:** el servicio hace las solicitudes mediante `httpRequest` de ZML; el Side Service de Zepp App actúa como proxy de red y reenvía la petición a la URL configurada en `app-side/config.js`.
 - **Unidad del estrés:** la documentación describe un valor numérico, pero no especifica unidad o rango para `getCurrent()`. El backend lo guarda como `score` sin imponer un máximo.
-- **SpO₂:** desactivado temporalmente. Al probar esa medición, el Amazfit Active 2 se reinició, incluso sin iniciar primero ritmo cardíaco. La miniapp ya no llama a la API de SpO₂ ni solicita su permiso.
 - **Ritmo cardíaco durante el sueño, duración del sueño, fases y otras métricas del sueño:** omitidos por ahora. Las APIs Zepp `HeartRate.getToday()` y `Sleep.getInfo()`/`getStage()` consultan datos registrados por el sistema; esta versión no los lee.
 
 ## Base de datos Supabase y API en Vercel
 
-La API serverless vive en `api/` y Supabase conserva una fila por muestra. El identificador `sample_id` es único para que los reintentos de Zepp no creen duplicados. `measured_at` registra cuándo midió el reloj y `received_at` cuándo se guardó en la base.
+La API serverless vive en `api/` y Supabase conserva una fila por muestra, excepto pasos, que mantienen una fila por día. El identificador `sample_id` es único para que los reintentos de Zepp no creen duplicados y las actualizaciones diarias de pasos hagan upsert. `measured_at` registra cuándo midió el reloj y `received_at` cuándo se guardó en la base.
 
 ### 1. Crear la tabla
 
 1. Crea un proyecto en Supabase.
 2. En **SQL Editor**, ejecuta el contenido de [`supabase/schema.sql`](./supabase/schema.sql).
+   Si ya existe la tabla, ejecuta una vez [`supabase/migrations/20261111_add_daily_steps.sql`](./supabase/migrations/20261111_add_daily_steps.sql) para permitir los totales diarios de pasos.
 3. La tabla activa Row Level Security sin políticas públicas. La API accede desde el servidor con `SUPABASE_SERVICE_ROLE_KEY`; no copies esa clave a la miniaplicación ni a `app-side/config.js`.
 
 ### 2. Desplegar la API en Vercel
@@ -50,7 +52,7 @@ Despliega después de guardar las variables:
 npx vercel --prod
 ```
 
-La API queda disponible en `https://<dominio-vercel>/api/samples`; la comprobación de salud es `https://<dominio-vercel>/api/health`. La función no necesita un servidor Node ejecutándose en tu computadora. No se debe configurar CORS para que el Side Service realice su petición servidor-a-servidor.
+La API queda disponible en `https://<dominio-vercel>/api/samples`; la comprobación de salud es `https://<dominio-vercel>/api/health`. La función no necesita un servidor Node ejecutándose en tu computadora. El Side Service del teléfono realiza las solicitudes reenviadas por BLE desde el reloj.
 
 La API resta 8 horas a `measured_at` y `received_at` antes de guardar cada muestra. Esto es un ajuste fijo y altera el instante real registrado; no se adapta al horario de verano.
 
@@ -63,7 +65,7 @@ export const SAMPLE_API_URL =
   "https://<dominio-vercel>/api/samples";
 ```
 
-Luego recompila e instala la miniaplicación: el Side Service va incluido en el paquete del reloj y la URL queda incorporada durante la compilación. No cambies la URL a una IP local para el despliegue en la nube.
+Luego recompila e instala la miniaplicación: la URL se incorpora durante la compilación y el Side Service reenvía las peticiones del App Service. No cambies la URL a una IP local para el despliegue en la nube.
 
 ### 4. Consultas analíticas iniciales
 
@@ -141,18 +143,16 @@ Verifica primero en la computadora que `http://10.221.170.109:3000/health` respo
    ```
 
    Cambia el target por `Amazfit Active 2 (Square)` si corresponde.
-4. Abre **WachiMoles Health Test** y concede los permisos de frecuencia cardíaca y estrés.
-5. Pulsa **Iniciar monitoreo**. La app mantiene la pantalla encendida y el primer envío ocurre al minuto; los siguientes se programan cada 60 segundos.
-6. Confirma los envíos en el reloj y revisa la tabla `public.samples` en Supabase (o `server/data/samples.jsonl` cuando uses el backend local).
-7. Pulsa **Detener monitoreo** para cancelar los envíos, detener ambos sensores y restaurar el tiempo de pantalla predeterminado.
+4. Abre **WachiMoles Health Test** y concede los permisos de información del dispositivo, servicio en segundo plano, frecuencia cardíaca, estrés, pasos y SpO₂.
+5. Pulsa **Iniciar en segundo plano**. El servicio procesa ritmo cardíaco, estrés, el historial de SpO₂ y el total de pasos cada minuto. Puedes salir de la miniaplicación y apagar la pantalla.
+6. Revisa los registros JS de Zepp y la tabla `public.samples` en Supabase (o `server/data/samples.jsonl` si configuraste el backend local).
+7. Vuelve a abrir la miniaplicación y pulsa **Detener monitoreo** para cancelar el temporizador y apagar ambos listeners de sensores.
 
-La miniaplicación no ofrece ejecución persistente en segundo plano. La API de pantalla documenta que el sistema termina la miniaplicación después de apagar la pantalla y solo permite relanzarla al volver a encender el reloj; por eso esta prueba mantiene la pantalla encendida. No cierres la miniaplicación durante la medición: salir puede destruir la página y detener los sensores.
+El App Service se probó en un Amazfit Active 2. La integración principal usa el mismo mecanismo; verifica los registros y las muestras en Supabase después de probarla en tu reloj.
 
 El modo puntual que inicia y detiene el sensor cardíaco automáticamente se descartó después de que el reloj se reiniciara en una prueba. La causa no está identificada; esta versión evita esos arranques y paradas repetidos y usa el mismo listener estable del modo manual.
 
-La app requiere los permisos `data:os.device.info`, `data:user.hd.heart_rate` y `data:user.hd.stress`. `HeartRate.onCurrentChange` requiere API_LEVEL 2.1 o superior; la API `Stress` está disponible desde API_LEVEL 2.0. Después de compilar e instalar la nueva versión, concede los permisos solicitados en Zepp App.
-
-No vuelvas a probar SpO₂ con este dispositivo por ahora. El reinicio sucedió incluso sin medir ritmo cardíaco; la causa no está identificada y podría requerir diagnóstico de Zepp o una actualización de firmware.
+La app está configurada con API_LEVEL mínimo 4.0 y requiere `device:os.bg_service`, `data:os.device.info`, `data:user.hd.heart_rate`, `data:user.hd.stress`, `data:user.hd.step` y `data:user.hd.spo2`. Después de compilar e instalar la nueva versión, concede los permisos solicitados en Zepp App. La lectura de pasos y SpO₂ debe probarse en el reloj real; los builds no comprueban disponibilidad de datos ni estabilidad del firmware.
 
 ## Configuración Zepp
 
@@ -162,5 +162,5 @@ No vuelvas a probar SpO₂ con este dispositivo por ahora. El reinicio sucedió 
 
 - El backend local JSON Lines solo es adecuado para pruebas; el historial productivo se guarda en Supabase.
 - Las lecturas de un wearable de consumo no son mediciones médicas ni están validadas para decisiones de seguridad.
-- El modo continuo requiere que la miniaplicación permanezca abierta y la pantalla encendida; no se ejecuta en segundo plano ni continúa después de que Zepp OS cierre la página.
+- El sistema operativo o la conectividad del teléfono pueden interrumpir sensores o envíos; los errores aparecen en los registros JS. No hay una cola persistente sin conexión, así que las muestras durante una interrupción podrían perderse.
 - Esta prueba no valida continuidad prolongada, precisión clínica ni uso en una misión espacial.

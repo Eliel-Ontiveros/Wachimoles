@@ -1,6 +1,6 @@
 const http = require("node:http");
 const path = require("node:path");
-const { appendFile, mkdir } = require("node:fs/promises");
+const { appendFile, mkdir, readFile, writeFile } = require("node:fs/promises");
 const { isValidSample, MAX_BODY_BYTES } = require("./sample-validation");
 
 function sendJson(response, statusCode, body) {
@@ -45,7 +45,31 @@ function readJsonBody(request) {
 function createServer(options = {}) {
   const dataFile =
     options.dataFile || path.join(__dirname, "data", "samples.jsonl");
-  const knownSampleIds = new Set();
+  let records = null;
+  let persistenceQueue = Promise.resolve();
+
+  function withRecords(action) {
+    const operation = persistenceQueue.then(async () => {
+      if (records === null) {
+        try {
+          const contents = await readFile(dataFile, "utf8");
+          records = contents
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .map((line) => JSON.parse(line));
+        } catch (error) {
+          if (error.code !== "ENOENT") {
+            throw error;
+          }
+          records = [];
+        }
+      }
+
+      return action(records);
+    });
+    persistenceQueue = operation.catch(() => {});
+    return operation;
+  }
 
   return http.createServer(async (request, response) => {
     const requestUrl = new URL(request.url, "http://localhost");
@@ -87,26 +111,58 @@ function createServer(options = {}) {
       return;
     }
 
-    if (knownSampleIds.has(sample.sampleId)) {
-      sendJson(response, 200, {
-        ok: true,
-        duplicate: true,
-        sampleId: sample.sampleId
-      });
-      return;
-    }
-
     const record = {
       ...sample,
       receivedAt: Date.now()
     };
-    knownSampleIds.add(sample.sampleId);
 
     try {
-      await mkdir(path.dirname(dataFile), { recursive: true });
-      await appendFile(dataFile, `${JSON.stringify(record)}\n`, "utf8");
+      const result = await withRecords(async (storedRecords) => {
+        const existingIndex = storedRecords.findIndex(
+          (storedRecord) => storedRecord.sampleId === sample.sampleId
+        );
+        if (existingIndex !== -1) {
+          if (sample.metric !== "steps") {
+            return { duplicate: true };
+          }
+
+          const updatedRecords = [...storedRecords];
+          updatedRecords[existingIndex] = record;
+          await writeFile(
+            dataFile,
+            `${updatedRecords.map((item) => JSON.stringify(item)).join("\n")}\n`,
+            "utf8"
+          );
+          records = updatedRecords;
+          return { updated: true };
+        }
+
+        await mkdir(path.dirname(dataFile), { recursive: true });
+        await appendFile(dataFile, `${JSON.stringify(record)}\n`, "utf8");
+        storedRecords.push(record);
+        return { inserted: true };
+      });
+
+      if (result.duplicate) {
+        sendJson(response, 200, {
+          ok: true,
+          duplicate: true,
+          sampleId: sample.sampleId
+        });
+        return;
+      }
+
+      if (result.updated) {
+        sendJson(response, 200, {
+          ok: true,
+          duplicate: false,
+          updated: true,
+          sampleId: record.sampleId,
+          receivedAt: record.receivedAt
+        });
+        return;
+      }
     } catch (error) {
-      knownSampleIds.delete(sample.sampleId);
       console.error("Could not persist sample:", error);
       sendJson(response, 500, {
         ok: false,

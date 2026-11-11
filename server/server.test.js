@@ -168,3 +168,42 @@ test("SpO2 values above 100 are rejected", async () => {
   assert.equal(response.status, 400);
   assert.equal((await response.json()).ok, false);
 });
+
+test("daily step samples update the existing record", async () => {
+  const sampleId = "steps-2026-11-11";
+  const firstResponse = await fetch(`${baseUrl}/samples`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sampleId,
+      metric: "steps",
+      value: 1200,
+      unit: "steps",
+      measuredAt: 1794190000003
+    })
+  });
+  assert.equal(firstResponse.status, 201);
+
+  const updateResponse = await fetch(`${baseUrl}/samples`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sampleId,
+      metric: "steps",
+      value: 1850,
+      unit: "steps",
+      measuredAt: 1794190600003
+    })
+  });
+  assert.equal(updateResponse.status, 200);
+  assert.equal((await updateResponse.json()).updated, true);
+
+  const records = (await readFile(dataFile, "utf8"))
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const stepRecords = records.filter((record) => record.metric === "steps");
+  assert.equal(stepRecords.length, 1);
+  assert.equal(stepRecords[0].value, 1850);
+  assert.equal(stepRecords[0].measuredAt, 1794190600003);
+});
