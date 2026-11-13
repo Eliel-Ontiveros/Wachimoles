@@ -10,6 +10,103 @@ import {
 
 // Servicio preparado para conectar misiones, entorno y fotos de lesiones con el backend
 
+export interface BodyConditionSyncInput {
+  muscleId: string;
+  bodyRegion: string;
+  muscleName: string;
+  observation: {
+    painIntensity: number;
+    swelling: boolean;
+    functionalLimitation: boolean;
+    notes: string;
+  } | null;
+}
+
+export interface BodyConditionRecord {
+  id: string;
+  muscleId: string;
+  bodyRegion: string;
+  muscleName: string;
+  conditionName: string;
+  description: string | null;
+  painIntensity: number;
+  swelling: boolean;
+  functionalLimitation: boolean;
+  status: 'active' | 'resolved';
+  recordedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+}
+
+type DailyHealthCheckRecord = Omit<DailyHealthCheck, 'notes'> & {
+  notes: string | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isBodyConditionRecord(value: unknown): value is BodyConditionRecord {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    typeof value.muscleId === 'string' &&
+    typeof value.bodyRegion === 'string' &&
+    typeof value.muscleName === 'string' &&
+    typeof value.conditionName === 'string' &&
+    (typeof value.description === 'string' || value.description === null) &&
+    typeof value.painIntensity === 'number' &&
+    Number.isInteger(value.painIntensity) &&
+    value.painIntensity >= 1 &&
+    value.painIntensity <= 10 &&
+    typeof value.swelling === 'boolean' &&
+    typeof value.functionalLimitation === 'boolean' &&
+    (value.status === 'active' || value.status === 'resolved') &&
+    typeof value.recordedAt === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string' &&
+    (typeof value.resolvedAt === 'string' || value.resolvedAt === null)
+  );
+}
+
+function isNullableFiniteNumber(value: unknown): value is number | null {
+  return (
+    value === null ||
+    (typeof value === 'number' && Number.isFinite(value))
+  );
+}
+
+function isDailyHealthCheckRecord(
+  value: unknown
+): value is DailyHealthCheckRecord {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    typeof value.dateIso === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value.dateIso) &&
+    isNullableFiniteNumber(value.bloodSugarMgDl) &&
+    isNullableFiniteNumber(value.systolicBp) &&
+    isNullableFiniteNumber(value.diastolicBp) &&
+    isNullableFiniteNumber(value.temperatureC) &&
+    isNullableFiniteNumber(value.sleepHours) &&
+    typeof value.mood === 'number' &&
+    Number.isInteger(value.mood) &&
+    value.mood >= 1 &&
+    value.mood <= 5 &&
+    Array.isArray(value.symptoms) &&
+    value.symptoms.every((symptom) => typeof symptom === 'string') &&
+    (typeof value.notes === 'string' || value.notes === null) &&
+    (value.overallStatus === 'normal' ||
+      value.overallStatus === 'warning' ||
+      value.overallStatus === 'critical') &&
+    typeof value.recommendation === 'string' &&
+    typeof value.recordedAt === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string'
+  );
+}
+
 export const SPACE_LOCATIONS: Record<
   SpaceLocation,
   { id: SpaceLocation; label: string; shortLabel: string }
@@ -407,19 +504,166 @@ export async function uploadInjuryPhotoToBackend(
 
 // Endpoint listo para guardar observación anatómica en el backend
 export async function syncObservationToBackend(
-  muscleId: string,
-  payload: unknown
+  input: BodyConditionSyncInput
 ): Promise<{ synced: boolean }> {
-  const baseUrl = API_CONFIG.localUrls[0];
-  try {
-    const res = await fetch(`${baseUrl}/observations/${muscleId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: API_CONFIG.userId, payload }),
-    });
-    return { synced: res.ok };
-  } catch {
+  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+    console.warn(
+      'No se pudo sincronizar el padecimiento: falta configurar el backend.'
+    );
     return { synced: false };
+  }
+
+  const observation = input.observation;
+  const shouldResolve = !observation || observation.painIntensity === 0;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
+
+  try {
+    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
+    if (
+      baseUrl.protocol !== 'https:' &&
+      !(__DEV__ && baseUrl.protocol === 'http:')
+    ) {
+      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
+    }
+
+    const url = new URL(
+      `/dashboard/body-conditions/${encodeURIComponent(input.muscleId)}`,
+      baseUrl
+    );
+    const response = await fetch(url.toString(), {
+      method: shouldResolve ? 'DELETE' : 'PUT',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
+        ...(shouldResolve ? {} : { 'Content-Type': 'application/json' }),
+      },
+      ...(shouldResolve
+        ? {}
+        : {
+            body: JSON.stringify({
+              bodyRegion: input.bodyRegion,
+              muscleName: input.muscleName,
+              conditionName: 'Dolor muscular',
+              description: observation.notes,
+              painIntensity: observation.painIntensity,
+              swelling: observation.swelling,
+              functionalLimitation: observation.functionalLimitation,
+            }),
+          }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      console.warn(
+        `No se pudo sincronizar el padecimiento (${response.status}).`
+      );
+      return { synced: false };
+    }
+    return { synced: true };
+  } catch (error) {
+    console.warn('No se pudo sincronizar el padecimiento con el backend.', error);
+    return { synced: false };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecord[]> {
+  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+    throw new Error(
+      'Configura EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN para cargar los padecimientos.'
+    );
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
+  try {
+    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
+    if (
+      baseUrl.protocol !== 'https:' &&
+      !(__DEV__ && baseUrl.protocol === 'http:')
+    ) {
+      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
+    }
+
+    const url = new URL('/dashboard/body-conditions', baseUrl);
+    url.searchParams.set('limit', '500');
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        response.status === 401
+          ? 'El backend rechazó el token al cargar los padecimientos (401).'
+          : `No se pudieron cargar los padecimientos (${response.status}).`
+      );
+    }
+
+    const body: unknown = await response.json();
+    if (!Array.isArray(body) || !body.every(isBodyConditionRecord)) {
+      throw new Error('El backend devolvió registros anatómicos con formato inválido.');
+    }
+    return body;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function getDailyHealthChecksFromBackend(): Promise<DailyHealthCheck[]> {
+  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+    throw new Error(
+      'Configura EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN para cargar los cuestionarios.'
+    );
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
+  try {
+    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
+    if (
+      baseUrl.protocol !== 'https:' &&
+      !(__DEV__ && baseUrl.protocol === 'http:')
+    ) {
+      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
+    }
+
+    const url = new URL('/dashboard/health-checks', baseUrl);
+    url.searchParams.set('limit', '500');
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        response.status === 401
+          ? 'El backend rechazó el token al cargar los cuestionarios (401).'
+          : `No se pudieron cargar los cuestionarios (${response.status}).`
+      );
+    }
+
+    const body: unknown = await response.json();
+    if (!Array.isArray(body) || !body.every(isDailyHealthCheckRecord)) {
+      throw new Error('El backend devolvió cuestionarios con formato inválido.');
+    }
+
+    return body.map((record) => ({
+      ...record,
+      notes: record.notes ?? '',
+    }));
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -427,16 +671,66 @@ export async function syncObservationToBackend(
 export async function syncHealthCheckToBackend(
   check: DailyHealthCheck
 ): Promise<{ synced: boolean }> {
-  const baseUrl = API_CONFIG.localUrls[0];
-  try {
-    const res = await fetch(`${baseUrl}/observations/health-check`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: API_CONFIG.userId, ...check }),
-    });
-    return { synced: res.ok };
-  } catch {
+  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+    console.warn(
+      'No se pudo sincronizar el cuestionario: falta configurar el backend.'
+    );
     return { synced: false };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
+
+  try {
+    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
+    if (
+      baseUrl.protocol !== 'https:' &&
+      !(__DEV__ && baseUrl.protocol === 'http:')
+    ) {
+      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
+    }
+
+    const url = new URL(
+      `/dashboard/health-checks/${check.dateIso}`,
+      baseUrl
+    );
+    const response = await fetch(url.toString(), {
+      method: 'PUT',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        bloodSugarMgDl: check.bloodSugarMgDl,
+        systolicBp: check.systolicBp,
+        diastolicBp: check.diastolicBp,
+        temperatureC: check.temperatureC,
+        sleepHours: check.sleepHours,
+        mood: check.mood,
+        symptoms: check.symptoms,
+        notes: check.notes,
+        overallStatus: check.overallStatus,
+        recommendation: check.recommendation,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      console.warn(
+        `No se pudo sincronizar el cuestionario diario (${response.status}).`
+      );
+      return { synced: false };
+    }
+    return { synced: true };
+  } catch (error) {
+    console.warn(
+      'No se pudo sincronizar el cuestionario diario con el backend.',
+      error
+    );
+    return { synced: false };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -1,191 +1,126 @@
 import { DashboardSample, SampleMetric, VitalSignsData } from '../types/vital-signs';
 
-// Conexión y procesamiento de signos vitales desde NestJS y Supabase
+// Conexión y procesamiento de signos vitales desde el backend NestJS
 export const API_CONFIG = {
+  apiBaseUrl:
+    process.env.EXPO_PUBLIC_API_BASE_URL ||
+    process.env.EXPO_PUBLIC_LOCAL_API_URL ||
+    '',
+  dashboardApiToken: process.env.EXPO_PUBLIC_DASHBOARD_API_TOKEN || '',
+
+  // Conservados para los servicios de misiones que aún usan esta configuración.
   localUrls: process.env.EXPO_PUBLIC_LOCAL_API_URL
     ? [process.env.EXPO_PUBLIC_LOCAL_API_URL]
     : ([] as string[]),
-
-  webUser: process.env.EXPO_PUBLIC_WEB_USER || 'dashboard',
-  webPassword: process.env.EXPO_PUBLIC_WEB_PASSWORD || '',
-
-  supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
-  supabaseKey: process.env.EXPO_PUBLIC_SUPABASE_KEY || '',
   userId: process.env.EXPO_PUBLIC_USER_ID || '',
 
   timeoutMs: 5000,
 };
 
-function encodeBasicAuth(user: string, pass: string): string {
-  const str = `${user}:${pass}`;
-  if (typeof btoa === 'function') {
-    return btoa(str);
+const SAMPLE_METRICS: readonly SampleMetric[] = [
+  'heart_rate',
+  'stress',
+  'spo2',
+  'steps',
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isDashboardSample(value: unknown): value is DashboardSample {
+  return (
+    isRecord(value) &&
+    Number.isSafeInteger(value.id) &&
+    typeof value.sampleId === 'string' &&
+    SAMPLE_METRICS.some((metric) => metric === value.metric) &&
+    typeof value.value === 'number' &&
+    Number.isFinite(value.value) &&
+    typeof value.unit === 'string' &&
+    typeof value.measuredAt === 'string' &&
+    typeof value.receivedAt === 'string'
+  );
+}
+
+function parseSamples(value: unknown): DashboardSample[] {
+  if (!Array.isArray(value)) {
+    throw new Error('El backend devolvió una respuesta de muestras inválida.');
   }
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  let output = '';
-  for (let block = 0, charCode, i = 0, map = chars;
-    str.charAt(i | 0) || (map = '=', i % 1);
-    output += map.charAt(63 & block >> 8 - i % 1 * 8)) {
-    charCode = str.charCodeAt(i += 3 / 4);
-    if (charCode > 0xFF) {
-      throw new Error("Invalid Latin1 character in credentials");
+
+  return value.map((sample: unknown) => {
+    if (!isDashboardSample(sample)) {
+      throw new Error('El backend devolvió una muestra con formato inválido.');
     }
-    block = block << 8 | charCode;
-  }
-  return output;
+    return sample;
+  });
 }
 
-interface RawSample {
-  id: number;
-  sampleId?: string;
-  sample_id?: string;
-  metric: SampleMetric;
-  value: number;
-  unit: string;
-  measuredAt?: string;
-  measured_at?: string;
-  receivedAt?: string;
-  received_at?: string;
-}
-
-function normalizeSamples(raw: RawSample[]): DashboardSample[] {
-  return raw.map((r) => ({
-    id: r.id,
-    sampleId: r.sampleId || r.sample_id || `sample-${r.id}`,
-    metric: r.metric,
-    value: Number(r.value),
-    unit: r.unit,
-    measuredAt: r.measuredAt || r.measured_at || new Date().toISOString(),
-    receivedAt: r.receivedAt || r.received_at || new Date().toISOString(),
-  }));
-}
-
-let activeLocalUrl: string | null = null;
-let localProbeCooldownUntil = 0;
-const LOCAL_COOLDOWN_MS = 30000;
-
-async function fetchLocalSamples(path: string, authHeader: string): Promise<RawSample[] | null> {
-  const now = Date.now();
-  if (!activeLocalUrl && now < localProbeCooldownUntil) {
-    return null;
+async function requestSamples(
+  limit: number,
+  metric?: SampleMetric
+): Promise<DashboardSample[]> {
+  if (!API_CONFIG.apiBaseUrl) {
+    throw new Error('Configura EXPO_PUBLIC_API_BASE_URL para conectar con el backend.');
+  }
+  if (!API_CONFIG.dashboardApiToken) {
+    throw new Error('Configura EXPO_PUBLIC_DASHBOARD_API_TOKEN para autorizar el backend.');
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+    throw new Error('El límite de muestras debe estar entre 1 y 500.');
   }
 
-  const urls = activeLocalUrl ? [activeLocalUrl] : API_CONFIG.localUrls;
-  for (const baseUrl of urls) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 1500);
-
-      const res = await fetch(`${baseUrl}${path}`, {
-        method: 'GET',
-        headers: {
-          Authorization: authHeader,
-          Accept: 'application/json',
-        },
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          activeLocalUrl = baseUrl;
-          return data;
-        }
-      }
-    } catch {
-      if (activeLocalUrl === baseUrl) {
-        activeLocalUrl = null;
-      }
-    }
+  const baseUrl = new URL(API_CONFIG.apiBaseUrl);
+  if (baseUrl.protocol !== 'https:' && !(__DEV__ && baseUrl.protocol === 'http:')) {
+    throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
   }
 
-  if (!activeLocalUrl) {
-    localProbeCooldownUntil = Date.now() + LOCAL_COOLDOWN_MS;
-  }
-  return null;
-}
-
-/**
- * Consulta las muestras reales del usuario desde el backend NestJS o Supabase Cloud.
- */
-export async function fetchDashboardSamples(limit = 100): Promise<DashboardSample[]> {
-  const authHeader = `Basic ${encodeBasicAuth(API_CONFIG.webUser, API_CONFIG.webPassword)}`;
-
-  const localData = await fetchLocalSamples(`/dashboard/data?limit=${limit}`, authHeader);
-  if (localData) {
-    return normalizeSamples(localData);
+  const url = new URL('/dashboard/samples', baseUrl);
+  url.searchParams.set('limit', String(limit));
+  if (metric) {
+    url.searchParams.set('metric', metric);
   }
 
-  // 2. Conexión directa a Supabase Cloud con datos reales
-  const supabaseEndpoint = `${API_CONFIG.supabaseUrl}/rest/v1/samples?select=*&user_id=eq.${API_CONFIG.userId}&order=measured_at.desc&limit=${limit}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
-
   try {
-    const res = await fetch(supabaseEndpoint, {
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        apikey: API_CONFIG.supabaseKey,
-        Authorization: `Bearer ${API_CONFIG.supabaseKey}`,
+        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
         Accept: 'application/json',
       },
       signal: controller.signal,
     });
-    clearTimeout(timer);
 
-    if (!res.ok) {
-      throw new Error(`Supabase Error: ${res.status}`);
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('El backend rechazó el token de acceso (401).');
+      }
+      throw new Error(`No se pudieron cargar las muestras (${response.status}).`);
     }
 
-    const data = await res.json();
-    return normalizeSamples(data);
-  } catch (error) {
-    clearTimeout(timer);
+    return parseSamples(await response.json());
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('La solicitud al backend agotó el tiempo de espera.');
+    }
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-/**
- * Consulta el historial de una métrica específica (heart_rate, spo2, stress, steps)
- * desde el backend NestJS o directamente desde Supabase Cloud.
- */
+/** Consulta las muestras del usuario fijo configurado y autorizado por el backend. */
+export async function fetchDashboardSamples(limit = 100): Promise<DashboardSample[]> {
+  return requestSamples(limit);
+}
+
+/** Consulta el historial de una métrica específica desde el backend NestJS. */
 export async function fetchMetricHistory(
   metric: SampleMetric,
   limit = 300
 ): Promise<DashboardSample[]> {
-  const authHeader = `Basic ${encodeBasicAuth(API_CONFIG.webUser, API_CONFIG.webPassword)}`;
-
-  const localData = await fetchLocalSamples(
-    `/dashboard/data?limit=${limit}&metric=${metric}`,
-    authHeader
-  );
-  if (localData) {
-    return normalizeSamples(localData);
-  }
-
-  const supabaseEndpoint = `${API_CONFIG.supabaseUrl}/rest/v1/samples?select=*&user_id=eq.${API_CONFIG.userId}&metric=eq.${metric}&order=measured_at.desc&limit=${limit}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
-
-  try {
-    const res = await fetch(supabaseEndpoint, {
-      method: 'GET',
-      headers: {
-        apikey: API_CONFIG.supabaseKey,
-        Authorization: `Bearer ${API_CONFIG.supabaseKey}`,
-        Accept: 'application/json',
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) return [];
-    const data = await res.json();
-    return normalizeSamples(data);
-  } catch {
-    return [];
-  }
+  return requestSamples(limit, metric);
 }
 
 export async function fetchHeartRateHistory(limit = 300): Promise<DashboardSample[]> {

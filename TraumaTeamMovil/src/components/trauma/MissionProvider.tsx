@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Alert } from 'react-native';
 import { useVitalSigns } from '../../hooks/use-vital-signs';
 import {
   calculateMissionStateFromDeparture,
@@ -7,6 +8,7 @@ import {
   getMissionsForEnvironment,
   getRouteTotalDays,
   getTodayIsoDate,
+  getDailyHealthChecksFromBackend,
   syncEnvironmentToBackend,
   syncHealthCheckToBackend,
   uploadInjuryPhotoToBackend,
@@ -26,6 +28,18 @@ function formatNowLabel() {
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
   return `Hoy · ${hh}:${mm}`;
+}
+
+function formatHealthCheckRecordedAt(recordedAt: string, dateIso: string) {
+  const date = new Date(recordedAt);
+  if (Number.isNaN(date.getTime())) return recordedAt;
+
+  const time = date.toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  if (dateIso === getTodayIsoDate()) return time;
+  return `${date.toLocaleDateString('es-MX')} · ${time}`;
 }
 
 export function MissionProvider({ children }: { children: ReactNode }) {
@@ -51,6 +65,47 @@ export function MissionProvider({ children }: { children: ReactNode }) {
 
   const highStressCountRef = useRef(0);
   const lastAlertTimeRef = useRef<Record<string, number>>({});
+  const locallyEditedHealthCheckDates = useRef(new Set<string>());
+
+  useEffect(() => {
+    let isMounted = true;
+    void getDailyHealthChecksFromBackend()
+      .then((checks) => {
+        if (!isMounted) return;
+        const formattedChecks = checks.map((check) => ({
+          ...check,
+          recordedAt: formatHealthCheckRecordedAt(
+            check.recordedAt,
+            check.dateIso
+          ),
+        }));
+        setHealthChecks((currentChecks) => {
+          const checksByDate = new Map(
+            formattedChecks.map((check) => [check.dateIso, check])
+          );
+          for (const localCheck of currentChecks) {
+            if (locallyEditedHealthCheckDates.current.has(localCheck.dateIso)) {
+              checksByDate.set(localCheck.dateIso, localCheck);
+            }
+          }
+          return [...checksByDate.values()].sort((a, b) =>
+            b.dateIso.localeCompare(a.dateIso)
+          );
+        });
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) return;
+        console.error('No se pudieron cargar los cuestionarios diarios.', error);
+        Alert.alert(
+          'No se pudo cargar el cuestionario',
+          'Revisa la conexión con el backend e inténtalo de nuevo.'
+        );
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const pushCriticalAlert = useCallback(
     (alertData: Omit<CriticalAlert, 'id' | 'timestamp' | 'acknowledged'>) => {
@@ -257,11 +312,15 @@ export function MissionProvider({ children }: { children: ReactNode }) {
   const submitHealthCheck = useCallback(
     (checkData: Omit<DailyHealthCheck, 'id' | 'dateIso' | 'recordedAt'>): DailyHealthCheck => {
       const todayIso = getTodayIsoDate();
+      locallyEditedHealthCheckDates.current.add(todayIso);
       const entry: DailyHealthCheck = {
         ...checkData,
         id: `hc-${todayIso}`,
         dateIso: todayIso,
-        recordedAt: formatNowLabel(),
+        recordedAt: formatHealthCheckRecordedAt(
+          new Date().toISOString(),
+          todayIso
+        ),
       };
       setHealthChecks((prev) => {
         const existsIdx = prev.findIndex((c) => c.dateIso === todayIso);
@@ -273,7 +332,14 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       if (!checkedInToday) {
         doDailyCheckIn();
       }
-      void syncHealthCheckToBackend(entry);
+      void syncHealthCheckToBackend(entry).then(({ synced }) => {
+        if (!synced) {
+          Alert.alert(
+            'No se guardó el cuestionario',
+            'El cuestionario se actualizó en pantalla, pero no pudo guardarse en el servidor. Revisa la conexión antes de cerrar la app.'
+          );
+        }
+      });
 
       if (entry.overallStatus === 'critical') {
         pushCriticalAlert({

@@ -16,6 +16,27 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
+## Vital signs backend (single-user prototype)
+
+Set these variables in the local `.env` file:
+
+```env
+EXPO_PUBLIC_API_BASE_URL=https://your-backend-host
+EXPO_PUBLIC_DASHBOARD_API_TOKEN=your-backend-dashboard-api-token
+```
+
+For local development, `EXPO_PUBLIC_LOCAL_API_URL` can still provide the API
+base URL when `EXPO_PUBLIC_API_BASE_URL` is unset. The mobile app reads samples
+from `GET /dashboard/samples`. `EXPO_PUBLIC_DASHBOARD_API_TOKEN` must match the
+backend's `DASHBOARD_API_TOKEN`; the backend selects the user configured by
+`DASHBOARD_USER_ID`.
+
+**Prototype security warning:** Expo embeds every `EXPO_PUBLIC_*` value in the
+client app. The dashboard API token can therefore be extracted from a
+development or release build. Do not distribute this build or use this shared
+token for a production app. Use a user session or revocable per-device
+credentials before external distribution.
+
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)

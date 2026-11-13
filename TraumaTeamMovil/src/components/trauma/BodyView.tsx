@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Modal,
@@ -37,7 +38,10 @@ import {
 import { InjuryTimelapseModal } from './InjuryTimelapseModal';
 import { HealthQuestionnaireSection } from './HealthQuestionnaireSection';
 import { useMission } from './mission-context';
-import { syncObservationToBackend } from '../../services/mission-api';
+import {
+  getBodyConditionsFromBackend,
+  syncObservationToBackend,
+} from '../../services/mission-api';
 
 // Vista de exploración anatómica y registro de malestares
 interface BodyViewProps {
@@ -370,6 +374,48 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   const [detailMuscle, setDetailMuscle] = useState<MuscleData | null>(null);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [timelapseMuscle, setTimelapseMuscle] = useState<MuscleData | null>(null);
+  const locallyEditedMuscleIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    let isMounted = true;
+    void getBodyConditionsFromBackend()
+      .then((records) => {
+        if (!isMounted) return;
+        setMuscles((currentMuscles) =>
+          currentMuscles.map((muscle) => {
+            if (locallyEditedMuscleIds.current.has(muscle.id)) return muscle;
+            const record = records.find(
+              (item) => item.muscleId === muscle.id && item.status === 'active'
+            );
+            if (!record) return muscle;
+
+            return {
+              ...muscle,
+              status: record.painIntensity >= 7 ? 'critical' : 'warning',
+              observation: {
+                painIntensity: record.painIntensity,
+                swelling: record.swelling,
+                functionalLimitation: record.functionalLimitation,
+                notes: record.description ?? '',
+                updatedAt: new Date(record.recordedAt).toLocaleString(),
+              },
+            };
+          })
+        );
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) return;
+        console.error('No se pudieron cargar los padecimientos del cuerpo 3D.', error);
+        Alert.alert(
+          'No se pudieron cargar los registros',
+          'Revisa la conexión con el backend e inténtalo de nuevo.'
+        );
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const selectedMuscle =
     muscles.find((m) => m.name.toLowerCase() === selectedName.toLowerCase()) || muscles[0];
@@ -378,6 +424,8 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
     selectedMuscle.status !== 'normal' && Boolean(selectedMuscle.observation);
 
   const handleSaveObservation = (muscleId: string, observation: MuscleObservation | null) => {
+    locallyEditedMuscleIds.current.add(muscleId);
+    const muscle = muscles.find((item) => item.id === muscleId);
     setMuscles((prev) =>
       prev.map((m) => {
         if (m.id !== muscleId) return m;
@@ -393,7 +441,33 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
         };
       })
     );
-    void syncObservationToBackend(muscleId, observation);
+    if (!muscle) {
+      console.error(
+        `No se encontró la zona muscular ${muscleId} para sincronizar.`
+      );
+      return;
+    }
+
+    void syncObservationToBackend({
+      muscleId,
+      bodyRegion: muscle.category,
+      muscleName: muscle.name,
+      observation: observation
+        ? {
+            painIntensity: observation.painIntensity,
+            swelling: observation.swelling,
+            functionalLimitation: observation.functionalLimitation,
+            notes: observation.notes,
+          }
+        : null,
+    }).then(({ synced }) => {
+      if (!synced) {
+        Alert.alert(
+          'No se guardó en el backend',
+          'El padecimiento se actualizó en esta sesión, pero no pudo sincronizarse. Revisa la conexión antes de cerrar la app.'
+        );
+      }
+    });
   };
 
   const openDetailFor = (muscle: MuscleData) => {

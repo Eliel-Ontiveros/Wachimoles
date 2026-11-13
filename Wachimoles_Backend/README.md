@@ -13,7 +13,13 @@ El endpoint SSE vuelve a consultar Supabase cada cinco segundos.
 2. Ejecuta
    `supabase/migrations/20261111_add_user_ownership_to_samples.sql` en el SQL
    Editor de Supabase.
-3. Las filas previas y las que siga insertando el endpoint actual del reloj
+3. Ejecuta
+   `supabase/migrations/20261113_add_body_conditions.sql` para crear la tabla
+   privada de padecimientos del cuerpo 3D.
+4. Ejecuta
+   `supabase/migrations/20261113_add_daily_health_checks.sql` para crear la
+   tabla de cuestionarios médicos diarios.
+5. Las filas previas y las que siga insertando el endpoint actual del reloj
    tendrán `user_id` nulo. La API las excluye. Asigna cada fila al usuario fijo
    solo después de comprobar que le pertenece.
 
@@ -88,13 +94,39 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
   `steps`.
 - `GET /dashboard/samples/stream?limit=100` — envía una instantánea inicial y
   nuevas instantáneas mediante SSE cada cinco segundos.
+- `GET /dashboard/body-conditions?limit=100` — lista los padecimientos del
+  usuario fijo, incluidos los resueltos.
+- `PUT /dashboard/body-conditions/:muscleId` — crea o actualiza el padecimiento
+  actual de una zona muscular.
+- `DELETE /dashboard/body-conditions/:muscleId` — marca como resuelto el
+  padecimiento activo de esa zona; conserva el registro.
+- `GET /dashboard/health-checks?limit=100` — lista los cuestionarios diarios
+  del usuario fijo.
+- `PUT /dashboard/health-checks/:dateIso` — crea o actualiza el cuestionario
+  de esa fecha (`YYYY-MM-DD`).
 - `GET /dashboard/data?limit=500` — datos para el frontend independiente,
   protegidos con la contraseña web.
 
-Los dos endpoints de API requieren
+`/dashboard/samples`, `/dashboard/samples/stream` y todas las rutas
+`/dashboard/body-conditions` y `/dashboard/health-checks` requieren
 `Authorization: Bearer <DASHBOARD_API_TOKEN>`. No requieren inicio de sesión.
-Cada consulta filtra explícitamente por `DASHBOARD_USER_ID`; la clave
+`/dashboard/data` usa la contraseña web independiente. Cada consulta de datos
+del usuario filtra explícitamente por `DASHBOARD_USER_ID`; la clave
 service-role omite RLS, por lo que este filtro del backend es esencial.
+
+La tabla `body_conditions` conserva un estado por usuario y músculo: el ID
+estable de la zona 3D, la sección anatómica y el nombre visible, padecimiento,
+descripción, intensidad del dolor (1–10), hinchazón y limitación funcional.
+`recorded_at` indica el último registro; `created_at` y `updated_at` conservan
+la cronología del estado. Al limpiar una observación se marca como resuelta en
+vez de borrar la fila. Los nombres anatómicos se guardan como instantáneas para
+que los registros sigan siendo legibles aunque cambie el catálogo del modelo.
+
+La tabla `daily_health_checks` guarda una fila por usuario y fecha: glucosa,
+presión sistólica y diastólica, temperatura, horas de sueño, ánimo, síntomas,
+notas, estado general y recomendación. Las mediciones son opcionales;
+`recorded_at` y `updated_at` los genera el servidor y se actualizan al editar
+el cuestionario del mismo día.
 
 El token de API está pensado para llamadas servidor-a-servidor. No lo incluyas
 en JavaScript que se entrega al navegador ni en una app móvil: sus usuarios
