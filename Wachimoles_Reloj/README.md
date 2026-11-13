@@ -8,13 +8,15 @@ Miniaplicación Zepp OS para registrar ritmo cardíaco, estrés, pasos y SpO₂ 
 4. El Side Service realiza un `POST` a la API de Vercel.
 5. La API valida y guarda las muestras en Supabase para análisis histórico. Los pasos se actualizan en una sola fila por día.
 
-La pantalla permite iniciar y detener el servicio; al iniciarlo se puede salir de la miniaplicación y apagar la pantalla. El servicio mantiene los sensores y el temporizador activos, y al detenerlo cancela el temporizador y ambos listeners.
+Mientras la pantalla principal está abierta, la miniaplicación extiende al máximo el tiempo de iluminación de esa página y suspende el apagado por bajar la muñeca o cubrir la pantalla. Al salir de la página, restaura esos comportamientos. El tiempo de iluminación es finito según la API de Zepp OS; el sistema todavía puede apagar la pantalla por el botón físico o por políticas del dispositivo.
+
+La pantalla permite iniciar y detener el servicio; al iniciarlo se puede salir de la miniaplicación y apagar la pantalla. El servicio mantiene los sensores y el temporizador activos. Una alarma persistente abre una página de recuperación cada minuto; la página reinicia el servicio si se detuvo y regresa a la pantalla previa. **Detener monitoreo** cancela la alarma y detiene ambos listeners.
 
 ## Alcance actual
 
 - **Ritmo cardíaco en vivo:** incluido.
-- **Medición en segundo plano:** `app-service/health_monitor` mantiene los listeners de sensores; `Time.onPerMinute` activa un ciclo de envío cada minuto desde el App Service. El servicio se inicia explícitamente desde la pantalla y se detiene con **Detener monitoreo**.
-- **Ritmo cardíaco:** el servicio consulta `HeartRate.getToday()` al iniciar y en cada ciclo por minuto, y además escucha `HeartRate.onLastChange` para enviar las nuevas lecturas automáticas en cuanto el reloj las registra. No activa el muestreo continuo de alta frecuencia. Solo se envían lecturas de los últimos cinco minutos; si no hay una reciente, se omite el envío.
+- **Medición en segundo plano:** `app-service/health_monitor` mantiene los listeners de sensores; `Time.onPerMinute` activa un ciclo de envío cada minuto desde el App Service. Una alarma persistente abre `page/watchdog` cada minuto; esa página inicia el monitor si ya no aparece entre los servicios activos. **Detener monitoreo** desactiva y cancela la alarma antes de detener el servicio. La recuperación depende de que Zepp OS permita ejecutar la alarma y el App Service.
+- **Ritmo cardíaco:** el servicio consulta `HeartRate.getToday()` al iniciar y en cada ciclo por minuto. Cuando el reloj registra una medición individual, `HeartRate.onLastChange` lee directamente `HeartRate.getLast()` para no depender de que el historial por minuto ya se haya actualizado; si esa lectura no está disponible, intenta usar el historial. No activa el muestreo continuo de alta frecuencia. Las lecturas programadas solo se envían si son de los últimos cinco minutos.
 - **Estrés actual:** el servicio lee `Stress.getCurrent()` al comenzar, en cada cambio y en cada ciclo de envío. La API no inicia una medición manual, por lo que un valor disponible puede no ser una medición nueva de ese minuto.
 - **Pasos diarios:** el servicio consulta el total acumulado con `Step.getCurrent()` al iniciar y cada minuto. Cada día usa un `sample_id` local de formato `steps-YYYY-MM-DD`; las nuevas lecturas actualizan esa misma fila en vez de insertar otra.
 - **SpO₂ histórico:** cada minuto consulta `BloodOxygen.getLastFewHour(24)` y envía las mediciones nuevas que ya registró el reloj. No llama `BloodOxygen.start()` ni inicia un análisis; al iniciar el servicio solo considera lecturas de los últimos 10 minutos y luego procesa las nuevas en orden.
@@ -152,16 +154,17 @@ Verifica primero en la computadora que `http://10.221.170.109:3000/health` respo
    ```
 
    Cambia el target por `Amazfit Active 2 (Square)` si corresponde.
-4. Abre **WachiMoles Health Test** y concede los permisos de información del dispositivo, servicio en segundo plano, frecuencia cardíaca, estrés, pasos y SpO₂.
-5. Pulsa **Iniciar en segundo plano**. El servicio procesa ritmo cardíaco, estrés, el historial de SpO₂ y el total de pasos cada minuto. Puedes salir de la miniaplicación y apagar la pantalla.
-6. Revisa los registros JS de Zepp y la tabla `public.samples` en Supabase (o `server/data/samples.jsonl` si configuraste el backend local).
-7. Vuelve a abrir la miniaplicación y pulsa **Detener monitoreo** para cancelar el temporizador y apagar ambos listeners de sensores.
+4. Abre **WachiMoles Health Test** y concede los permisos de información del dispositivo, servicio en segundo plano, alarmas, frecuencia cardíaca, estrés, pasos y SpO₂.
+5. Pulsa **Iniciar en segundo plano**. El servicio procesa ritmo cardíaco, estrés, el historial de SpO₂ y el total de pasos cada minuto. Puedes salir de la miniaplicación y apagar la pantalla; la alarma abre brevemente la página de recuperación cada minuto.
+6. Para probar una interrupción, deja activa la miniaplicación y comprueba los registros JS de Zepp; una permanencia de 20 minutos verifica que el servicio y el watchdog siguen activos, pero para comprobar un reinicio debe ocurrir una interrupción inesperada. La alarma reintentará el inicio en el siguiente minuto.
+7. Revisa la tabla `public.samples` en Supabase (o `server/data/samples.jsonl` si configuraste el backend local).
+8. Vuelve a abrir la miniaplicación y pulsa **Detener monitoreo** para cancelar la alarma de recuperación, el temporizador y los listeners de sensores.
 
 El App Service se probó en un Amazfit Active 2. La integración principal usa el mismo mecanismo; verifica los registros y las muestras en Supabase después de probarla en tu reloj.
 
 El modo puntual que inicia y detiene el sensor cardíaco automáticamente se descartó después de que el reloj se reiniciara en una prueba. La causa no está identificada; esta versión evita esos arranques y paradas repetidos y usa el mismo listener estable del modo manual.
 
-La app está configurada con API_LEVEL mínimo 4.0 y requiere `device:os.bg_service`, `data:os.device.info`, `data:user.hd.heart_rate`, `data:user.hd.stress`, `data:user.hd.step` y `data:user.hd.spo2`. Después de compilar e instalar la nueva versión, concede los permisos solicitados en Zepp App. La lectura de pasos y SpO₂ debe probarse en el reloj real; los builds no comprueban disponibilidad de datos ni estabilidad del firmware.
+La app está configurada con API_LEVEL mínimo 4.0 y requiere `device:os.bg_service`, `device:os.alarm`, `data:os.device.info`, `data:user.hd.heart_rate`, `data:user.hd.stress`, `data:user.hd.step` y `data:user.hd.spo2`. Después de compilar e instalar la nueva versión, concede los permisos solicitados en Zepp App. La lectura de pasos y SpO₂ debe probarse en el reloj real; los builds no comprueban disponibilidad de datos ni estabilidad del firmware.
 
 ## Configuración Zepp
 

@@ -153,7 +153,9 @@ AppService(
       try {
         const sensor = new HeartRate();
         const callback = () => {
-          const sample = this.captureHeartRateReading("sensor change");
+          const sample =
+            this.captureLastHeartRateReading("sensor change") ||
+            this.captureHeartRateReading("sensor change");
           if (sample) {
             this.uploadSampleIfNeeded(sample, true);
           }
@@ -233,6 +235,36 @@ AppService(
       const initialSteps = this.captureStepReading("initial");
       if (initialSteps) {
         this.uploadSampleIfNeeded(initialSteps, true);
+      }
+    },
+    captureLastHeartRateReading(source) {
+      if (!this.state.heartRateSensor) {
+        return null;
+      }
+
+      try {
+        const value = this.state.heartRateSensor.getLast();
+        if (!Number.isFinite(value) || value <= 0 || value > 250) {
+          logger.log(`No valid latest heart-rate reading is available (${source})`);
+          return null;
+        }
+
+        const sample = {
+          metric: "heart_rate",
+          value,
+          unit: "bpm",
+          measuredAt: Date.now()
+        };
+        this.state.latestSamples.heart_rate = sample;
+        publishToPage({ type: "SAMPLE", sample });
+        logger.log(`Latest heart rate read: ${value} bpm (${source})`);
+        return sample;
+      } catch (error) {
+        logger.error(
+          `Could not read latest heart-rate measurement (${source}):`,
+          error
+        );
+        return null;
       }
     },
     captureHeartRateReading(source) {

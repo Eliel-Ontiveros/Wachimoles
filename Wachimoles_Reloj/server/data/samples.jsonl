@@ -1,0 +1,6 @@
+{"metric":"heart_rate","value":66,"unit":"bpm","measuredAt":1794259068916,"sampleId":"heart_rate-1794259068916","receivedAt":1794259070296}
+{"metric":"stress","value":48,"unit":"score","measuredAt":1794259070186,"sensorTime":1794257760,"sampleId":"stress-1794259070186","receivedAt":1794259070573}
+{"metric":"heart_rate","value":69,"unit":"bpm","measuredAt":1794259126853,"sampleId":"heart_rate-1794259126853","receivedAt":1794259130122}
+{"metric":"stress","value":48,"unit":"score","measuredAt":1794259129678,"sensorTime":1794257760,"sampleId":"stress-1794259129678","receivedAt":1794259130450}
+{"metric":"heart_rate","value":66,"unit":"bpm","measuredAt":1794259186781,"sampleId":"heart_rate-1794259186781","receivedAt":1794259190162}
+{"metric":"stress","value":48,"unit":"score","measuredAt":1794259189379,"sensorTime":1794257760,"sampleId":"stress-1794259189379","receivedAt":1794259190473}
