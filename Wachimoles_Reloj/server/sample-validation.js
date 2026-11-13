@@ -43,6 +43,15 @@ function isValidSample(sample) {
     );
   }
 
+  if (sample.metric === "sleep") {
+    return (
+      sample.value > 0 &&
+      sample.value <= 24 &&
+      sample.unit === "hours" &&
+      /^sleep-\d{4}-\d{2}-\d{2}$/.test(sample.sampleId)
+    );
+  }
+
   return false;
 }
 

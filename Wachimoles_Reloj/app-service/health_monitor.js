@@ -1,6 +1,7 @@
 import {
   BloodOxygen,
   HeartRate,
+  Sleep,
   Step,
   Stress,
   Time
@@ -23,6 +24,7 @@ const UPLOAD_INTERVAL_MS = 60 * 1000;
 const MAX_HEART_RATE_AGE_MS = 5 * UPLOAD_INTERVAL_MS;
 const SPO2_LOOKBACK_HOURS = 24;
 const SPO2_STARTUP_LOOKBACK_SECONDS = 10 * 60;
+const SLEEP_UPLOAD_INTERVAL_MINUTES = 30;
 
 function parseResponseBody(body) {
   const parsed = typeof body === "string" ? JSON.parse(body) : body;
@@ -112,27 +114,32 @@ AppService(
       heartRateCallback: null,
       stepSensor: null,
       spo2Sensor: null,
+      sleepSensor: null,
       stressSensor: null,
       stressCallback: null,
       latestSamples: {
         heart_rate: null,
         stress: null,
         steps: null,
-        spo2: null
+        spo2: null,
+        sleep: null
       },
       lastUploaded: {
         heart_rate: null,
         stress: null,
         steps: null,
-        spo2: null
+        spo2: null,
+        sleep: null
       },
       uploadsInFlight: {
         heart_rate: false,
         stress: false,
         steps: false,
-        spo2: false
+        spo2: false,
+        sleep: false
       },
       lastSpo2SensorTime: null,
+      sleepMinuteTicks: 0,
       timeSensor: null,
       timeCallback: null
     },
@@ -180,6 +187,13 @@ AppService(
       }
 
       try {
+        this.state.sleepSensor = new Sleep();
+        logger.log("Background sleep history reader initialized");
+      } catch (error) {
+        logger.error("Could not initialize background sleep reader:", error);
+      }
+
+      try {
         this.state.spo2Sensor = new BloodOxygen();
         this.state.lastSpo2SensorTime =
           Math.floor(Date.now() / 1000) - SPO2_STARTUP_LOOKBACK_SECONDS;
@@ -213,6 +227,7 @@ AppService(
       try {
         const timeSensor = new Time();
         const callback = () => {
+          this.state.sleepMinuteTicks += 1;
           this.runUploadCycle();
         };
         timeSensor.onPerMinute(callback);
@@ -235,6 +250,10 @@ AppService(
       const initialSteps = this.captureStepReading("initial");
       if (initialSteps) {
         this.uploadSampleIfNeeded(initialSteps, true);
+      }
+      const initialSleep = this.captureSleepReading("initial");
+      if (initialSleep) {
+        this.uploadSampleIfNeeded(initialSleep, true);
       }
     },
     captureLastHeartRateReading(source) {
@@ -264,6 +283,42 @@ AppService(
           `Could not read latest heart-rate measurement (${source}):`,
           error
         );
+        return null;
+      }
+    },
+    captureSleepReading(source) {
+      if (!this.state.sleepSensor) {
+        return null;
+      }
+
+      try {
+        const info = this.state.sleepSensor.getInfo();
+        if (
+          !info ||
+          !Number.isFinite(info.totalTime) ||
+          info.totalTime <= 0 ||
+          info.totalTime > 24 * 60
+        ) {
+          logger.log(`No valid system sleep duration is available (${source})`);
+          return null;
+        }
+
+        const now = new Date();
+        const sample = {
+          metric: "sleep",
+          value: Math.round((info.totalTime / 60) * 100) / 100,
+          unit: "hours",
+          measuredAt: now.getTime(),
+          sampleId: `sleep-${getLocalDateKey(now)}`
+        };
+        this.state.latestSamples.sleep = sample;
+        publishToPage({ type: "SAMPLE", sample });
+        logger.log(
+          `System sleep duration read: ${sample.value} hours (${source})`
+        );
+        return sample;
+      } catch (error) {
+        logger.error(`Could not read system sleep duration (${source}):`, error);
         return null;
       }
     },
@@ -516,6 +571,14 @@ AppService(
         this.uploadSampleIfNeeded(steps, true);
       }
 
+      if (this.state.sleepMinuteTicks >= SLEEP_UPLOAD_INTERVAL_MINUTES) {
+        this.state.sleepMinuteTicks = 0;
+        const sleep = this.captureSleepReading("scheduled");
+        if (sleep) {
+          this.uploadSampleIfNeeded(sleep, true);
+        }
+      }
+
       let uploadCount = 0;
       samples.forEach((sample) => {
         if (!this.state.uploadsInFlight[sample.metric]) {
@@ -535,6 +598,7 @@ AppService(
       stopSensors(this.state);
       this.state.stepSensor = null;
       this.state.spo2Sensor = null;
+      this.state.sleepSensor = null;
       BgService.onMessage = null;
       publishToPage({ type: "STATUS", active: false });
       logger.log("Background health monitoring stopped");

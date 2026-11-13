@@ -135,6 +135,48 @@ test("upserts daily step totals by sample ID", async () => {
   assert.equal(requests.length, 2);
 });
 
+test("upserts daily sleep duration by sample ID", async () => {
+  const now = 1794191800000;
+  const sample = {
+    sampleId: "sleep-2026-11-11",
+    metric: "sleep",
+    value: 7.25,
+    unit: "hours",
+    measuredAt: now
+  };
+  let requestUrl;
+  let requestOptions;
+  const handler = createHandler({
+    env,
+    now: () => now,
+    fetchImpl: async (url, options) => {
+      requestUrl = url;
+      requestOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [
+          {
+            sample_id: sample.sampleId,
+            received_at: new Date(now).toISOString()
+          }
+        ]
+      };
+    }
+  });
+  const response = createResponse();
+
+  await handler({ method: "POST", body: sample }, response);
+
+  assert.equal(requestUrl, "https://example.supabase.co/rest/v1/samples?on_conflict=sample_id");
+  assert.equal(
+    requestOptions.headers.Prefer,
+    "resolution=merge-duplicates,return=representation"
+  );
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.updated, true);
+});
+
 test("acknowledges duplicate sample IDs without adding another row", async () => {
   const handler = createHandler({
     env,

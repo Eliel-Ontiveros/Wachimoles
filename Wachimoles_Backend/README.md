@@ -19,7 +19,10 @@ El endpoint SSE vuelve a consultar Supabase cada cinco segundos.
 4. Ejecuta
    `supabase/migrations/20261113_add_daily_health_checks.sql` para crear la
    tabla de cuestionarios médicos diarios.
-5. Las filas previas y las que siga insertando el endpoint actual del reloj
+5. Ejecuta
+   `supabase/migrations/20261113_add_sleep_samples.sql` para permitir las
+   muestras diarias de duración del sueño del reloj.
+6. Las filas previas y las que siga insertando el endpoint actual del reloj
    tendrán `user_id` nulo. La API las excluye. Asigna cada fila al usuario fijo
    solo después de comprobar que le pertenece.
 
@@ -91,7 +94,7 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
 - `GET /health` — estado del proceso, sin autenticación.
 - `GET /dashboard/samples?limit=100&metric=heart_rate` — hasta 500 muestras
   del usuario fijo; `metric` puede ser `heart_rate`, `stress`, `spo2` o
-  `steps`.
+  `steps` o `sleep`.
 - `GET /dashboard/samples/stream?limit=100` — envía una instantánea inicial y
   nuevas instantáneas mediante SSE cada cinco segundos.
 - `GET /dashboard/body-conditions?limit=100` — lista los padecimientos del

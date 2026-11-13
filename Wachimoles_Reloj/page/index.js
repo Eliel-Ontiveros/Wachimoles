@@ -39,7 +39,8 @@ const REQUIRED_PERMISSIONS = [
   "data:user.hd.heart_rate",
   "data:user.hd.stress",
   "data:user.hd.step",
-  "data:user.hd.spo2"
+  "data:user.hd.spo2",
+  "data:user.hd.sleep"
 ];
 const logger = log.getLogger("health-test.page");
 const { width: SCREEN_WIDTH } = getDeviceInfo();

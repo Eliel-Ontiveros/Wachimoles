@@ -1,5 +1,5 @@
 // Tipos de datos para signos vitales y muestras del sensor
-export type SampleMetric = 'heart_rate' | 'stress' | 'spo2' | 'steps';
+export type SampleMetric = 'heart_rate' | 'stress' | 'spo2' | 'steps' | 'sleep';
 
 /** Estructura exacta de una muestra devuelta por la API NestJS / Supabase */
 export interface DashboardSample {
@@ -22,6 +22,8 @@ export interface VitalSignsData {
   stress: number | null;
   /** Contador de pasos del día */
   steps: number;
+  /** Duración de sueño más reciente en horas, o null si no hay registro */
+  sleepHours: number | null;
   /** Texto legible de la última medición (ej: "Hace 2 min" o "17:08") */
   lastMeasuredAt?: string;
   /** Indica si hay datos reales del sensor activos */
@@ -32,6 +34,8 @@ export interface VitalSignsData {
   spo2History: DashboardSample[];
   /** Lista histórica de muestras de estrés */
   stressHistory: DashboardSample[];
+  /** Historial diario de duración del sueño */
+  sleepHistory: DashboardSample[];
 }
 
 /** Estado de conexión con el backend */

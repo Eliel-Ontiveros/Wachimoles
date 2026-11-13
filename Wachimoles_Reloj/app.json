@@ -5,8 +5,8 @@
     "appName": "WachiMoles Health Test",
     "appType": "app",
     "version": {
-      "code": 28,
-      "name": "0.5.2"
+      "code": 29,
+      "name": "0.5.3"
     },
     "icon": "icon.png",
     "vender": "WachiMoles",
@@ -26,7 +26,8 @@
     "data:user.hd.heart_rate",
     "data:user.hd.stress",
     "data:user.hd.step",
-    "data:user.hd.spo2"
+    "data:user.hd.spo2",
+    "data:user.hd.sleep"
   ],
   "targets": {
     "default": {

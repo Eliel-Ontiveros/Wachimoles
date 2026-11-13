@@ -4,7 +4,8 @@ export const SAMPLE_METRICS = [
   "heart_rate",
   "stress",
   "spo2",
-  "steps"
+  "steps",
+  "sleep"
 ] as const;
 
 export type SampleMetric = (typeof SAMPLE_METRICS)[number];

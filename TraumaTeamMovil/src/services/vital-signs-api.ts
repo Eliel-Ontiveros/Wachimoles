@@ -22,6 +22,7 @@ const SAMPLE_METRICS: readonly SampleMetric[] = [
   'stress',
   'spo2',
   'steps',
+  'sleep',
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -135,12 +136,14 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
   let heartRate: number | null = null;
   let spo2: number | null = null;
   let stress: number | null = null;
+  let sleepHours: number | null = null;
   let steps = 0;
   let latestDate: Date | null = null;
 
   const pulseHistory: DashboardSample[] = [];
   const spo2History: DashboardSample[] = [];
   const stressHistory: DashboardSample[] = [];
+  const sleepHistory: DashboardSample[] = [];
 
   for (const s of samples) {
     if (s.metric === 'heart_rate') {
@@ -165,6 +168,12 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
         stress = Math.round(s.value);
         const d = new Date(s.measuredAt);
         if (!latestDate || d > latestDate) latestDate = d;
+      }
+    }
+    if (s.metric === 'sleep') {
+      sleepHistory.push(s);
+      if (sleepHours === null) {
+        sleepHours = s.value;
       }
     }
     if (s.metric === 'steps' && steps === 0) {
@@ -192,11 +201,13 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
     spo2,
     stress,
     steps,
+    sleepHours,
     lastMeasuredAt: formattedTime,
     isAvailable: heartRate !== null && heartRate > 0,
     pulseHistory,
     spo2History,
     stressHistory,
+    sleepHistory,
   };
 }
 
@@ -207,10 +218,12 @@ export function getInitialEmptyVitals(): VitalSignsData {
     spo2: null,
     stress: null,
     steps: 0,
+    sleepHours: null,
     lastMeasuredAt: undefined,
     isAvailable: false,
     pulseHistory: [],
     spo2History: [],
     stressHistory: [],
+    sleepHistory: [],
   };
 }

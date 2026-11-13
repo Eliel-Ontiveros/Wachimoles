@@ -106,7 +106,7 @@ function createServer(options = {}) {
     if (!isValidSample(sample)) {
       sendJson(response, 400, {
         ok: false,
-        error: "Expected a valid heart-rate, SpO2, or stress sample."
+        error: "Expected a valid heart-rate, SpO2, stress, steps, or sleep sample."
       });
       return;
     }
@@ -122,7 +122,7 @@ function createServer(options = {}) {
           (storedRecord) => storedRecord.sampleId === sample.sampleId
         );
         if (existingIndex !== -1) {
-          if (sample.metric !== "steps") {
+          if (!["steps", "sleep"].includes(sample.metric)) {
             return { duplicate: true };
           }
 

@@ -20,9 +20,10 @@ La pantalla permite iniciar y detener el servicio; al iniciarlo se puede salir d
 - **Estrés actual:** el servicio lee `Stress.getCurrent()` al comenzar, en cada cambio y en cada ciclo de envío. La API no inicia una medición manual, por lo que un valor disponible puede no ser una medición nueva de ese minuto.
 - **Pasos diarios:** el servicio consulta el total acumulado con `Step.getCurrent()` al iniciar y cada minuto. Cada día usa un `sample_id` local de formato `steps-YYYY-MM-DD`; las nuevas lecturas actualizan esa misma fila en vez de insertar otra.
 - **SpO₂ histórico:** cada minuto consulta `BloodOxygen.getLastFewHour(24)` y envía las mediciones nuevas que ya registró el reloj. No llama `BloodOxygen.start()` ni inicia un análisis; al iniciar el servicio solo considera lecturas de los últimos 10 minutos y luego procesa las nuevas en orden.
+- **Sueño diario:** lee `Sleep.getInfo()` al iniciar y cada 30 minutos. Envía `totalTime` convertido de minutos a horas y actualiza una sola muestra `sleep-YYYY-MM-DD` correspondiente al día local de lectura. No inicia ni fuerza un análisis de sueño; depende de los datos que Zepp OS ya haya sincronizado.
 - **Red:** el servicio hace las solicitudes mediante `httpRequest` de ZML; el Side Service de Zepp App actúa como proxy de red y reenvía la petición a la URL configurada en `app-side/config.js`.
 - **Unidad del estrés:** la documentación describe un valor numérico, pero no especifica unidad o rango para `getCurrent()`. El backend lo guarda como `score` sin imponer un máximo.
-- **Ritmo cardíaco durante el sueño, duración del sueño, fases y otras métricas del sueño:** omitidos por ahora. Las APIs Zepp `HeartRate.getToday()` y `Sleep.getInfo()`/`getStage()` consultan datos registrados por el sistema; esta versión no los lee.
+- **Fases del sueño:** no se guardan por ahora; solo se incorpora la duración total.
 
 ## Base de datos Supabase y API en Vercel
 
@@ -36,6 +37,8 @@ La API serverless vive en `api/` y Supabase conserva una fila por muestra, excep
    Para una tabla existente, ejecuta también la migración
    [`20261111_add_user_ownership_to_samples.sql`](../Wachimoles_Movil/supabase/migrations/20261111_add_user_ownership_to_samples.sql)
    para agregar `user_id`.
+   Para habilitar la nueva métrica de sueño en una tabla existente, ejecuta
+   [`20261113_add_sleep_samples.sql`](../Wachimoles_Backend/supabase/migrations/20261113_add_sleep_samples.sql).
 3. La tabla activa Row Level Security sin políticas públicas. La API accede desde el servidor con `SUPABASE_SERVICE_ROLE_KEY`; no copies esa clave a la miniaplicación ni a `app-side/config.js`.
 
 ### 2. Desplegar la API en Vercel

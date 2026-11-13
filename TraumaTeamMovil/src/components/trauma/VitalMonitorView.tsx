@@ -23,8 +23,9 @@ import {
   Flame,
   ArrowUpRight,
   ArrowDownRight,
+  Moon,
 } from 'lucide-react-native';
-import { DashboardSample, SampleMetric } from '../../types/vital-signs';
+import { DashboardSample } from '../../types/vital-signs';
 import { EnvironmentSelector } from './EnvironmentSelector';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
@@ -228,7 +229,7 @@ function RealtimeEcgChart({
   );
 }
 
-type HistoryMetric = 'heart_rate' | 'spo2' | 'stress';
+type HistoryMetric = 'heart_rate' | 'spo2' | 'stress' | 'sleep';
 
 interface DailySummary {
   dateKey: string;
@@ -295,6 +296,7 @@ function groupSamplesByDay(samples: DashboardSample[]): DailySummary[] {
 
   const summaries: DailySummary[] = [];
   for (const [dateKey, list] of groups.entries()) {
+    const isSleep = list[0].metric === 'sleep';
     let maxSample = list[0];
     let minSample = list[0];
     let sum = 0;
@@ -309,15 +311,21 @@ function groupSamplesByDay(samples: DashboardSample[]): DailySummary[] {
       dateKey,
       dateLabel: formatDayLabel(dateKey),
       count: list.length,
-      avg: Math.round(sum / list.length),
-      max: Math.round(maxSample.value),
+      avg: isSleep
+        ? Math.round((sum / list.length) * 10) / 10
+        : Math.round(sum / list.length),
+      max: isSleep ? maxSample.value : Math.round(maxSample.value),
       maxTime: formatHourMinute(maxSample.measuredAt),
-      min: Math.round(minSample.value),
+      min: isSleep ? minSample.value : Math.round(minSample.value),
       minTime: formatHourMinute(minSample.measuredAt),
     });
   }
 
   return summaries.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
+}
+
+function formatMetricValue(metric: HistoryMetric, value: number): string {
+  return metric === 'sleep' ? value.toFixed(1) : String(Math.round(value));
 }
 
 const METRIC_META: Record<
@@ -358,6 +366,15 @@ const METRIC_META: Record<
     softBg: '#fff7ed',
     minBound: 0,
     maxBound: 100,
+  },
+  sleep: {
+    title: 'Historial de Sueño',
+    tabLabel: 'Sueño',
+    unit: 'h',
+    accent: '#7c3aed',
+    softBg: '#f5f3ff',
+    minBound: 0,
+    maxBound: 12,
   },
 };
 
@@ -442,14 +459,19 @@ function VitalHistoryModal({
     if (validSamples.length === 0) {
       return { min: 0, max: 0, avg: 0, latest: currentValue || 0 };
     }
-    const vals = validSamples.map((s) => Math.round(s.value));
+    const vals = validSamples.map((s) =>
+      metric === 'sleep' ? s.value : Math.round(s.value)
+    );
     const min = Math.min(...vals);
     const max = Math.max(...vals);
     const sum = vals.reduce((acc, v) => acc + v, 0);
-    const avg = Math.round(sum / vals.length);
+    const avg =
+      metric === 'sleep'
+        ? Math.round((sum / vals.length) * 10) / 10
+        : Math.round(sum / vals.length);
     const latest = currentValue ?? vals[0];
     return { min, max, avg, latest };
-  }, [validSamples, currentValue]);
+  }, [metric, validSamples, currentValue]);
 
   const chartPoints = useMemo(() => {
     if (chartWidth <= 0 || validSamples.length < 2) return '';
@@ -493,6 +515,8 @@ function VitalHistoryModal({
                   className="mr-2.5 h-9 w-9 items-center justify-center rounded-xl">
                   {metric === 'heart_rate' ? (
                     <Heart size={18} color={meta.accent} fill={meta.accent} />
+                  ) : metric === 'sleep' ? (
+                    <Moon size={18} color={meta.accent} />
                   ) : (
                     <Activity size={18} color={meta.accent} />
                   )}
@@ -502,7 +526,9 @@ function VitalHistoryModal({
                     {meta.title}
                   </Text>
                   <Text className="font-mono text-[10px] text-slate-400">
-                    Resumen agrupado por día (pico, promedio y mínimo)
+                    {metric === 'sleep'
+                      ? 'Duración de sueño registrada por noche'
+                      : 'Resumen agrupado por día (pico, promedio y mínimo)'}
                   </Text>
                 </View>
               </View>
@@ -514,9 +540,9 @@ function VitalHistoryModal({
               </Pressable>
             </View>
 
-            {/* Pestañas para alternar entre Pulso, Oxígeno y Estrés */}
+            {/* Pestañas para alternar entre métricas */}
             <View className="flex-row gap-2 px-5 pt-3">
-              {(['heart_rate', 'spo2', 'stress'] as HistoryMetric[]).map((mKey) => {
+              {(['heart_rate', 'spo2', 'stress', 'sleep'] as HistoryMetric[]).map((mKey) => {
                 const active = mKey === metric;
                 return (
                   <Pressable
@@ -548,7 +574,7 @@ function VitalHistoryModal({
                 <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
                   <Text className="font-mono text-[9px] uppercase text-slate-400">Actual</Text>
                   <Text className="font-mono text-lg font-extrabold text-slate-900">
-                    {stats.latest ? `${stats.latest}` : '--'}
+                    {stats.latest ? formatMetricValue(metric, stats.latest) : '--'}
                   </Text>
                   <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
                 </View>
@@ -556,7 +582,7 @@ function VitalHistoryModal({
                 <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
                   <Text className="font-mono text-[9px] uppercase text-slate-400">Promedio</Text>
                   <Text className="font-mono text-lg font-extrabold text-sky-600">
-                    {stats.avg || '--'}
+                    {stats.avg ? formatMetricValue(metric, stats.avg) : '--'}
                   </Text>
                   <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
                 </View>
@@ -564,7 +590,9 @@ function VitalHistoryModal({
                 <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
                   <Text className="font-mono text-[9px] uppercase text-slate-400">Mín / Máx</Text>
                   <Text className="mt-0.5 font-mono text-sm font-extrabold text-slate-900">
-                    {stats.min && stats.max ? `${stats.min} - ${stats.max}` : '--'}
+                    {stats.min && stats.max
+                      ? `${formatMetricValue(metric, stats.min)} - ${formatMetricValue(metric, stats.max)}`
+                      : '--'}
                   </Text>
                   <Text className="font-mono text-[8.5px] text-slate-500">Rango</Text>
                 </View>
@@ -640,63 +668,76 @@ function VitalHistoryModal({
                         </Text>
                         <View className="rounded-md bg-slate-100 px-2 py-0.5">
                           <Text className="font-mono text-[9px] font-bold text-slate-500">
-                            {day.count} {day.count === 1 ? 'lectura' : 'lecturas'}
+                            {day.count} {metric === 'sleep'
+                              ? day.count === 1 ? 'registro' : 'registros'
+                              : day.count === 1 ? 'lectura' : 'lecturas'}
                           </Text>
                         </View>
                       </View>
 
-                      <View className="flex-row gap-2">
-                        {/* Pico más alto y su hora */}
-                        <View className="flex-1 rounded-xl border border-red-100 bg-red-50/40 p-2.5">
+                      {metric === 'sleep' ? (
+                        <View className="flex-row items-center justify-between rounded-xl border border-violet-100 bg-violet-50/60 p-3">
                           <View className="flex-row items-center">
-                            <ArrowUpRight size={12} color="#dc2626" />
-                            <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-red-600">
-                              Pico más alto
+                            <Moon size={16} color="#7c3aed" />
+                            <Text className="ml-2 font-mono text-xs font-bold text-violet-800">
+                              Duración total
                             </Text>
                           </View>
-                          <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
-                            {day.max} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
+                          <Text className="font-mono text-lg font-extrabold text-violet-800">
+                            {formatMetricValue(metric, day.max)} h
                           </Text>
-                          <View className="mt-1 flex-row items-center">
-                            <Clock size={10} color="#64748b" />
-                            <Text className="ml-1 font-mono text-[9px] text-slate-500">
-                              {day.maxTime}
-                            </Text>
-                          </View>
                         </View>
+                      ) : (
+                        <View className="flex-row gap-2">
+                          <View className="flex-1 rounded-xl border border-red-100 bg-red-50/40 p-2.5">
+                            <View className="flex-row items-center">
+                              <ArrowUpRight size={12} color="#dc2626" />
+                              <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-red-600">
+                                Pico más alto
+                              </Text>
+                            </View>
+                            <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
+                              {formatMetricValue(metric, day.max)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
+                            </Text>
+                            <View className="mt-1 flex-row items-center">
+                              <Clock size={10} color="#64748b" />
+                              <Text className="ml-1 font-mono text-[9px] text-slate-500">
+                                {day.maxTime}
+                              </Text>
+                            </View>
+                          </View>
 
-                        {/* Promedio del día */}
-                        <View className="flex-1 items-center justify-center rounded-xl border border-sky-100 bg-sky-50/50 p-2.5">
-                          <Text className="font-mono text-[8.5px] font-bold uppercase text-sky-700">
-                            Promedio
-                          </Text>
-                          <Text className="mt-1 font-mono text-base font-extrabold text-sky-700">
-                            {day.avg}
-                          </Text>
-                          <Text className="mt-0.5 font-mono text-[8.5px] text-slate-500">
-                            {meta.unit} del día
-                          </Text>
-                        </View>
+                          <View className="flex-1 items-center justify-center rounded-xl border border-sky-100 bg-sky-50/50 p-2.5">
+                            <Text className="font-mono text-[8.5px] font-bold uppercase text-sky-700">
+                              Promedio
+                            </Text>
+                            <Text className="mt-1 font-mono text-base font-extrabold text-sky-700">
+                              {formatMetricValue(metric, day.avg)}
+                            </Text>
+                            <Text className="mt-0.5 font-mono text-[8.5px] text-slate-500">
+                              {meta.unit} del día
+                            </Text>
+                          </View>
 
-                        {/* Punto más bajo y su hora */}
-                        <View className="flex-1 rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5">
-                          <View className="flex-row items-center">
-                            <ArrowDownRight size={12} color="#059669" />
-                            <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-emerald-700">
-                              Más bajo
+                          <View className="flex-1 rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5">
+                            <View className="flex-row items-center">
+                              <ArrowDownRight size={12} color="#059669" />
+                              <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-emerald-700">
+                                Más bajo
+                              </Text>
+                            </View>
+                            <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
+                              {formatMetricValue(metric, day.min)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
                             </Text>
-                          </View>
-                          <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
-                            {day.min} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
-                          </Text>
-                          <View className="mt-1 flex-row items-center">
-                            <Clock size={10} color="#64748b" />
-                            <Text className="ml-1 font-mono text-[9px] text-slate-500">
-                              {day.minTime}
-                            </Text>
+                            <View className="mt-1 flex-row items-center">
+                              <Clock size={10} color="#64748b" />
+                              <Text className="ml-1 font-mono text-[9px] text-slate-500">
+                                {day.minTime}
+                              </Text>
+                            </View>
                           </View>
                         </View>
-                      </View>
+                      )}
                     </View>
                   ))
                 )}
@@ -804,14 +845,14 @@ export function VitalMonitorView() {
     setHistorySamples([]);
 
     try {
-      const full = await getFullHistory(metric as SampleMetric);
+      const full = await getFullHistory(metric);
       if (reqId !== historyReqIdRef.current) return;
-      const fallback =
-        metric === 'spo2'
-          ? vitals.spo2History
-          : metric === 'stress'
-            ? vitals.stressHistory
-            : vitals.pulseHistory;
+      const fallback = {
+        heart_rate: vitals.pulseHistory,
+        spo2: vitals.spo2History,
+        stress: vitals.stressHistory,
+        sleep: vitals.sleepHistory,
+      }[metric];
       setHistorySamples(full.length > 0 ? full : fallback || []);
     } finally {
       if (reqId === historyReqIdRef.current) {
@@ -924,6 +965,28 @@ export function VitalMonitorView() {
         />
       </View>
 
+      <Pressable
+        onPress={() => handleOpenMetricHistory('sleep')}
+        accessibilityLabel="Ver historial de sueño"
+        className="mb-4 flex-row items-center justify-between rounded-2xl border border-violet-100 bg-white p-4 shadow-md active:opacity-85">
+        <View className="flex-row items-center">
+          <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
+            <Moon size={20} color="#7c3aed" />
+          </View>
+          <View>
+            <Text className="font-mono text-xs font-bold text-trauma-ink">
+              Sueño registrado
+            </Text>
+            <Text className="mt-1 font-mono text-[9px] text-slate-500">
+              Total diario leído del reloj · Ver historial
+            </Text>
+          </View>
+        </View>
+        <Text className="font-mono text-2xl font-extrabold text-violet-700">
+          {vitals.sleepHours !== null ? `${vitals.sleepHours.toFixed(1)} h` : '-- h'}
+        </Text>
+      </Pressable>
+
       {/* Resumen de trayectoria y misiones diarias */}
       <Pressable
         onPress={() => router.navigate('/missions')}
@@ -1019,7 +1082,9 @@ export function VitalMonitorView() {
             ? vitals.spo2
             : selectedMetric === 'stress'
               ? vitals.stress
-              : vitals.heartRate
+              : selectedMetric === 'sleep'
+                ? vitals.sleepHours
+                : vitals.heartRate
         }
       />
     </View>

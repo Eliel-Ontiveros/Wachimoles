@@ -74,9 +74,10 @@ export function useVitalSigns(autoRefreshIntervalMs = 5000) {
       }
       if (metric === 'spo2') return vitals.spo2History || [];
       if (metric === 'stress') return vitals.stressHistory || [];
+      if (metric === 'sleep') return vitals.sleepHistory || [];
       return vitals.pulseHistory || [];
     },
-    [vitals.pulseHistory, vitals.spo2History, vitals.stressHistory]
+    [vitals.pulseHistory, vitals.spo2History, vitals.stressHistory, vitals.sleepHistory]
   );
 
   // Carga inicial

@@ -148,7 +148,7 @@ test("invalid sample payloads are rejected", async () => {
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), {
     ok: false,
-    error: "Expected a valid heart-rate, SpO2, or stress sample."
+    error: "Expected a valid heart-rate, SpO2, stress, steps, or sleep sample."
   });
 });
 
@@ -206,4 +206,42 @@ test("daily step samples update the existing record", async () => {
   assert.equal(stepRecords.length, 1);
   assert.equal(stepRecords[0].value, 1850);
   assert.equal(stepRecords[0].measuredAt, 1794190600003);
+});
+
+test("daily sleep samples update the existing record", async () => {
+  const sampleId = "sleep-2026-11-11";
+  const firstResponse = await fetch(`${baseUrl}/samples`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sampleId,
+      metric: "sleep",
+      value: 6.75,
+      unit: "hours",
+      measuredAt: 1794190000004
+    })
+  });
+  assert.equal(firstResponse.status, 201);
+
+  const updateResponse = await fetch(`${baseUrl}/samples`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sampleId,
+      metric: "sleep",
+      value: 7.25,
+      unit: "hours",
+      measuredAt: 1794191800004
+    })
+  });
+  assert.equal(updateResponse.status, 200);
+  assert.equal((await updateResponse.json()).updated, true);
+
+  const records = (await readFile(dataFile, "utf8"))
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const sleepRecords = records.filter((record) => record.metric === "sleep");
+  assert.equal(sleepRecords.length, 1);
+  assert.equal(sleepRecords[0].value, 7.25);
 });

@@ -106,7 +106,7 @@ function isSupabaseSampleRow(value: unknown): value is SupabaseSampleRow {
     Number.isSafeInteger(value.id) &&
     typeof value.sample_id === "string" &&
     typeof value.metric === "string" &&
-    ["heart_rate", "stress", "spo2", "steps"].includes(value.metric) &&
+    ["heart_rate", "stress", "spo2", "steps", "sleep"].includes(value.metric) &&
     typeof value.value === "number" &&
     Number.isFinite(value.value) &&
     typeof value.unit === "string" &&

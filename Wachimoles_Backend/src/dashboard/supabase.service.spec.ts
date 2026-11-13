@@ -46,6 +46,48 @@ describe("SupabaseService", () => {
     expect(samples[0].sampleId).toBe("steps-2026-11-11");
   });
 
+  it("accepts sleep samples in the dashboard history", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            id: 9,
+            sample_id: "sleep-2026-11-11",
+            metric: "sleep",
+            value: 7.25,
+            unit: "hours",
+            measured_at: "2026-11-11T10:00:00.000Z",
+            received_at: "2026-11-11T10:00:02.000Z"
+          }
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    const service = new SupabaseService(
+      new ConfigService({
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "server-secret"
+      })
+    );
+
+    const samples = await service.getSamples(
+      "46f18439-ff31-4e31-ae49-246d5724f134",
+      { metric: "sleep" }
+    );
+
+    expect(samples).toEqual([
+      {
+        id: 9,
+        sampleId: "sleep-2026-11-11",
+        metric: "sleep",
+        value: 7.25,
+        unit: "hours",
+        measuredAt: "2026-11-11T10:00:00.000Z",
+        receivedAt: "2026-11-11T10:00:02.000Z"
+      }
+    ]);
+  });
+
   it("upserts the user's body condition and maps the database row", async () => {
     const row = {
       id: "c2d7ac29-07d2-48c7-8fd1-cde56881b08e",
