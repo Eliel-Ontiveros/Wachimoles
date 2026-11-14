@@ -7,6 +7,8 @@ import { CriticalAlertToaster } from '@/components/trauma/CriticalAlertToaster';
 import { DrawerProvider } from '@/components/trauma/DrawerProvider';
 import { MissionOnboardingModal } from '@/components/trauma/MissionOnboardingModal';
 import { MissionProvider } from '@/components/trauma/MissionProvider';
+import { VoiceFab } from '@/voice/VoiceButton';
+import { VoiceProvider } from '@/voice/VoiceProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -18,9 +20,12 @@ export default function RootLayout() {
   return (
     <MissionProvider>
       <DrawerProvider>
-        <Stack screenOptions={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
-        <MissionOnboardingModal />
-        <CriticalAlertToaster />
+        <VoiceProvider>
+          <Stack screenOptions={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
+          <MissionOnboardingModal />
+          <CriticalAlertToaster />
+          <VoiceFab />
+        </VoiceProvider>
       </DrawerProvider>
     </MissionProvider>
   );

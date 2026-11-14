@@ -38,6 +38,7 @@ import {
 import { InjuryTimelapseModal } from './InjuryTimelapseModal';
 import { HealthQuestionnaireSection } from './HealthQuestionnaireSection';
 import { useMission } from './mission-context';
+import { useVoice } from '@/voice/voice-context';
 import {
   getBodyConditionsFromBackend,
   syncObservationToBackend,
@@ -364,6 +365,7 @@ function ProblemDetailModal({
 
 export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   const { injuryPhotos } = useMission();
+  const { bodyIntent, consumeBodyIntent } = useVoice();
   const [tab, setTab] = useState<'body' | 'health' | 'records'>('body');
   const [muscles, setMuscles] = useState<MuscleData[]>(INITIAL_MUSCLES);
   const [selectedName, setSelectedName] = useState<string>('Cuello');
@@ -416,6 +418,17 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
       isMounted = false;
     };
   }, []);
+
+  // Comandos de voz: cambiar de pestaña y/o seleccionar una zona del cuerpo
+  useEffect(() => {
+    if (!bodyIntent) return;
+    if (bodyIntent.tab) setTab(bodyIntent.tab);
+    if (bodyIntent.muscleId) {
+      const target = muscles.find((m) => m.id === bodyIntent.muscleId);
+      if (target) setSelectedName(target.name);
+    }
+    consumeBodyIntent(bodyIntent.nonce);
+  }, [bodyIntent, consumeBodyIntent, muscles]);
 
   const selectedMuscle =
     muscles.find((m) => m.name.toLowerCase() === selectedName.toLowerCase()) || muscles[0];

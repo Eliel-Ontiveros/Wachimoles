@@ -22,6 +22,7 @@ import {
   getPainColorHex,
 } from './BodyModelViewer';
 import { useMission } from './mission-context';
+import { DictationButton } from '@/voice/VoiceButton';
 
 // Modal para registrar o editar observación clínica de una zona
 interface RegisterObservationModalProps {
@@ -534,6 +535,12 @@ export function RegisterObservationModal({
                   placeholderTextColor="#94a3b8"
                   className="min-h-[76px] text-xs leading-5 text-slate-700"
                   textAlignVertical="top"
+                />
+              </View>
+              <View className="mt-2">
+                <DictationButton
+                  label="Dictar observación"
+                  onText={(t) => setNotes((prev) => (prev ? `${prev} ${t}` : t).slice(0, 300))}
                 />
               </View>
               <Text className="mt-1.5 text-right text-[11px] text-slate-400">

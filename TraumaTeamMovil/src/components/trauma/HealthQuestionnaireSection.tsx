@@ -15,6 +15,7 @@ import {
 import { getTodayIsoDate } from '../../services/mission-api';
 import { DailyHealthCheck, HealthStatusLevel } from '../../types/mission';
 import { useMission } from './mission-context';
+import { DictationButton } from '@/voice/VoiceButton';
 
 const HERO_STARS = [
   { x: 0.08, y: 0.2, r: 1.1, o: 0.65 },
@@ -719,6 +720,12 @@ export function HealthQuestionnaireSection() {
             placeholder="Nota clínica adicional (opcional)..."
             placeholderTextColor="#94a3b8"
             className="font-mono text-[11px] text-slate-700"
+          />
+        </View>
+        <View className="mt-2">
+          <DictationButton
+            label="Dictar nota"
+            onText={(t) => setNotes((prev) => (prev ? `${prev} ${t}` : t))}
           />
         </View>
       </View>
