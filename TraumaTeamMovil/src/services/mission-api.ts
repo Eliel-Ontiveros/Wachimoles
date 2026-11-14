@@ -19,6 +19,8 @@ export interface BodyConditionSyncInput {
   muscleId: string;
   bodyRegion: string;
   muscleName: string;
+  conditionName?: string;
+  resolveAfterSave?: boolean;
   observation: {
     painIntensity: number;
     swelling: boolean;
@@ -949,41 +951,67 @@ export async function syncObservationToBackend(
   }
 
   const observation = input.observation;
-  const shouldResolve = !observation || observation.painIntensity === 0;
+  const resolveAfterSave = Boolean(
+    input.resolveAfterSave || (observation && observation.painIntensity === 0)
+  );
+  const pureDelete = !observation;
   const path = `/dashboard/body-conditions/${encodeURIComponent(input.muscleId)}`;
 
-  try {
+  const sendWithAuth = async (
+    method: 'PUT' | 'DELETE',
+    bodyJson?: string
+  ): Promise<Response | null> => {
     let response: Response | null = null;
     for (const baseHeaders of authHeadersList) {
       response = await fetchBackendWithFallback(path, {
-        method: shouldResolve ? 'DELETE' : 'PUT',
+        method,
         headers: {
           ...baseHeaders,
-          ...(shouldResolve ? {} : { 'Content-Type': 'application/json' }),
+          ...(bodyJson ? { 'Content-Type': 'application/json' } : {}),
         },
-        ...(shouldResolve
-          ? {}
-          : {
-            body: JSON.stringify({
-              bodyRegion: input.bodyRegion,
-              muscleName: input.muscleName,
-              conditionName: 'Dolor muscular',
-              description: observation.notes,
-              painIntensity: observation.painIntensity,
-              swelling: observation.swelling,
-              functionalLimitation: observation.functionalLimitation,
-            }),
-          }),
+        ...(bodyJson ? { body: bodyJson } : {}),
       });
       if (response.status !== 401) break;
     }
+    return response;
+  };
 
-    if (!response || !response.ok) {
+  try {
+    if (!pureDelete && observation) {
+      const clampedPain = Math.max(1, Math.min(10, Math.round(observation.painIntensity || 1)));
+      const putResponse = await sendWithAuth(
+        'PUT',
+        JSON.stringify({
+          bodyRegion: input.bodyRegion,
+          muscleName: input.muscleName,
+          conditionName: input.conditionName?.trim() || 'Dolor muscular',
+          description: observation.notes,
+          painIntensity: clampedPain,
+          swelling: observation.swelling,
+          functionalLimitation: observation.functionalLimitation,
+        })
+      );
+
+      if (!putResponse || !putResponse.ok) {
+        console.warn(
+          `No se pudo sincronizar el padecimiento (${putResponse?.status ?? 0}).`
+        );
+        return { synced: false };
+      }
+
+      if (!resolveAfterSave) {
+        return { synced: true };
+      }
+    }
+
+    const deleteResponse = await sendWithAuth('DELETE');
+    if (!deleteResponse || !deleteResponse.ok) {
       console.warn(
-        `No se pudo sincronizar el padecimiento (${response?.status ?? 0}).`
+        `No se pudo marcar como resuelto el padecimiento (${deleteResponse?.status ?? 0}).`
       );
       return { synced: false };
     }
+
     return { synced: true };
   } catch (error) {
     console.warn('No se pudo sincronizar el padecimiento con el backend.', error);

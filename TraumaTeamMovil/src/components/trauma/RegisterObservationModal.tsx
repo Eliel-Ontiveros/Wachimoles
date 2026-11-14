@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -15,7 +15,19 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Path, Polygon, Circle, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import { ArrowLeft, Camera, Images, Zap, Layers, FileText, Check, RotateCcw } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Camera,
+  Images,
+  Zap,
+  Layers,
+  FileText,
+  Check,
+  RotateCcw,
+  Clock,
+  PlusCircle,
+  X,
+} from 'lucide-react-native';
 import {
   BodyRegionCategory,
   MuscleData,
@@ -23,14 +35,26 @@ import {
   getPainColorHex,
 } from './BodyModelViewer';
 import { useMission } from './mission-context';
+import type { InjuryPhoto } from '../../types/mission';
+import {
+  appendConditionUpdate,
+  parseConditionUpdates,
+  serializeConditionUpdates,
+} from '../../utils/condition-updates';
 
-// Modal para registrar o editar observación clínica de una zona
+// Modal para registrar o agregar actualizaciones a la observación clínica de una zona
 interface RegisterObservationModalProps {
   visible: boolean;
   muscle: MuscleData;
   snapshotUri?: string;
+  mode?: 'create' | 'update';
+  existingPhotos?: InjuryPhoto[];
   onClose: () => void;
-  onSave: (muscleId: string, observation: MuscleObservation | null) => void;
+  onSave: (
+    muscleId: string,
+    observation: MuscleObservation | null,
+    options?: { isCured?: boolean; latestUpdateNote?: string }
+  ) => void;
 }
 
 // Icono vectorial por categoría anatómica
@@ -179,10 +203,12 @@ export function RegisterObservationModal({
   visible,
   muscle,
   snapshotUri,
+  mode,
+  existingPhotos,
   onClose,
   onSave,
 }: RegisterObservationModalProps) {
-  const { addInjuryPhoto } = useMission();
+  const { addInjuryPhoto, injuryPhotos } = useMission();
   const [painIntensity, setPainIntensity] = useState<number>(7);
   const [swelling, setSwelling] = useState<boolean>(true);
   const [functionalLimitation, setFunctionalLimitation] = useState<boolean>(false);
@@ -191,6 +217,28 @@ export function RegisterObservationModal({
   const [capturedPhoto, setCapturedPhoto] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const isUpdateMode = (mode ?? (muscle.observation ? 'update' : 'create')) === 'update' && Boolean(muscle.observation);
+  const musclePhotos = useMemo(
+    () => existingPhotos ?? injuryPhotos[muscle.id] ?? [],
+    [existingPhotos, injuryPhotos, muscle.id]
+  );
+
+  const existingUpdates = useMemo(() => {
+    if (!muscle.observation) return [];
+    return parseConditionUpdates({
+      description: muscle.observation.notes,
+      fallbackPain: muscle.observation.painIntensity,
+      fallbackDateLabel: muscle.observation.updatedAt,
+      photos: musclePhotos,
+    });
+  }, [muscle.observation, musclePhotos]);
+
+  const nextUpdateNumber = isUpdateMode
+    ? existingUpdates.length > 0
+      ? Math.max(...existingUpdates.map((u) => u.updateNumber)) + 1
+      : 2
+    : 1;
 
   // Sincroniza los datos de la zona seleccionada
   useEffect(() => {
@@ -203,7 +251,7 @@ export function RegisterObservationModal({
         setPainIntensity(muscle.observation.painIntensity);
         setSwelling(muscle.observation.swelling);
         setFunctionalLimitation(muscle.observation.functionalLimitation);
-        setNotes(muscle.observation.notes);
+        setNotes('');
       } else {
         setPainIntensity(7);
         setSwelling(true);
@@ -259,36 +307,79 @@ export function RegisterObservationModal({
     }
   };
 
-  const handleSave = async () => {
+  const persistUpdate = async (forceCure: boolean) => {
     if (isSaving) return;
     setIsSaving(true);
+    const effectivePain = forceCure ? 0 : painIntensity;
+    const isCured = forceCure || effectivePain === 0;
+    const trimmedInput = notes.trim();
+    const updateText =
+      trimmedInput ||
+      (isCured
+        ? 'Ya no siento el síntoma, molestia superada.'
+        : isUpdateMode
+          ? `Seguimiento #${nextUpdateNumber} registrado.`
+          : `Registro inicial en ${muscle.name}.`);
+
     try {
+      let uploadedPath: string | undefined;
       if (capturedPhoto) {
-        await addInjuryPhoto(muscle.id, muscle.name, {
+        const uploaded = await addInjuryPhoto(muscle.id, muscle.name, {
           uri: capturedPhoto.uri,
           fileName: capturedPhoto.fileName ?? undefined,
           mimeType: capturedPhoto.mimeType ?? undefined,
-          painIntensity,
-          note: notes.trim(),
+          painIntensity: effectivePain,
+          note: `Actualización ${nextUpdateNumber} - ${updateText}`,
         });
+        uploadedPath = uploaded.id;
       }
-      onSave(muscle.id, {
-        painIntensity,
-        swelling,
-        functionalLimitation,
-        notes: notes.trim(),
-        updatedAt: 'Ahora mismo',
+
+      const baseDescription =
+        muscle.observation?.notes?.trim() ||
+        (existingUpdates.length > 0 ? serializeConditionUpdates(existingUpdates) : null);
+
+      const { serializedDescription } = appendConditionUpdate({
+        existingDescription: isUpdateMode ? baseDescription : null,
+        newText: updateText,
+        painIntensity: effectivePain,
+        photoPathOrFileName: uploadedPath,
+        isResolvedEvent: isCured,
+        fallbackPain: muscle.observation?.painIntensity,
+        fallbackDateLabel: muscle.observation?.updatedAt,
       });
+
+      onSave(
+        muscle.id,
+        {
+          painIntensity: effectivePain,
+          swelling: isCured ? false : swelling,
+          functionalLimitation: isCured ? false : functionalLimitation,
+          notes: serializedDescription,
+          updatedAt: 'Ahora mismo',
+        },
+        {
+          isCured,
+          latestUpdateNote: updateText,
+        }
+      );
       onClose();
     } catch (error: unknown) {
       console.error('[RegisterObservationModal] Error al guardar:', error);
       Alert.alert(
         'No se pudo guardar',
-        error instanceof Error ? error.message : 'Ocurrió un error al guardar la imagen.'
+        error instanceof Error ? error.message : 'Ocurrió un error al guardar la actualización.'
       );
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = () => {
+    void persistUpdate(false);
+  };
+
+  const handleMarkCured = () => {
+    void persistUpdate(true);
   };
 
   const handleClear = () => {
@@ -299,7 +390,7 @@ export function RegisterObservationModal({
 
   const percent = (painIntensity / 10) * 100;
   // Color gradual actual para el slider (Amarillo en 1 -> Naranja en 5 -> Rojo en 10)
-  const currentPainColor = painIntensity > 0 ? getPainColorHex(painIntensity) : '#38bdf8';
+  const currentPainColor = painIntensity > 0 ? getPainColorHex(painIntensity) : '#10b981';
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -332,14 +423,27 @@ export function RegisterObservationModal({
           </View>
 
           {/* Barra superior de navegación */}
-          <View className="flex-row items-center px-5 pb-3 pt-4">
-            <Pressable
-              onPress={onClose}
-              accessibilityLabel="Volver"
-              className="mr-3 h-9 w-9 items-center justify-center rounded-full active:bg-slate-200">
-              <ArrowLeft size={20} color="#1e293b" strokeWidth={2.2} />
-            </Pressable>
-            <Text className="text-lg font-bold text-slate-800">Registrar observación</Text>
+          <View className="flex-row items-center justify-between px-5 pb-3 pt-4">
+            <View className="flex-row items-center">
+              <Pressable
+                onPress={onClose}
+                accessibilityLabel="Volver"
+                className="mr-3 h-9 w-9 items-center justify-center rounded-full active:bg-slate-200">
+                <ArrowLeft size={20} color="#1e293b" strokeWidth={2.2} />
+              </Pressable>
+              <View>
+                <Text className="text-lg font-bold text-slate-800">
+                  {isUpdateMode
+                    ? `Actualización #${nextUpdateNumber}`
+                    : 'Registrar observación'}
+                </Text>
+                <Text className="font-mono text-[10px] text-slate-500">
+                  {isUpdateMode
+                    ? 'Seguimiento de evolución clínica (texto y foto)'
+                    : 'Se guardará como Actualización 1 en la base de datos'}
+                </Text>
+              </View>
+            </View>
           </View>
 
           <ScrollView
@@ -385,6 +489,61 @@ export function RegisterObservationModal({
               </View>
             </View>
 
+            {/* Bitácora de actualizaciones previas cuando se agrega una nueva actualización */}
+            {isUpdateMode && existingUpdates.length > 0 && (
+              <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+                <View className="mb-2.5 flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Clock size={15} color="#0284c7" strokeWidth={2.2} />
+                    <Text className="ml-1.5 text-xs font-bold text-slate-800">
+                      Historial previo ({existingUpdates.length})
+                    </Text>
+                  </View>
+                  <Text className="font-mono text-[10px] font-bold text-sky-700">
+                    Siguiente: Actualización {nextUpdateNumber}
+                  </Text>
+                </View>
+
+                <View className="gap-2">
+                  {existingUpdates.map((item) => (
+                    <View
+                      key={item.updateNumber}
+                      className="flex-row items-start rounded-2xl border border-slate-100 bg-slate-50/80 p-2.5">
+                      <View className="flex-1 pr-2">
+                        <View className="flex-row flex-wrap items-center gap-1.5">
+                          <View className="rounded-md bg-sky-100 px-1.5 py-0.5">
+                            <Text className="font-mono text-[9.5px] font-bold text-sky-900">
+                              {item.title}
+                            </Text>
+                          </View>
+                          {!!item.dateLabel && (
+                            <Text className="font-mono text-[9.5px] text-slate-400">
+                              {item.dateLabel}
+                            </Text>
+                          )}
+                          {item.painIntensity !== undefined && (
+                            <Text className="font-mono text-[9.5px] font-bold text-slate-600">
+                              · Dolor {item.painIntensity}/10
+                            </Text>
+                          )}
+                        </View>
+                        <Text className="mt-1 text-[11.5px] leading-4 text-slate-600">
+                          {item.text}
+                        </Text>
+                      </View>
+                      {item.photoUri && (
+                        <Image
+                          source={{ uri: item.photoUri }}
+                          style={{ width: 46, height: 46, borderRadius: 10 }}
+                          resizeMode="cover"
+                        />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* Tarjeta 2: Intensidad del dolor (Fiel al diseño original con slider minimalista) */}
             <View className="mt-3.5 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
               <View className="flex-row items-center justify-between">
@@ -395,8 +554,18 @@ export function RegisterObservationModal({
                   </Text>
                 </View>
                 {/* Indicador numérico pill: "7 / 10" */}
-                <View className="flex-row items-baseline rounded-xl border border-slate-200 bg-slate-50 px-3 py-1">
-                  <Text className="text-sm font-extrabold text-slate-800">{painIntensity}</Text>
+                <View
+                  className={`flex-row items-baseline rounded-xl border px-3 py-1 ${
+                    painIntensity === 0
+                      ? 'border-emerald-300 bg-emerald-50'
+                      : 'border-slate-200 bg-slate-50'
+                  }`}>
+                  <Text
+                    className={`text-sm font-extrabold ${
+                      painIntensity === 0 ? 'text-emerald-700' : 'text-slate-800'
+                    }`}>
+                    {painIntensity}
+                  </Text>
                   <Text className="text-xs text-slate-400"> / 10</Text>
                 </View>
               </View>
@@ -454,7 +623,11 @@ export function RegisterObservationModal({
                       className="items-center px-1">
                       <Text
                         className={`text-xs ${
-                          active ? 'font-extrabold text-slate-900' : 'font-medium text-slate-400'
+                          active
+                            ? i === 0
+                              ? 'font-extrabold text-emerald-700'
+                              : 'font-extrabold text-slate-900'
+                            : 'font-medium text-slate-400'
                         }`}>
                         {i}
                       </Text>
@@ -462,6 +635,14 @@ export function RegisterObservationModal({
                   );
                 })}
               </View>
+
+              {painIntensity === 0 && (
+                <View className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 px-3 py-2.5">
+                  <Text className="text-xs font-bold text-emerald-800">
+                    Mejoría total (0/10): se guardará esta actualización como curada y pasará al historial de malestares.
+                  </Text>
+                </View>
+              )}
 
               {/* Tira minimalista discreta de la escala de color (1 Leve -> 5 Moderado -> 10 Intenso) */}
               <View className="mt-3 pt-1">
@@ -541,11 +722,20 @@ export function RegisterObservationModal({
               </View>
             </View>
 
-            {/* Tarjeta 5: Observaciones escritas */}
+            {/* Tarjeta 5: Texto de la actualización */}
             <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-              <View className="mb-2.5 flex-row items-center">
-                <FileText size={18} color="#334155" strokeWidth={2} />
-                <Text className="ml-2 text-sm font-bold text-slate-800">Observaciones</Text>
+              <View className="mb-2.5 flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <FileText size={18} color="#334155" strokeWidth={2} />
+                  <Text className="ml-2 text-sm font-bold text-slate-800">
+                    {isUpdateMode
+                      ? `Texto · Actualización ${nextUpdateNumber}`
+                      : 'Texto · Actualización 1'}
+                  </Text>
+                </View>
+                <Text className="font-mono text-[10px] text-slate-400">
+                  Se guarda en BD
+                </Text>
               </View>
 
               <View className="rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
@@ -553,37 +743,46 @@ export function RegisterObservationModal({
                   value={notes}
                   onChangeText={setNotes}
                   multiline
-                  maxLength={300}
-                  placeholder={`Ej. Dolor localizado en ${muscle.name.toLowerCase()} tras esfuerzo...`}
+                  maxLength={400}
+                  placeholder={
+                    isUpdateMode
+                      ? `Describe la evolución o cambios para la Actualización ${nextUpdateNumber}...`
+                      : `Ej. Dolor localizado en ${muscle.name.toLowerCase()} tras esfuerzo...`
+                  }
                   placeholderTextColor="#94a3b8"
                   className="min-h-[76px] text-xs leading-5 text-slate-700"
                   textAlignVertical="top"
                 />
               </View>
               <Text className="mt-1.5 text-right text-[11px] text-slate-400">
-                {notes.length} / 300
+                {notes.length} / 400
               </Text>
             </View>
 
-            {/* Tarjeta 6: Foto de seguimiento diario */}
+            {/* Tarjeta 6: Foto de esta actualización */}
             <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
               <View className="mb-2.5 flex-row items-center justify-between">
                 <View className="flex-row items-center">
                   <Camera size={18} color="#334155" strokeWidth={2} />
                   <Text className="ml-2 text-sm font-bold text-slate-800">
-                    Foto diaria de lesión
+                    {`Foto · Actualización ${nextUpdateNumber}`}
                   </Text>
                 </View>
                 <Text className="text-[10px] text-slate-400">Opcional</Text>
               </View>
 
               {capturedPhoto && (
-                <View className="mb-3 overflow-hidden rounded-2xl border border-slate-200">
+                <View className="relative mb-3 overflow-hidden rounded-2xl border border-slate-200">
                   <Image
                     source={{ uri: capturedPhoto.uri }}
                     style={{ width: '100%', height: 150 }}
                     resizeMode="cover"
                   />
+                  <Pressable
+                    onPress={() => setCapturedPhoto(null)}
+                    className="absolute right-2 top-2 h-7 w-7 items-center justify-center rounded-full bg-slate-900/75">
+                    <X size={14} color="#ffffff" />
+                  </Pressable>
                 </View>
               )}
 
@@ -607,18 +806,41 @@ export function RegisterObservationModal({
             <Pressable
               onPress={handleSave}
               disabled={isSaving}
-              className="mt-5 flex-row items-center justify-center rounded-2xl bg-[#58c7f3] py-4 shadow-md active:opacity-80">
+              className={`mt-5 flex-row items-center justify-center rounded-2xl py-4 shadow-md active:opacity-80 ${
+                painIntensity === 0 ? 'bg-emerald-600' : 'bg-[#58c7f3]'
+              }`}>
               {isSaving ? (
                 <ActivityIndicator color="#ffffff" />
+              ) : isUpdateMode ? (
+                <PlusCircle size={18} color="#ffffff" strokeWidth={2.3} />
               ) : (
                 <Check size={18} color="#ffffff" strokeWidth={2.5} />
               )}
               <Text className="ml-2 text-sm font-bold text-white">
-                {isSaving ? 'Guardando...' : 'Guardar registro'}
+                {isSaving
+                  ? 'Guardando...'
+                  : painIntensity === 0
+                    ? 'Guardar mejoría y mover al historial'
+                    : isUpdateMode
+                      ? `Guardar Actualización ${nextUpdateNumber}`
+                      : 'Guardar Actualización 1'}
               </Text>
             </Pressable>
 
-            {/* Botón secundario para limpiar la zona si ya tenía un malestar registrado */}
+            {/* Botón dedicado para curar el malestar ("Ya no siento el síntoma") */}
+            {isUpdateMode && painIntensity > 0 && (
+              <Pressable
+                onPress={handleMarkCured}
+                disabled={isSaving}
+                className="mt-3 flex-row items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 py-3.5 active:opacity-80">
+                <Check size={16} color="#047857" strokeWidth={2.4} />
+                <Text className="ml-2 text-xs font-bold text-emerald-800">
+                  Ya no siento el síntoma (Curar y guardar historial)
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Botón secundario para limpiar la zona si se registró por error */}
             {muscle.status !== 'normal' && (
               <Pressable
                 onPress={handleClear}

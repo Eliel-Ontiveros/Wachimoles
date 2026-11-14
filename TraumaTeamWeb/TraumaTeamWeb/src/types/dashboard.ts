@@ -88,6 +88,12 @@ export interface DailyHealthCheck {
   updatedAt: string;
 }
 
+export interface BodyConditionImageRecord {
+  path: string;
+  signedUrl: string;
+  expiresAt: string;
+}
+
 export interface InjuryPhoto {
   id: string;
   muscleId: string;

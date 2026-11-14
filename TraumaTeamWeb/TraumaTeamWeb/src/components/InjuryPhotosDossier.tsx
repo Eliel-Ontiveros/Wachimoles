@@ -137,11 +137,11 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
           <div className="timelapse-media-box">
             <img
               src={activePhoto.uri}
-              alt={`Día ${activePhoto.dayNumber} en ${activePhoto.muscleName}`}
+              alt={`Actualización ${activePhoto.dayNumber} en ${activePhoto.muscleName}`}
               className="timelapse-photo"
             />
             <span className="timelapse-day-badge">
-              DÍA {activePhoto.dayNumber} · {safeIndex + 1}/{filteredPhotos.length}
+              ACTUALIZACIÓN {activePhoto.dayNumber} · {safeIndex + 1}/{filteredPhotos.length}
             </span>
           </div>
 
@@ -168,7 +168,7 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
                   setIsPlaying(false);
                   setActiveIndex(0);
                 }}
-                title="Día 1"
+                title="Actualización 1"
               >
                 <RotateCcwIcon size={14} />
               </button>
@@ -177,7 +177,7 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
 
           {activePhoto.note && <p className="timelapse-note">“{activePhoto.note}”</p>}
 
-          <div className="timelapse-strip" role="list" aria-label="Miniaturas diarias">
+          <div className="timelapse-strip" role="list" aria-label="Miniaturas por actualización">
             {filteredPhotos.map((p, idx) => (
               <button
                 key={p.id}
@@ -188,8 +188,8 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
                   setActiveIndex(idx);
                 }}
               >
-                <img src={p.uri} alt={`Día ${p.dayNumber}`} />
-                <span>D{p.dayNumber}</span>
+                <img src={p.uri} alt={`Actualización ${p.dayNumber}`} />
+                <span>Act. {p.dayNumber}</span>
               </button>
             ))}
           </div>
