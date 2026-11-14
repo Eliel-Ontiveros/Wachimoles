@@ -26,21 +26,24 @@ describe("VoiceService", () => {
     const fetchMock = reply('{"type":"body-zone","muscleId":"dorsal_izq"}');
     global.fetch = fetchMock as unknown as typeof fetch;
     const result = await make().interpret("me duele la espalda de la izquierda");
-    expect(result.intent).toEqual({ type: "body-zone", muscleId: "dorsal_izq", muscleName: "Dorsal izquierdo" });
+    expect(result.intent).toEqual({ type: "body-zone", muscleId: "dorsal_izq", muscleName: "Left Lat" });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://api.deepseek.com/chat/completions");
     expect(init.headers.Authorization).toBe("Bearer k");
   });
 
-  it("asks the model to answer in the app language (Spanish by default)", async () => {
+  it("always asks the model to answer in English and understand Spanish or English", async () => {
     const fetchMock = reply('{"type":"help"}');
     global.fetch = fetchMock as unknown as typeof fetch;
     await make().interpret("hola");
-    await make().interpret("hello", "en");
+    await make().interpret("hello");
     const system = (i: number) =>
       JSON.parse(fetchMock.mock.calls[i][1].body).messages[0].content as string;
-    expect(system(0)).toContain("siempre en español");
-    expect(system(1)).toContain("siempre en inglés");
+    for (const i of [0, 1]) {
+      expect(system(i)).toContain("The user may speak Spanish or English; understand both");
+      expect(system(i)).toContain("ALWAYS be in English");
+    }
+    expect(system(0)).toBe(system(1));
   });
 
   it("sends system, history in order, then the current text", async () => {
@@ -50,7 +53,7 @@ describe("VoiceService", () => {
       { role: "user" as const, content: "me duele el bíceps" },
       { role: "assistant" as const, content: "¿derecho o izquierdo?" }
     ];
-    await make().interpret("el derecho", "es", history);
+    await make().interpret("el derecho", history);
     const messages = JSON.parse(fetchMock.mock.calls[0][1].body).messages;
     expect(messages).toHaveLength(4);
     expect(messages[0].role).toBe("system");
@@ -86,11 +89,11 @@ describe("VoiceService", () => {
   it("puts the context into the system prompt", async () => {
     const fetchMock = reply('{"type":"help"}');
     global.fetch = fetchMock as unknown as typeof fetch;
-    await make().interpret("detalles", "es", [], { screen: "/", tab: undefined });
+    await make().interpret("detalles", [], { screen: "/", tab: undefined });
     await make().interpret("detalles");
     const system = (i: number) =>
       JSON.parse(fetchMock.mock.calls[i][1].body).messages[0].content as string;
-    expect(system(0)).toContain("El usuario está en Monitoreo Vital");
-    expect(system(1)).not.toContain("El usuario está en");
+    expect(system(0)).toContain("The user is on Vital Monitoring");
+    expect(system(1)).not.toContain("The user is on");
   });
 });

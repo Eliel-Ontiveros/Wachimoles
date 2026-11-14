@@ -1843,7 +1843,7 @@ export class SupabaseService {
       }
     } catch (err) {
       this.logger.warn(
-        "No se pudo consultar la tabla missions en Supabase. Usando catálogo de respaldo.",
+        "Could not query the missions table in Supabase. Using fallback catalog.",
         err
       );
     }
@@ -1983,7 +1983,7 @@ export class SupabaseService {
       }
     } catch (err) {
       this.logger.warn(
-        `No se pudo obtener el estado de misión en Supabase para el usuario ${usuarioId}`,
+        `Could not fetch the mission state in Supabase for user ${usuarioId}`,
         err
       );
     }
@@ -2073,7 +2073,7 @@ export class SupabaseService {
       }
     } catch (err) {
       this.logger.warn(
-        "No se pudo guardar el estado de misión en Supabase; retornando estado local.",
+        "Could not save the mission state in Supabase; returning local state.",
         err
       );
     }
@@ -2231,7 +2231,7 @@ export class SupabaseService {
       }
     } catch (err) {
       this.logger.warn(
-        `No se pudo obtener la ubicación actual en Supabase para el usuario ${usuarioId}`,
+        `Could not fetch the current location in Supabase for user ${usuarioId}`,
         err
       );
     }
@@ -2308,7 +2308,7 @@ export class SupabaseService {
       }
     } catch (err) {
       this.logger.warn(
-        "No se pudo guardar la ubicación en Supabase; retornando estado local.",
+        "Could not save the location in Supabase; returning local state.",
         err
       );
     }
@@ -2445,7 +2445,7 @@ export class SupabaseService {
         resumen = mapDailyMissionDay(rowsDia[0] as SupabaseDailyMissionDayRow);
       }
     } catch (err) {
-      this.logger.warn("No se pudo obtener el resumen del día de misiones", err);
+      this.logger.warn("Could not fetch the daily missions summary", err);
     }
 
     // 2. Consultar misiones completadas del día
@@ -2522,7 +2522,7 @@ export class SupabaseService {
         );
       } catch (err) {
         this.logger.warn(
-          `No se pudo guardar la misión ${misionId} en Supabase`,
+          `Could not save mission ${misionId} in Supabase`,
           err
         );
       }
@@ -2653,7 +2653,7 @@ export class SupabaseService {
         "upsert daily mission days summary"
       );
     } catch (err) {
-      this.logger.warn("No se pudo guardar el día en Supabase", err);
+      this.logger.warn("Could not save the day in Supabase", err);
     }
 
     const misionesMapeadas: MisionDiariaProgreso[] = misionesInput.map((m) => {

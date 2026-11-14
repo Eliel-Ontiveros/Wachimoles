@@ -50,3 +50,11 @@ describe("InterpretVoiceDto context", () => {
     expect(check({ text: "hola", context: "/" }).length).toBeGreaterThan(0);
   });
 });
+
+describe("InterpretVoiceDto locale (legacy)", () => {
+  it("still accepts an optional locale so older clients do not get a 400", () => {
+    expect(check({ text: "hola", locale: "es" })).toHaveLength(0);
+    expect(check({ text: "hello", locale: "en" })).toHaveLength(0);
+    expect(check({ text: "hello" })).toHaveLength(0);
+  });
+});

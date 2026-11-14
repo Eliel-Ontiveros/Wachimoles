@@ -1,11 +1,11 @@
-import { sanitizeIntent } from "./voice-intent";
+import { MUSCLES, sanitizeIntent } from "./voice-intent";
 
 describe("sanitizeIntent", () => {
   it("accepts known intents and rebuilds labels server-side", () => {
     expect(sanitizeIntent({ type: "navigate", route: "/missions", label: "x" }))
-      .toEqual({ type: "navigate", route: "/missions", label: "Misiones y Viaje" });
+      .toEqual({ type: "navigate", route: "/missions", label: "Missions & Journey" });
     expect(sanitizeIntent({ type: "body-zone", muscleId: "biceps_der" }))
-      .toEqual({ type: "body-zone", muscleId: "biceps_der", muscleName: "Bíceps derecho" });
+      .toEqual({ type: "body-zone", muscleId: "biceps_der", muscleName: "Right Biceps" });
     expect(sanitizeIntent({ type: "start-checkin", extra: 1 })).toEqual({ type: "start-checkin" });
   });
 
@@ -34,7 +34,7 @@ describe("sanitizeIntent", () => {
       expect(sanitizeIntent({ type: "complete-mission", missionId: "env-luna-eva" })).toEqual({ type: "complete-mission", missionId: "env-luna-eva" });
       expect(sanitizeIntent({ type: "vital-history", metric: "spo2" })).toEqual({ type: "vital-history", metric: "spo2" });
       expect(sanitizeIntent({ type: "fill-health-check", bloodSugarMgDl: 110, systolicBp: 120, diastolicBp: 80, temperatureC: 36.5, sleepHours: 7, mood: 4, symptoms: ["Fatiga"], notes: "ok", z: 1 }))
-        .toEqual({ type: "fill-health-check", bloodSugarMgDl: 110, systolicBp: 120, diastolicBp: 80, temperatureC: 36.5, sleepHours: 7, mood: 4, symptoms: ["Fatiga"], notes: "ok" });
+        .toEqual({ type: "fill-health-check", bloodSugarMgDl: 110, systolicBp: 120, diastolicBp: 80, temperatureC: 36.5, sleepHours: 7, mood: 4, symptoms: ["Fatigue"], notes: "ok" });
     });
 
     it("rejects invalid required fields", () => {
@@ -62,10 +62,26 @@ describe("sanitizeIntent", () => {
 
     it("fill-health-check filters, bounds and rejects empty", () => {
       expect(sanitizeIntent({ type: "fill-health-check", sleepHours: 7, mood: 9, bloodSugarMgDl: 5, systolicBp: "120", symptoms: ["Fatiga", "Rabia"] }))
-        .toEqual({ type: "fill-health-check", sleepHours: 7, symptoms: ["Fatiga"] });
+        .toEqual({ type: "fill-health-check", sleepHours: 7, symptoms: ["Fatigue"] });
       expect(sanitizeIntent({ type: "fill-health-check", symptoms: ["Rabia"], mood: 0, temperatureC: Infinity, notes: "  " })).toBeNull();
       expect(sanitizeIntent({ type: "fill-health-check" })).toBeNull();
     });
+  });
+
+  it("fill-health-check accepts legacy Spanish and English symptoms, normalized to English", () => {
+    expect(sanitizeIntent({ type: "fill-health-check", symptoms: ["Ninguno", "Mareo 0g", "Congestión", "Fatiga", "Cefalea"] }))
+      .toEqual({ type: "fill-health-check", symptoms: ["None", "Zero-G dizziness", "Congestion", "Fatigue", "Headache"] });
+    expect(sanitizeIntent({ type: "fill-health-check", symptoms: ["None", "Zero-G dizziness", "Congestion", "Fatigue", "Headache"] }))
+      .toEqual({ type: "fill-health-check", symptoms: ["None", "Zero-G dizziness", "Congestion", "Fatigue", "Headache"] });
+    expect(sanitizeIntent({ type: "fill-health-check", symptoms: ["Fatiga", "Fatigue", "Headache", "Rabia"] }))
+      .toEqual({ type: "fill-health-check", symptoms: ["Fatigue", "Headache"] });
+  });
+
+  it("uses English muscle display names", () => {
+    expect(MUSCLES.biceps_der).toBe("Right Biceps");
+    expect(MUSCLES.dorsal_izq).toBe("Left Lat");
+    expect(MUSCLES.cara).toBe("Face / Facial Region");
+    for (const name of Object.values(MUSCLES)) expect(name).not.toMatch(/[áéíóúñ]|derecho|izquierdo/i);
   });
 
   it("sanitizes describe-screen", () => {
