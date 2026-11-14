@@ -35,6 +35,7 @@ import {
   fetchBodyConditionsFromBackend,
   fetchDailyHealthChecksFromBackend,
   fetchSamplesFromBackend,
+  fetchAstronautLocationFromBackend,
   getInitialEmptyVitals,
   saveBodyConditionToBackend,
   uploadBodyConditionImageToBackend,
@@ -67,7 +68,7 @@ type ResponsiveStage = 'all' | 'signos' | 'visor' | 'musculo';
 
 export function App() {
   const [introFinished, setIntroFinished] = useState<boolean>(false);
-  const [astronauts] = useState<AstronautProfile[]>([PRIMARY_ASTRONAUT]);
+  const [astronauts, setAstronauts] = useState<AstronautProfile[]>([PRIMARY_ASTRONAUT]);
   const [selectedAstronautId, setSelectedAstronautId] = useState<string>(PRIMARY_ASTRONAUT.id);
   const themeMode = 'light' as const;
   const [responsiveStage, setResponsiveStage] = useState<ResponsiveStage>('all');
@@ -98,10 +99,11 @@ export function App() {
   const performSync = useCallback(async () => {
     const healthOk = await checkBackendHealth();
 
-    const [samplesRes, condRes, checksRes] = await Promise.allSettled([
+    const [samplesRes, condRes, checksRes, locationRes] = await Promise.allSettled([
       fetchSamplesFromBackend(500),
       fetchBodyConditionsFromBackend(500),
       fetchDailyHealthChecksFromBackend(100),
+      fetchAstronautLocationFromBackend(),
     ]);
 
     let nextSamplesStatus: ConnectionEndpointStatus['samplesStatus'] = 'ok';
@@ -124,6 +126,21 @@ export function App() {
       setHealthChecks(checksRes.value);
     } else {
       nextChecksStatus = 'error';
+    }
+
+    if (locationRes.status === 'fulfilled' && locationRes.value) {
+      const loc = locationRes.value;
+      setAstronauts((prev) =>
+        prev.map((astro) =>
+          astro.id === selectedAstronautId || astro.isPrimary
+            ? {
+                ...astro,
+                environment: loc.environment,
+                gravityLabel: loc.gravityLabel,
+              }
+            : astro
+        )
+      );
     }
 
     setConnectionStatus({

@@ -8,7 +8,7 @@ import {
   Min
 } from "class-validator";
 import { Type } from "class-transformer";
-import { UbicacionEspacial, EstadoMision } from "./dashboard.types";
+import { UbicacionEspacial, EstadoMision, UbicacionEntorno } from "./dashboard.types";
 
 export class GuardarEstadoMisionDto {
   @IsOptional()
@@ -113,3 +113,22 @@ export class LlegadaAnticipadaDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "actualArrivalDate debe tener formato YYYY-MM-DD" })
   actualArrivalDate?: string;
 }
+
+export class GuardarUbicacionAstronautaDto {
+  @IsOptional()
+  @IsString()
+  usuarioId?: string;
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @IsOptional()
+  @IsIn(["tierra", "nave", "estacion", "luna", "marte"])
+  entorno?: UbicacionEntorno;
+
+  @IsOptional()
+  @IsIn(["tierra", "nave", "estacion", "luna", "marte"])
+  environment?: UbicacionEntorno;
+}
+

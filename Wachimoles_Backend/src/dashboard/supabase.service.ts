@@ -30,12 +30,19 @@ import {
   EstadoMision,
   MisionCatalogo,
   MisionDiariaRotada,
-  EstadoMisionAstronauta
+  EstadoMisionAstronauta,
+  UbicacionEntorno,
+  UbicacionAstronauta,
+  SupabaseAstronautLocationRow
 } from "./dashboard.types";
 import { SaveDailyHealthCheckDto } from "./daily-health-checks.dto";
 import { SaveBodyConditionDto } from "./body-conditions.dto";
 import { ConsultarMisionesQueryDto } from "./missions.dto";
-import { GuardarEstadoMisionDto, LlegadaAnticipadaDto } from "./astronaut-mission.dto";
+import {
+  GuardarEstadoMisionDto,
+  LlegadaAnticipadaDto,
+  GuardarUbicacionAstronautaDto
+} from "./astronaut-mission.dto";
 
 interface SupabaseSampleRow {
   id: number;
@@ -367,6 +374,54 @@ function mapAstronautMissionState(
     currentEnvironment: entornoActual,
     status: estado,
     arrivedEarly: llegadaAnticipada
+  };
+}
+
+const CONFIG_ENTORNOS: Record<
+  UbicacionEntorno,
+  { etiqueta: string; gravedadEtiqueta: string }
+> = {
+  nave: {
+    etiqueta: "En la Nave (Órbita)",
+    gravedadEtiqueta: "0g Microgravedad"
+  },
+  estacion: {
+    etiqueta: "Estación Espacial (EEI)",
+    gravedadEtiqueta: "0g Microgravedad"
+  },
+  luna: {
+    etiqueta: "Base Lunar",
+    gravedadEtiqueta: "0.16g Gravedad Lunar"
+  },
+  marte: {
+    etiqueta: "Superficie de Marte",
+    gravedadEtiqueta: "0.38g Gravedad Marciana"
+  },
+  tierra: {
+    etiqueta: "En la Tierra (Base)",
+    gravedadEtiqueta: "1.0g Gravedad Terrestre"
+  }
+};
+
+function mapAstronautLocation(
+  row: SupabaseAstronautLocationRow
+): UbicacionAstronauta {
+  const entorno = (row.entorno || "tierra") as UbicacionEntorno;
+  const config = CONFIG_ENTORNOS[entorno] ?? CONFIG_ENTORNOS.tierra;
+  const ahoraIso = new Date().toISOString();
+  const actualizadoEn = row.actualizado_en ?? ahoraIso;
+
+  return {
+    usuarioId: row.user_id,
+    entorno,
+    etiqueta: config.etiqueta,
+    gravedadEtiqueta: config.gravedadEtiqueta,
+    actualizadoEn,
+    userId: row.user_id,
+    environment: entorno,
+    label: config.etiqueta,
+    gravityLabel: config.gravedadEtiqueta,
+    updatedAt: actualizadoEn
   };
 }
 
@@ -1983,5 +2038,157 @@ export class SupabaseService {
 
   private getAstronautMissionStatesUrl(): URL {
     return new URL(`${this.supabaseUrl}/rest/v1/astronaut_mission_states`);
+  }
+
+  private getAstronautLocationsUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/astronaut_locations`);
+  }
+
+  async obtenerUbicacionActualAstronauta(
+    usuarioId: string
+  ): Promise<UbicacionAstronauta> {
+    const url = this.getAstronautLocationsUrl();
+    url.searchParams.set("select", "*");
+    url.searchParams.set("user_id", `eq.${usuarioId}`);
+    url.searchParams.set("limit", "1");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        { method: "GET" },
+        "astronaut current location"
+      );
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return mapAstronautLocation(rows[0] as SupabaseAstronautLocationRow);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo obtener la ubicación actual en Supabase para el usuario ${usuarioId}`,
+        err
+      );
+    }
+
+    // Fallback: si no hay registro en astronaut_locations, revisar si existe estado de misión
+    const estadoMision = await this.obtenerEstadoMisionAstronauta(usuarioId);
+    if (estadoMision?.entornoActual) {
+      const config = CONFIG_ENTORNOS[estadoMision.entornoActual] ?? CONFIG_ENTORNOS.tierra;
+      return {
+        usuarioId,
+        entorno: estadoMision.entornoActual,
+        etiqueta: config.etiqueta,
+        gravedadEtiqueta: config.gravedadEtiqueta,
+        actualizadoEn: estadoMision.actualizadoEn,
+        userId: usuarioId,
+        environment: estadoMision.entornoActual,
+        label: config.etiqueta,
+        gravityLabel: config.gravedadEtiqueta,
+        updatedAt: estadoMision.actualizadoEn
+      };
+    }
+
+    const configDefault = CONFIG_ENTORNOS.tierra;
+    const ahoraIso = new Date().toISOString();
+    return {
+      usuarioId,
+      entorno: "tierra",
+      etiqueta: configDefault.etiqueta,
+      gravedadEtiqueta: configDefault.gravedadEtiqueta,
+      actualizadoEn: ahoraIso,
+      userId: usuarioId,
+      environment: "tierra",
+      label: configDefault.etiqueta,
+      gravityLabel: configDefault.gravedadEtiqueta,
+      updatedAt: ahoraIso
+    };
+  }
+
+  async guardarUbicacionActualAstronauta(
+    usuarioId: string,
+    dto: GuardarUbicacionAstronautaDto
+  ): Promise<UbicacionAstronauta> {
+    const entorno: UbicacionEntorno = dto.entorno ?? dto.environment ?? "tierra";
+    const config = CONFIG_ENTORNOS[entorno] ?? CONFIG_ENTORNOS.tierra;
+    const ahoraIso = new Date().toISOString();
+
+    const payload = {
+      user_id: usuarioId,
+      entorno,
+      actualizado_en: ahoraIso
+    };
+
+    const url = this.getAstronautLocationsUrl();
+    url.searchParams.set("on_conflict", "user_id");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=representation"
+          },
+          body: JSON.stringify(payload)
+        },
+        "save astronaut current location"
+      );
+
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        void this.actualizarEntornoEnEstadoMisionSiExiste(usuarioId, entorno);
+        return mapAstronautLocation(rows[0] as SupabaseAstronautLocationRow);
+      }
+    } catch (err) {
+      this.logger.warn(
+        "No se pudo guardar la ubicación en Supabase; retornando estado local.",
+        err
+      );
+    }
+
+    void this.actualizarEntornoEnEstadoMisionSiExiste(usuarioId, entorno);
+
+    return {
+      usuarioId,
+      entorno,
+      etiqueta: config.etiqueta,
+      gravedadEtiqueta: config.gravedadEtiqueta,
+      actualizadoEn: ahoraIso,
+      userId: usuarioId,
+      environment: entorno,
+      label: config.etiqueta,
+      gravityLabel: config.gravedadEtiqueta,
+      updatedAt: ahoraIso
+    };
+  }
+
+  private async actualizarEntornoEnEstadoMisionSiExiste(
+    usuarioId: string,
+    entorno: UbicacionEntorno
+  ): Promise<void> {
+    try {
+      const estado = await this.obtenerEstadoMisionAstronauta(usuarioId);
+      if (estado) {
+        const url = this.getAstronautMissionStatesUrl();
+        url.searchParams.set("user_id", `eq.${usuarioId}`);
+        await this.requestSupabaseTable(
+          url,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Prefer: "return=minimal"
+            },
+            body: JSON.stringify({
+              entorno_actual: entorno,
+              actualizado_en: new Date().toISOString()
+            })
+          },
+          "sync environment to astronaut mission states"
+        );
+      }
+    } catch {
+      // Ignorar fallas secundarias al actualizar astronaut_mission_states
+    }
   }
 }

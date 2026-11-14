@@ -908,17 +908,108 @@ export async function markEarlyArrivalInBackend(
   }
 }
 
-// Endpoint listo para guardar entorno seleccionado en el backend
+// Endpoint para guardar la ubicación actual del astronauta en el backend de forma independiente (con o sin misión)
+export async function saveAstronautLocationToBackend(
+  entorno: EnvironmentType
+): Promise<boolean> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return false;
+  }
+
+  const paths = [
+    '/dashboard/astronaut/location',
+    '/dashboard/mission-state/location',
+    '/mission/environment',
+  ];
+
+  for (const path of paths) {
+    try {
+      let response: Response | null = null;
+      for (const baseHeaders of authHeadersList) {
+        response = await fetchBackendWithFallback(path, {
+          method: 'PUT',
+          headers: {
+            ...baseHeaders,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            entorno,
+            environment: entorno,
+            userId: API_CONFIG.userId,
+          }),
+        });
+        if (response.status !== 401 && response.status !== 404) break;
+      }
+      if (response && response.ok) {
+        return true;
+      }
+    } catch {
+      // Intentar siguiente ruta de fallback si hay fallo de red específico
+    }
+  }
+  return false;
+}
+
+// Endpoint para consultar la ubicación actual del astronauta desde el backend
+export async function fetchAstronautLocationFromBackend(): Promise<{
+  entorno: EnvironmentType;
+  label: string;
+  gravityLabel: string;
+} | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const paths = ['/dashboard/astronaut/location', '/dashboard/mission-state/location'];
+  for (const path of paths) {
+    try {
+      let response: Response | null = null;
+      for (const headers of authHeadersList) {
+        response = await fetchBackendWithFallback(path, {
+          method: 'GET',
+          headers: { ...headers, Accept: 'application/json' },
+        });
+        if (response.status !== 401 && response.status !== 404) break;
+      }
+
+      if (response && response.ok) {
+        const data: unknown = await response.json();
+        if (isRecord(data)) {
+          const entorno = (data.entorno ?? data.environment) as EnvironmentType;
+          if (
+            entorno === 'tierra' ||
+            entorno === 'nave' ||
+            entorno === 'estacion' ||
+            entorno === 'luna' ||
+            entorno === 'marte'
+          ) {
+            return {
+              entorno,
+              label: typeof data.etiqueta === 'string' ? data.etiqueta : (data.label as string) || entorno,
+              gravityLabel:
+                typeof data.gravedadEtiqueta === 'string'
+                  ? data.gravedadEtiqueta
+                  : (data.gravityLabel as string) || '',
+            };
+          }
+        }
+      }
+    } catch {
+      // Intentar siguiente ruta de fallback
+    }
+  }
+  return null;
+}
+
+// Guarda el entorno seleccionado en el backend de forma inmediata
 export async function syncEnvironmentToBackend(environment: EnvironmentType): Promise<void> {
-  const baseUrl = API_CONFIG.localUrls[0];
   try {
-    await fetch(`${baseUrl}/mission/environment`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: API_CONFIG.userId, environment }),
-    });
+    await saveAstronautLocationToBackend(environment);
   } catch {
-    // El frontend continúa operando en estado local si el endpoint aún no existe
+    // Si la red no está disponible, el frontend mantiene su estado local sin bloquear al usuario
   }
 }
 

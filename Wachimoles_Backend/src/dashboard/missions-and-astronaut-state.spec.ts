@@ -2,12 +2,14 @@ import { ConfigService } from "@nestjs/config";
 import { SupabaseService } from "./supabase.service";
 import { MissionsController } from "./missions.controller";
 import { AstronautMissionController } from "./astronaut-mission.controller";
+import { AstronautLocationController } from "./astronaut-location.controller";
 import { DashboardRequest } from "./dashboard.types";
 
 describe("Misiones y Estado Relativo del Astronauta", () => {
   let supabase: SupabaseService;
   let missionsController: MissionsController;
   let astronautController: AstronautMissionController;
+  let locationController: AstronautLocationController;
   const mockUserId = "43235979-2b38-4a17-9a38-632484accad9";
   const mockReq: DashboardRequest = {
     dashboardUserId: mockUserId
@@ -23,6 +25,7 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
     );
     missionsController = new MissionsController(supabase);
     astronautController = new AstronautMissionController(supabase);
+    locationController = new AstronautLocationController(supabase);
   });
 
   describe("Misiones y Rotación de Dificultades", () => {
@@ -180,6 +183,61 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
       expect(resultado.porcentajeProgresoRelativo).toBe(100);
       expect(resultado.entornoActual).toBe("marte");
       expect(resultado.fechaLlegadaReal).toBe("2026-11-14");
+      mockFetch.mockRestore();
+    });
+  });
+
+  describe("Ubicación Actual Independiente del Astronauta (Sin plan de vuelo)", () => {
+    it("guarda la ubicación seleccionada ('marte') en la base de datos sin requerir plan de vuelo", async () => {
+      const mockFetch = jest.spyOn(global, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "loc-uuid-1",
+              user_id: mockUserId,
+              entorno: "marte",
+              actualizado_en: "2026-11-14T12:00:00Z"
+            }
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const resultado = await locationController.guardarUbicacionActualPut(mockReq, {
+        entorno: "marte"
+      });
+
+      expect(resultado.entorno).toBe("marte");
+      expect(resultado.environment).toBe("marte");
+      expect(resultado.etiqueta).toBe("Superficie de Marte");
+      expect(resultado.gravedadEtiqueta).toBe("0.38g Gravedad Marciana");
+      expect(resultado.usuarioId).toBe(mockUserId);
+      expect(mockFetch).toHaveBeenCalled();
+      mockFetch.mockRestore();
+    });
+
+    it("obtiene la ubicación actual guardada de forma independiente", async () => {
+      const mockFetch = jest.spyOn(global, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "loc-uuid-2",
+              user_id: mockUserId,
+              entorno: "luna",
+              actualizado_en: "2026-11-14T12:00:00Z"
+            }
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const resultado = await astronautController.obtenerUbicacion(mockReq);
+
+      expect(resultado.entorno).toBe("luna");
+      expect(resultado.environment).toBe("luna");
+      expect(resultado.etiqueta).toBe("Base Lunar");
+      expect(resultado.gravedadEtiqueta).toBe("0.16g Gravedad Lunar");
+      expect(mockFetch).toHaveBeenCalled();
       mockFetch.mockRestore();
     });
   });

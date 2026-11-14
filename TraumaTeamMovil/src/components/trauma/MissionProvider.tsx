@@ -17,6 +17,7 @@ import {
   fetchDailyMissionsFromBackend,
   markEarlyArrivalInBackend,
   syncAstronautMissionStateToBackend,
+  fetchAstronautLocationFromBackend,
 } from '../../services/mission-api';
 import {
   CriticalAlert,
@@ -108,6 +109,21 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           'Revisa la conexión con el backend e inténtalo de nuevo.'
         );
       });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Carga la ubicación actual guardada en backend/base de datos (independiente de misión)
+  useEffect(() => {
+    let isMounted = true;
+    void fetchAstronautLocationFromBackend()
+      .then((loc) => {
+        if (!isMounted || !loc) return;
+        setEnvironmentState(loc.entorno);
+      })
+      .catch(() => {});
 
     return () => {
       isMounted = false;

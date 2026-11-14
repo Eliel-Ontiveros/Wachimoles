@@ -180,3 +180,27 @@ export interface EstadoMisionAstronauta {
   status?: EstadoMision;
   arrivedEarly?: boolean;
 }
+
+export type UbicacionEntorno = "tierra" | "nave" | "estacion" | "luna" | "marte";
+
+export interface UbicacionAstronauta {
+  usuarioId: string;
+  entorno: UbicacionEntorno;
+  etiqueta: string;
+  gravedadEtiqueta: string;
+  actualizadoEn: string;
+  // Campos en inglés para compatibilidad
+  userId?: string;
+  environment?: UbicacionEntorno;
+  label?: string;
+  gravityLabel?: string;
+  updatedAt?: string;
+}
+
+export interface SupabaseAstronautLocationRow {
+  id: string;
+  user_id: string;
+  entorno: UbicacionEntorno;
+  actualizado_en: string;
+}
+

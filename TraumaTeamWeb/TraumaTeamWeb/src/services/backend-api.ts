@@ -688,3 +688,49 @@ export function groupSamplesByDay(samples: DashboardSample[]): DailyMetricSummar
 
   return summaries.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
 }
+
+export interface AstronautLocationBackendResponse {
+  entorno: 'tierra' | 'nave' | 'estacion' | 'luna' | 'marte';
+  environment: 'tierra' | 'nave' | 'estacion' | 'luna' | 'marte';
+  label: string;
+  gravityLabel: string;
+  actualizadoEn?: string;
+}
+
+export async function fetchAstronautLocationFromBackend(): Promise<AstronautLocationBackendResponse | null> {
+  try {
+    const url = resolveUrl('/dashboard/astronaut/location');
+    const res = await fetchWithBearerOrBasic(url, { method: 'GET' });
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    if (isRecord(data)) {
+      const entorno = (data.entorno ?? data.environment) as
+        | 'tierra'
+        | 'nave'
+        | 'estacion'
+        | 'luna'
+        | 'marte';
+      if (
+        entorno === 'tierra' ||
+        entorno === 'nave' ||
+        entorno === 'estacion' ||
+        entorno === 'luna' ||
+        entorno === 'marte'
+      ) {
+        return {
+          entorno,
+          environment: entorno,
+          label: (data.etiqueta as string) || (data.label as string) || entorno,
+          gravityLabel:
+            (data.gravedadEtiqueta as string) || (data.gravityLabel as string) || '',
+          actualizadoEn:
+            (data.actualizadoEn as string) || (data.actualizado_en as string) || '',
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+

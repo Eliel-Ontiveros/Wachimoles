@@ -7,6 +7,7 @@ import { BodyConditionImagesController } from "./body-condition-images.controlle
 import { DailyHealthChecksController } from "./daily-health-checks.controller";
 import { MissionsController } from "./missions.controller";
 import { AstronautMissionController } from "./astronaut-mission.controller";
+import { AstronautLocationController } from "./astronaut-location.controller";
 import { DashboardWebGuard } from "./dashboard-web.guard";
 import { SupabaseService } from "./supabase.service";
 
@@ -18,7 +19,8 @@ import { SupabaseService } from "./supabase.service";
     BodyConditionImagesController,
     DailyHealthChecksController,
     MissionsController,
-    AstronautMissionController
+    AstronautMissionController,
+    AstronautLocationController
   ],
   providers: [DashboardTokenGuard, DashboardWebGuard, SupabaseService]
 })
