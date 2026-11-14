@@ -374,36 +374,47 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
     }
   };
 
-  const quickMetrics: { key: SampleMetric; label: string; color: string; valueText: string }[] = [
+  const quickMetrics: {
+    key: SampleMetric;
+    label: string;
+    tone: string;
+    valueText: string;
+    unit: string;
+  }[] = [
     {
       key: 'heart_rate',
       label: 'Pulso',
-      color: '#ef4444',
-      valueText: vitals.heartRate !== null ? `${vitals.heartRate} Lpm` : '--',
+      tone: 'tone-rose',
+      valueText: vitals.heartRate !== null ? `${vitals.heartRate}` : '--',
+      unit: 'Lpm',
     },
     {
       key: 'spo2',
       label: 'Oxígeno',
-      color: '#0284c7',
-      valueText: vitals.spo2 !== null ? `${vitals.spo2}%` : '--%',
+      tone: 'tone-sky',
+      valueText: vitals.spo2 !== null ? `${vitals.spo2}` : '--',
+      unit: '%',
     },
     {
       key: 'stress',
       label: 'Estrés',
-      color: '#f59e0b',
-      valueText: vitals.stress !== null ? `${vitals.stress}/100` : '--',
+      tone: 'tone-amber',
+      valueText: vitals.stress !== null ? `${vitals.stress}` : '--',
+      unit: '/100',
     },
     {
       key: 'sleep',
       label: 'Sueño',
-      color: '#7c3aed',
-      valueText: vitals.sleepHours !== null ? `${vitals.sleepHours.toFixed(1)} h` : '-- h',
+      tone: 'tone-sky',
+      valueText: vitals.sleepHours !== null ? vitals.sleepHours.toFixed(1) : '--',
+      unit: 'h',
     },
     {
       key: 'steps',
       label: 'Pasos',
-      color: '#06b6d4',
+      tone: 'tone-sky',
       valueText: vitals.steps !== null ? vitals.steps.toLocaleString('es-MX') : '--',
+      unit: 'pasos',
     },
   ];
 
@@ -427,15 +438,15 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
 
   return (
     <>
-      {/* Tarjeta simple y expresiva de Historial: Bitácora de Vuelo */}
+      {/* Accesos al historial con el lenguaje visual de las tarjetas de signos */}
       <section className="history-summary-card" aria-label="Bitácora de vuelo biométrica">
         <div className="history-card-head">
           <div className="history-head-title">
-            <span className="history-orbit-badge">
+            <span className="sym-icon-box tone-sky" aria-hidden="true">
               <OrbitIcon size={14} />
             </span>
             <div className="history-head-copy">
-              <strong>Bitácora de Vuelo</strong>
+              <h2>Bitácora de Vuelo</h2>
               <span>{allSamples.length} lecturas en órbita</span>
             </div>
           </div>
@@ -450,20 +461,24 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
           </button>
         </div>
 
-        <div className="history-quick-grid">
+        <div className="history-metric-list">
           {quickMetrics.map((qm) => (
             <button
               key={qm.key}
               type="button"
-              className="history-quick-pill"
+              className="history-metric-row"
               onClick={() => openHistoryModal(qm.key)}
+              aria-label={`Ver historial de ${qm.label}: ${qm.valueText} ${qm.unit}`}
             >
-              <span className="hqp-top">
-                <i className="hqp-dot" style={{ backgroundColor: qm.color }} />
-                {renderMetricIcon(qm.key, 11)}
-                <span>{qm.label}</span>
+              <span className={`sym-icon-box ${qm.tone}`} aria-hidden="true">
+                {renderMetricIcon(qm.key, 14)}
               </span>
-              <strong>{qm.valueText}</strong>
+              <span className="history-metric-label">{qm.label}</span>
+              <span className="history-metric-value">
+                <strong>{qm.valueText}</strong>
+                <span>{qm.unit}</span>
+              </span>
+              <ChevronRightIcon size={14} />
             </button>
           ))}
         </div>
