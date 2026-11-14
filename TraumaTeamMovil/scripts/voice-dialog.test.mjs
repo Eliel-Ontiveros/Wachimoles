@@ -57,7 +57,7 @@ test('observation dialog from "registrar una molestia en el hombro"', () => {
   assert.deepEqual(r.done, {
     type: 'register-observation',
     muscleId: 'deltoides_izq',
-    muscleName: 'Deltoides izquierdo',
+    muscleName: 'Left Deltoid',
     painIntensity: 7,
     swelling: true,
     functionalLimitation: false,
@@ -152,7 +152,7 @@ test('health questionnaire with skips and BP pair', () => {
     diastolicBp: 80,
     temperatureC: 36.5,
     mood: 3,
-    symptoms: ['Mareo 0g', 'Fatiga'],
+    symptoms: ['Zero-G dizziness', 'Fatigue'],
   });
 });
 
@@ -168,7 +168,7 @@ test('health: mood words, ninguno, skip phrases, finish early, initial fields', 
   assert.equal(r.done.mood, 5);
   assert.equal(r.done.sleepHours, 7);
   assert.equal(r.done.temperatureC, 36.5);
-  assert.deepEqual(r.done.symptoms, ['Ninguno']);
+  assert.deepEqual(r.done.symptoms, ['None']);
   assert.equal('systolicBp' in r.done, false);
 
   const moods = { bien: 4, estable: 4, tenso: 2, estresado: 2, mal: 1, crítico: 1, '2': 2 };
@@ -205,5 +205,22 @@ test('ambiguous zone without register keeps its action', () => {
   const d = startDialog(r.pending);
   assert.equal(d.question.key, 'dialog.q.side');
   const res = answer(d.state, 'derecho');
-  assert.deepEqual(res.done, { type: 'zone-photos', muscleId: 'deltoides_der', muscleName: 'Deltoides derecho' });
+  assert.deepEqual(res.done, { type: 'zone-photos', muscleId: 'deltoides_der', muscleName: 'Right Deltoid' });
+});
+
+test('S3 English zone names in dialog output and Spanish answers still work', () => {
+  const d = dialogFrom('registrar una molestia en el hombro');
+  assert.deepEqual(d.question.params, { zone: 'Deltoid' });
+  const r = d.say('izquierdo');
+  assert.equal(d.question.key, 'dialog.q.pain');
+  assert.equal(r.question.key, 'dialog.q.pain');
+  const s = d.say('siete');
+  assert.equal(s.question.key, 'dialog.q.swelling');
+});
+
+test('S5 symptom answers produce English values (Spanish or English speech)', () => {
+  const sp = dialogFrom('mi glucosa es 100 presión 120 80 temperatura 36.5 dormí 8 horas me siento bien');
+  assert.deepEqual(sp.say('tengo cefalea y congestión').done.symptoms, ['Congestion', 'Headache']);
+  const en = dialogFrom('my glucose is 100 pressure 120 80 temperature 36.5 slept 8 hours i feel good');
+  assert.deepEqual(en.say('dizzy').done.symptoms, ['Zero-G dizziness']);
 });

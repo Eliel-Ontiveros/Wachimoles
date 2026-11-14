@@ -3,7 +3,7 @@ import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 
-import { DEFAULT_LOCALE, isLocale, type Locale } from '@/i18n/messages';
+import { DEFAULT_VOICE_LANGUAGE, isVoiceLanguage, type VoiceLanguage } from '@/i18n/messages';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export const THEME_PREFERENCES: readonly ThemePreference[] = ['system', 'light', 'dark'];
@@ -16,8 +16,9 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 type SettingsCtx = {
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
+  /** Idioma de entrada del reconocedor de voz (la interfaz es solo en inglés). */
+  voiceLanguage: VoiceLanguage;
+  setVoiceLanguage: (language: VoiceLanguage) => void;
   themePreference: ThemePreference;
   setThemePreference: (preference: ThemePreference) => void;
   /** Tema efectivo (la preferencia 'system' ya resuelta con el del dispositivo). */
@@ -27,24 +28,24 @@ type SettingsCtx = {
 const SettingsContext = createContext<SettingsCtx | null>(null);
 
 /**
- * Preferencias de la app (idioma y tema), persistidas en AsyncStorage.
+ * Preferencias de la app (idioma de voz y tema), persistidas en AsyncStorage.
  * Renderiza de inmediato con los valores por defecto y aplica los guardados al cargar.
  */
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+  const [voiceLanguage, setVoiceLanguageState] = useState<VoiceLanguage>(DEFAULT_VOICE_LANGUAGE);
   const [themePreference, setThemeState] = useState<ThemePreference>(DEFAULT_THEME_PREFERENCE);
   const systemScheme = useColorScheme();
   /** Si el usuario cambia algo antes de que termine la carga, no lo pisamos. */
-  const touched = useRef({ locale: false, theme: false });
-  const current = useRef({ locale: DEFAULT_LOCALE as Locale, theme: DEFAULT_THEME_PREFERENCE });
+  const touched = useRef({ voiceLanguage: false, theme: false });
+  const current = useRef({ voiceLanguage: DEFAULT_VOICE_LANGUAGE as VoiceLanguage, theme: DEFAULT_THEME_PREFERENCE });
 
   useEffect(() => {
     let alive = true;
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         if (!alive || !raw) return;
-        const stored = JSON.parse(raw) as { locale?: unknown; theme?: unknown };
-        if (!touched.current.locale && isLocale(stored.locale)) setLocaleState(stored.locale);
+        const stored = JSON.parse(raw) as { voiceLanguage?: unknown; theme?: unknown };
+        if (!touched.current.voiceLanguage && isVoiceLanguage(stored.voiceLanguage)) setVoiceLanguageState(stored.voiceLanguage);
         if (!touched.current.theme && isThemePreference(stored.theme)) setThemeState(stored.theme);
       })
       .catch(() => {});
@@ -56,16 +57,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const persist = useCallback(() => {
     AsyncStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ locale: current.current.locale, theme: current.current.theme })
+      JSON.stringify({ voiceLanguage: current.current.voiceLanguage, theme: current.current.theme })
     ).catch(() => {});
   }, []);
 
-  const setLocale = useCallback(
-    (next: Locale) => {
-      if (!isLocale(next)) return;
-      touched.current.locale = true;
-      current.current.locale = next;
-      setLocaleState(next);
+  const setVoiceLanguage = useCallback(
+    (next: VoiceLanguage) => {
+      if (!isVoiceLanguage(next)) return;
+      touched.current.voiceLanguage = true;
+      current.current.voiceLanguage = next;
+      setVoiceLanguageState(next);
       persist();
     },
     [persist]
@@ -81,8 +82,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [persist]
   );
   useEffect(() => {
-    current.current = { locale, theme: themePreference };
-  }, [locale, themePreference]);
+    current.current = { voiceLanguage, theme: themePreference };
+  }, [voiceLanguage, themePreference]);
 
   const scheme: 'light' | 'dark' =
     themePreference === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : themePreference;
@@ -93,14 +94,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [scheme]);
 
   const value = useMemo(
-    () => ({ locale, setLocale, themePreference, setThemePreference, scheme }),
-    [locale, setLocale, themePreference, setThemePreference, scheme]
+    () => ({ voiceLanguage, setVoiceLanguage, themePreference, setThemePreference, scheme }),
+    [voiceLanguage, setVoiceLanguage, themePreference, setThemePreference, scheme]
   );
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
 export function useSettings() {
   const ctx = useContext(SettingsContext);
-  if (!ctx) throw new Error('useSettings debe usarse dentro de <SettingsProvider>');
+  if (!ctx) throw new Error('useSettings must be used inside <SettingsProvider>');
   return ctx;
 }

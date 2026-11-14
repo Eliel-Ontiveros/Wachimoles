@@ -49,12 +49,12 @@ function isDashboardSample(value: unknown): value is DashboardSample {
 
 function parseSamples(value: unknown): DashboardSample[] {
   if (!Array.isArray(value)) {
-    throw new Error('El backend devolvió una respuesta de muestras inválida.');
+    throw new Error('The backend returned an invalid samples response.');
   }
 
   return value.map((sample: unknown) => {
     if (!isDashboardSample(sample)) {
-      throw new Error('El backend devolvió una muestra con formato inválido.');
+      throw new Error('The backend returned a sample with an invalid format.');
     }
     return sample;
   });
@@ -137,7 +137,7 @@ export async function fetchBackendWithFallback(
   const candidates = getBackendCandidateBases();
 
   if (candidates.length === 0) {
-    throw new Error('Configura EXPO_PUBLIC_API_BASE_URL para conectar con el backend.');
+    throw new Error('Set EXPO_PUBLIC_API_BASE_URL to connect to the backend.');
   }
 
   let lastError: unknown = null;
@@ -214,7 +214,7 @@ export async function fetchBackendWithFallback(
 
   throw lastError instanceof Error
     ? lastError
-    : new Error('No se pudo conectar con el backend.');
+    : new Error('Could not connect to the backend.');
 }
 
 async function requestSamples(
@@ -222,13 +222,13 @@ async function requestSamples(
   metric?: SampleMetric
 ): Promise<DashboardSample[]> {
   if (!API_CONFIG.apiBaseUrl && typeof window === 'undefined') {
-    throw new Error('Configura EXPO_PUBLIC_API_BASE_URL para conectar con el backend.');
+    throw new Error('Set EXPO_PUBLIC_API_BASE_URL to connect to the backend.');
   }
   if (!API_CONFIG.dashboardApiToken) {
-    throw new Error('Configura EXPO_PUBLIC_DASHBOARD_API_TOKEN para autorizar el backend.');
+    throw new Error('Set EXPO_PUBLIC_DASHBOARD_API_TOKEN to authorize the backend.');
   }
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
-    throw new Error('El límite de muestras debe estar entre 1 y 500.');
+    throw new Error('The sample limit must be between 1 and 500.');
   }
 
   const query = metric
@@ -247,15 +247,15 @@ async function requestSamples(
 
     if (!response.ok) {
       if (response.status === 401) {
-        throw new Error('El backend rechazó el token de acceso (401).');
+        throw new Error('The backend rejected the access token (401).');
       }
-      throw new Error(`No se pudieron cargar las muestras (${response.status}).`);
+      throw new Error(`Could not load the samples (${response.status}).`);
     }
 
     return parseSamples(await response.json());
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('La solicitud al backend agotó el tiempo de espera.');
+      throw new Error('The backend request timed out.');
     }
     throw error;
   }
@@ -336,13 +336,13 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
   if (latestDate && !isNaN(latestDate.getTime())) {
     const diffSec = Math.floor((Date.now() - latestDate.getTime()) / 1000);
     if (diffSec < 60) {
-      formattedTime = `Hace ${Math.max(1, diffSec)} seg`;
+      formattedTime = `${Math.max(1, diffSec)} sec ago`;
     } else if (diffSec < 3600) {
-      formattedTime = `Hace ${Math.floor(diffSec / 60)} min`;
+      formattedTime = `${Math.floor(diffSec / 60)} min ago`;
     } else {
       const h = String(latestDate.getHours()).padStart(2, '0');
       const m = String(latestDate.getMinutes()).padStart(2, '0');
-      formattedTime = `A las ${h}:${m}`;
+      formattedTime = `At ${h}:${m}`;
     }
   }
 

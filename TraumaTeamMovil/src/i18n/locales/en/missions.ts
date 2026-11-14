@@ -1,7 +1,5 @@
-import type es from '../es/missions';
-
 /** Misiones y viaje (en). */
-const missions: Record<keyof typeof es, string> = {
+const missions: Record<string, string> = {
   'missions.env.nave.label': 'On the Ship (Orbit)',
   'missions.env.nave.short': 'Ship',
   'missions.env.nave.gravity': '0g Microgravity',

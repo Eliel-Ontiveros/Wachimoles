@@ -15,6 +15,7 @@ import {
 import { getTodayIsoDate } from '../../services/mission-api';
 import { DailyHealthCheck, HealthStatusLevel } from '../../types/mission';
 import { useMission } from './mission-context';
+import { displaySymptom } from '@/utils/symptoms';
 import { formatNumber } from '@/i18n/format';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
@@ -63,15 +64,23 @@ const MOOD_OPTIONS: {
   { value: 1, labelKey: 'body.mood.1', tag: '1/5', status: 'critical' },
 ];
 
-// Los valores (en español) se envían al backend y los usa la voz: solo se traduce lo que se muestra.
-const SYMPTOM_CHIPS = ['Ninguno', 'Mareo 0g', 'Congestión', 'Fatiga', 'Cefalea'];
+// Los valores (en inglés) se envían al backend y los usa la voz; los valores heredados en español se
+// normalizan con `displaySymptom` al leerlos.
+const NO_SYMPTOM = 'None';
+const SYMPTOM_CHIPS = ['None', 'Zero-G dizziness', 'Congestion', 'Fatigue', 'Headache'];
 const SYMPTOM_LABEL_KEYS: Record<string, MessageKey> = {
-  Ninguno: 'body.symptom.none',
-  'Mareo 0g': 'body.symptom.dizzy',
-  Congestión: 'body.symptom.congestion',
-  Fatiga: 'body.symptom.fatigue',
-  Cefalea: 'body.symptom.headache',
+  None: 'body.symptom.none',
+  'Zero-G dizziness': 'body.symptom.dizzy',
+  Congestion: 'body.symptom.congestion',
+  Fatigue: 'body.symptom.fatigue',
+  Headache: 'body.symptom.headache',
 };
+
+/** Símbolos guardados (inglés o español heredado) → valores en inglés, sin duplicados. */
+function normalizeSymptoms(list: string[]): string[] {
+  const out = [...new Set(list.map(displaySymptom))];
+  return out.length > 0 ? out : [NO_SYMPTOM];
+}
 
 function parseNum(raw: string): number | null {
   const clean = raw.replace(',', '.').trim();
@@ -199,7 +208,7 @@ export function HealthQuestionnaireSection() {
     todayCheck?.sleepHours != null ? String(todayCheck.sleepHours) : ''
   );
   const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>(todayCheck?.mood ?? 4);
-  const [symptoms, setSymptoms] = useState<string[]>(todayCheck?.symptoms ?? ['Ninguno']);
+  const [symptoms, setSymptoms] = useState<string[]>(normalizeSymptoms(todayCheck?.symptoms ?? []));
   const [notes, setNotes] = useState(todayCheck?.notes ?? '');
   const [openHelp, setOpenHelp] = useState<string | null>(null);
   const [savedBanner, setSavedBanner] = useState(false);
@@ -213,7 +222,7 @@ export function HealthQuestionnaireSection() {
     setTempText(todayCheck.temperatureC != null ? String(todayCheck.temperatureC) : '');
     setSleepText(todayCheck.sleepHours != null ? String(todayCheck.sleepHours) : '');
     setMood(todayCheck.mood);
-    setSymptoms(todayCheck.symptoms.length > 0 ? todayCheck.symptoms : ['Ninguno']);
+    setSymptoms(normalizeSymptoms(todayCheck.symptoms));
     setNotes(todayCheck.notes ?? '');
   }, [todayCheck]);
 
@@ -229,7 +238,7 @@ export function HealthQuestionnaireSection() {
     if (f.temperatureC !== undefined) setTempText(String(f.temperatureC));
     if (f.sleepHours !== undefined) setSleepText(String(f.sleepHours));
     if (f.mood !== undefined) setMood(f.mood);
-    if (f.symptoms !== undefined && f.symptoms.length > 0) setSymptoms(f.symptoms);
+    if (f.symptoms !== undefined && f.symptoms.length > 0) setSymptoms(normalizeSymptoms(f.symptoms));
     if (f.notes !== undefined) setNotes(f.notes);
   }
   useEffect(() => {
@@ -299,15 +308,15 @@ export function HealthQuestionnaireSection() {
   }, [glucose, sys, dia, temp, sleep, mood, t]);
 
   const toggleSymptom = (sym: string) => {
-    if (sym === 'Ninguno') {
-      setSymptoms(['Ninguno']);
+    if (sym === NO_SYMPTOM) {
+      setSymptoms([NO_SYMPTOM]);
       return;
     }
     setSymptoms((prev) => {
-      const cleaned = prev.filter((s) => s !== 'Ninguno');
+      const cleaned = prev.filter((s) => s !== NO_SYMPTOM);
       if (cleaned.includes(sym)) {
         const next = cleaned.filter((s) => s !== sym);
-        return next.length === 0 ? ['Ninguno'] : next;
+        return next.length === 0 ? [NO_SYMPTOM] : next;
       }
       return [...cleaned, sym];
     });

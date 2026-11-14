@@ -79,7 +79,7 @@ export function RegionCategoryIcon({
   color: string;
   size?: number;
 }) {
-  if (category === 'Cabeza y cuello') {
+  if (category === 'Head and neck') {
     return (
       <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Circle cx={12} cy={8} r={5} stroke={color} strokeWidth={2} />
@@ -94,7 +94,7 @@ export function RegionCategoryIcon({
     );
   }
 
-  if (category === 'Extremidad inferior') {
+  if (category === 'Lower limb') {
     return (
       <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
@@ -108,7 +108,7 @@ export function RegionCategoryIcon({
     );
   }
 
-  if (category === 'Extremidad superior') {
+  if (category === 'Upper limb') {
     return (
       <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
@@ -122,7 +122,7 @@ export function RegionCategoryIcon({
     );
   }
 
-  if (category === 'Cadera y pelvis') {
+  if (category === 'Hip and pelvis') {
     return (
       <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
@@ -341,10 +341,10 @@ export function RegisterObservationModal({
     const updateText =
       trimmedInput ||
       (isCured
-        ? 'Ya no siento el síntoma, molestia superada.'
+        ? 'I no longer feel the symptom; discomfort overcome.'
         : isUpdateMode
-          ? `Seguimiento #${nextUpdateNumber} registrado.`
-          : `Registro inicial en ${muscle.name}.`);
+          ? `Follow-up #${nextUpdateNumber} recorded.`
+          : `Initial record on ${muscle.name}.`);
 
     try {
       let uploadedPath: string | undefined;
@@ -354,7 +354,7 @@ export function RegisterObservationModal({
           fileName: capturedPhoto.fileName ?? undefined,
           mimeType: capturedPhoto.mimeType ?? undefined,
           painIntensity: effectivePain,
-          note: `Actualización ${nextUpdateNumber} - ${updateText}`,
+          note: `Update ${nextUpdateNumber} - ${updateText}`,
         });
         uploadedPath = uploaded.id;
       }
@@ -389,7 +389,7 @@ export function RegisterObservationModal({
       );
       onClose();
     } catch (error: unknown) {
-      console.error('[RegisterObservationModal] Error al guardar:', error);
+      console.error('[RegisterObservationModal] Error while saving:', error);
       Alert.alert(
         t('body.register.saveFailTitle'),
         error instanceof Error ? error.message : t('body.register.saveFailMsg')

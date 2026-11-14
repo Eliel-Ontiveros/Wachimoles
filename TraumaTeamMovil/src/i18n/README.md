@@ -1,42 +1,31 @@
-# i18n (es / en)
+# i18n (solo inglés)
 
-Español es el idioma por defecto. Idioma activo y persistencia viven en `SettingsProvider`
-(`@/settings/SettingsProvider`); `useI18n()` solo lo expone.
+La interfaz de la app es **solo en inglés**: `locales/en/**` es el único diccionario y `MessageKey` se deriva de él.
+No hay selector de idioma de interfaz ni intención de voz `set-locale`.
 
 ```tsx
 import { useI18n } from '@/i18n/I18nProvider';
-const { t, locale, setLocale, speech } = useI18n();
+const { t, locale, speech } = useI18n();   // locale es siempre 'en'
 <Text>{t('vital.title')}</Text>
-<Text>{t('common.close')}</Text>
-t('action.opening', { label })          // "Abriendo {label}" → params por nombre
+t('action.opening', { label })              // "Opening {label}" → params por nombre
 ```
 
 ## Cómo agregar textos
-1. Cada área tiene su archivo: `src/i18n/locales/<es|en>/<area>.ts` (default export de un objeto
-   `'clave': 'texto'`). Áreas existentes: `common`, `settings`, `nav`, `voice`, `vitals`, `body`, `missions`
-   (las tres últimas están vacías, para rellenar).
-2. Añade la clave en **es** y en **en** (el `en` está tipado con `Record<keyof typeof es, string>`:
-   `tsc` falla si falta una). `messages.ts` ya mezcla todas las áreas; `MessageKey` se deriva de `es`.
-3. Las claves son **globales y únicas** entre áreas (lo verifica `npm run test:voice`). Usa prefijo por área:
-   `common.*`, `settings.*`, `nav.*`/`alerts.*`, `vital.*` (¡no `vitals.*`, ya lo usa voz!), `body.*`, `missions.*`, y
-   para sub-componentes `body.modal.*`, etc. No toques áreas ajenas.
-4. Listas/datos mostrados (nombres de misión, entornos, síntomas, músculos): guarda el **id estable** en los datos
-   y traduce al mostrar con `t(`missions.title.${id}` as MessageKey)`. Lo que se guarda/envía al backend no cambia.
-5. Fuera de componentes (módulos puros): `translate(locale, key, params)` de `@/i18n/messages`.
+1. Cada área tiene su archivo: `src/i18n/locales/en/<area>.ts` (default export de un objeto `'clave': 'texto'`,
+   sin anotar el tipo para que `MessageKey` se infiera). Áreas: `common`, `settings`, `nav`, `voice`, `vitals`, `body`, `missions`.
+2. Las claves son **globales y únicas** entre áreas (lo verifica `npm run test:voice`, que además comprueba que cada
+   `t('clave')` literal del código exista). Prefijos: `common.*`, `settings.*`, `nav.*`/`alerts.*`, `vital.*`, `body.*`, `missions.*`.
+3. Listas/datos mostrados (misiones, entornos, síntomas, músculos): guarda el **id estable** y traduce al mostrar
+   (`t(`body.muscle.${id}`)`). Los valores guardados como datos nuevos son en inglés (síntomas `None`, `Zero-G dizziness`,
+   `Congestion`, `Fatigue`, `Headache`, títulos `Update N`); los valores heredados en español se aceptan al leer
+   (`@/utils/symptoms`, `@/utils/condition-updates`, `normalizeBodyRegion`).
+4. Fuera de componentes: `translate(locale, key, params)` de `@/i18n/messages`.
 
 ## Fechas y números
-```ts
-import { formatDate, formatTime, formatNumber } from '@/i18n/format';
-formatDate(date, locale)                                   // "14 nov 2026" / "Nov 14, 2026"
-formatDate(date, locale, { weekday: 'long', day: 'numeric' })
-formatTime(date, locale)
-formatNumber(36.6, locale, { maximumFractionDigits: 1 })   // "36,6" / "36.6"
-```
-Nunca lanzan (fecha inválida → `''`).
+`formatDate/formatTime/formatNumber` (`@/i18n/format`) usan siempre `en-US`.
 
 ## Voz
-STT/TTS/LLM ya usan `locale`/`speech`. Los comandos locales entienden ambos idiomas en `src/voice/parser.ts`.
-
-## Nuevo idioma
-Añadir a `LOCALES` + `SPEECH` (messages.ts), carpeta `locales/<code>/` con todas las áreas, y opción en el
-selector del drawer.
+- Salida (TTS, mensajes, preguntas del diálogo): siempre inglés (`speech.lang` = `en-US`).
+- Entrada (STT): ajuste persistido `voiceLanguage` (`'en'` por defecto | `'es'`) en `SettingsProvider`, con selector
+  "Voice input language" en el drawer. `STT_LANG` mapea a `en-US` / `es-ES`.
+- `src/voice/parser.ts` y `dialog.ts` entienden español e inglés; sus salidas (nombres de zona, etiquetas) son en inglés.

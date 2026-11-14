@@ -52,7 +52,7 @@ export function useVitalSigns(autoRefreshIntervalMs = 5000) {
     } catch (err: unknown) {
       if (!mountedRef.current) return;
 
-      const message = err instanceof Error ? err.message : 'Error al conectar con el sensor';
+      const message = err instanceof Error ? err.message : 'Error connecting to the sensor';
       setErrorMessage(message);
       setStatus('error');
     } finally {

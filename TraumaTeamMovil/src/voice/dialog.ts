@@ -195,10 +195,10 @@ function pain(text: string): number | null {
 const inRange = (n: number | undefined, lo: number, hi: number): n is number => n !== undefined && n >= lo && n <= hi;
 
 const SYMPTOM_WORDS: [string, string[]][] = [
-  ['Mareo 0g', ['mareo', 'mareado', 'mareada', 'dizzy', 'dizziness']],
-  ['Congestión', ['congestion', 'congestionado', 'congestionada', 'congested', 'stuffy']],
-  ['Fatiga', ['fatiga', 'fatigue', 'fatigued']],
-  ['Cefalea', ['cefalea', 'migrana', 'headache', 'dolor de cabeza']],
+  ['Zero-G dizziness', ['mareo', 'mareado', 'mareada', 'dizzy', 'dizziness']],
+  ['Congestion', ['congestion', 'congestionado', 'congestionada', 'congested', 'stuffy']],
+  ['Fatigue', ['fatiga', 'fatigue', 'fatigued']],
+  ['Headache', ['cefalea', 'migrana', 'headache', 'dolor de cabeza']],
 ];
 
 function mood(text: string): 1 | 2 | 3 | 4 | 5 | null {
@@ -276,7 +276,7 @@ function apply(slot: Slot, intent: VoiceIntent, text: string): Applied {
       if (!health) return null;
       const found = SYMPTOM_WORDS.filter(([, w]) => hasPhrase(text, w)).map(([name]) => name);
       if (found.length) return { intent: { ...health, symptoms: found } };
-      return anyWord(words(text), [...NO, 'ninguno']) ? { intent: { ...health, symptoms: ['Ninguno'] } } : null;
+      return anyWord(words(text), [...NO, 'ninguno']) ? { intent: { ...health, symptoms: ['None'] } } : null;
     }
   }
 }

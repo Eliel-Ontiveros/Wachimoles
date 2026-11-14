@@ -1401,11 +1401,11 @@ function SleepSummaryCard({
   );
 }
 
-/** El servicio entrega "Hace N seg/min" o "A las HH:mm" en español: se re-expresa en el idioma activo. */
+/** El servicio entrega "N sec/min ago" o "At HH:mm" (o el formato heredado en español): se pasa por el diccionario. */
 function localizeLastMeasured(text: string, t: TFn): string {
-  const rel = /^Hace (\d+) (seg|min)$/.exec(text);
-  if (rel) return t(rel[2] === 'seg' ? 'vital.ago.sec' : 'vital.ago.min', { n: rel[1] });
-  const at = /^A las (.+)$/.exec(text);
+  const rel = /^(\d+) (sec|min) ago$/.exec(text) ?? /^Hace (\d+) (seg|min)$/.exec(text);
+  if (rel) return t(rel[2] === 'min' ? 'vital.ago.min' : 'vital.ago.sec', { n: rel[1] });
+  const at = /^At (.+)$/.exec(text) ?? /^A las (.+)$/.exec(text);
   if (at) return t('vital.at', { time: at[1] });
   return text;
 }

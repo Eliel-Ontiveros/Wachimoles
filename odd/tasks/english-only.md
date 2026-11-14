@@ -11,9 +11,9 @@ Branch feat/english-only (from main 69ff6de).
 - S7 Comments/docs/READMEs are out of scope (report what remains).
 
 ## Tasks
-- T1 backend (S2,S3,S5) — worker
-- T2 mobile (S2-S6) — worker
-- T3 web (S2,S5,S6) — worker
+- T1 backend (S2,S3,S5) — done
+- T2 mobile (S2-S6) — done
+- T3 web (S2,S5,S6) — done
 
 ## Log
 - L1 the S1 request.

@@ -66,7 +66,7 @@ export function InjuryTimelapseModal({
       try {
         await refreshInjuryPhotos(muscle.id, muscle.name);
       } catch (error: unknown) {
-        console.error('[InjuryTimelapseModal] Error al cargar fotos de lesión:', error);
+        console.error('[InjuryTimelapseModal] Error loading injury photos:', error);
         if (isMounted) {
           setPhotoLoadError(
             error instanceof Error ? error.message : tRef.current('body.timelapse.loadFailMsg')
@@ -108,13 +108,13 @@ export function InjuryTimelapseModal({
         fileName: asset.fileName ?? undefined,
         mimeType: asset.mimeType ?? undefined,
         painIntensity: muscle.observation?.painIntensity,
-        note: note.trim() || 'Registro fotográfico diario', // dato almacenado: no se traduce
+        note: note.trim() || 'Daily photo record', // dato almacenado (inglés para datos nuevos)
       });
       setNote('');
       setIsPlaying(false);
       setSelectedIndex(photos.length);
     } catch (error: unknown) {
-      console.error('[InjuryTimelapseModal] Error al subir la imagen:', error);
+      console.error('[InjuryTimelapseModal] Error uploading the image:', error);
       Alert.alert(
         t('body.timelapse.uploadFailTitle'),
         error instanceof Error ? error.message : t('body.timelapse.uploadFailMsg')

@@ -28,8 +28,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Wachimoles necesita acceso a tus fotos para adjuntarlas a un padecimiento.",
-          "cameraPermission": "Wachimoles necesita acceso a la cámara para tomar fotos del padecimiento.",
+          "photosPermission": "Wachimoles needs access to your photos to attach them to a condition.",
+          "cameraPermission": "Wachimoles needs access to the camera to take photos of the condition.",
           "microphonePermission": false
         }
       ],
@@ -44,8 +44,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "TraumaTeam usa el micrófono para que controles la app con tu voz.",
-          "speechRecognitionPermission": "TraumaTeam usa el reconocimiento de voz para entender tus comandos.",
+          "microphonePermission": "TraumaTeam uses the microphone so you can control the app with your voice.",
+          "speechRecognitionPermission": "TraumaTeam uses speech recognition to understand your commands.",
           "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
         }
       ]

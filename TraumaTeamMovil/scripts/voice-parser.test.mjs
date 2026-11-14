@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCommand, LOW_CONFIDENCE_THRESHOLD, isLowConfidence } from '../src/voice/parser.ts';
+import { parseCommand, LOW_CONFIDENCE_THRESHOLD, isLowConfidence, zoneNameFor, HEALTH_SYMPTOMS } from '../src/voice/parser.ts';
 
 const intent = (s) => {
   const r = parseCommand(s);
@@ -82,7 +82,7 @@ test('S1: register an observation by voice', () => {
   assert.equal(intent('registrar molestia leve en el cuello').painIntensity, 3);
   const amb = parseCommand('registrar una molestia en el hombro');
   assert.equal(amb.reason, 'ambiguous');
-  assert.deepEqual(amb.pending, { type: 'register-observation', muscleId: 'deltoides', muscleName: 'Deltoides' });
+  assert.deepEqual(amb.pending, { type: 'register-observation', muscleId: 'deltoides', muscleName: 'Deltoid' });
 });
 
 test('zone detail and photos', () => {
@@ -133,7 +133,7 @@ test('fill health check', () => {
   assert.equal(intent('dormí 7 horas').sleepHours, 7);
   assert.equal(intent('me siento cansado').mood, 3);
   const sym = intent('tengo mareo y fatiga');
-  assert.deepEqual(sym.symptoms, ['Mareo 0g', 'Fatiga']);
+  assert.deepEqual(sym.symptoms, ['Zero-G dizziness', 'Fatigue']);
   assert.equal(intent('como me siento').type, 'fill-health-check');
 });
 
@@ -212,19 +212,33 @@ test('S7 set-theme (es/en)', () => {
   }
 });
 
-test('S7 set-locale (es/en)', () => {
-  for (const [phrase, locale] of [
-    ['cambia el idioma a inglés', 'en'],
-    ['cambia el idioma a español', 'es'],
-    ['change language to Spanish', 'es'],
-    ['change the language to English', 'en'],
-    ['switch to english', 'en'],
-    ['cambia a español', 'es'],
-  ]) {
-    const i = intent(phrase);
-    assert.equal(i.type, 'set-locale', phrase);
-    assert.equal(i.locale, locale, phrase);
+test('S4 the set-locale intent is gone (UI is English only)', () => {
+  for (const phrase of ['cambia el idioma a inglés', 'change language to Spanish', 'switch to english', 'cambia a español']) {
+    const r = parseCommand(phrase);
+    assert.notEqual(r.ok && r.intent.type, 'set-locale', phrase);
   }
+});
+
+test('S3 outputs are English, inputs may be Spanish or English', () => {
+  const es = intent('ve al bíceps derecho');
+  const en = intent('go to right biceps');
+  assert.equal(es.muscleName, 'Right Biceps');
+  assert.equal(en.muscleName, 'Right Biceps');
+  assert.equal(intent('ve al cuello').muscleName, 'Neck');
+  assert.equal(zoneNameFor('deltoides_izq'), 'Left Deltoid');
+  assert.equal(zoneNameFor('deltoides'), 'Deltoid');
+  assert.equal(intent('abre signos vitales').label, 'Vital Monitoring');
+  assert.equal(intent('llévame a misiones').label, 'Missions & Journey');
+  assert.equal(intent('ve a la vista corporal').label, 'Body View');
+  assert.equal(intent('registros').label, 'Records');
+  assert.equal(intent('modelo 3d').label, '3D View');
+  assert.equal(parseCommand('registrar una molestia en el hombro').zone, 'Deltoid');
+});
+
+test('S5 symptoms are produced as English values from Spanish or English speech', () => {
+  assert.deepEqual(HEALTH_SYMPTOMS, ['None', 'Zero-G dizziness', 'Congestion', 'Fatigue', 'Headache']);
+  assert.deepEqual(intent('tengo mareo y cefalea').symptoms, ['Zero-G dizziness', 'Headache']);
+  assert.deepEqual(intent('i have congestion and fatigue').symptoms, ['Congestion', 'Fatigue']);
 });
 
 test('S7 settings phrases do not hijack other commands', () => {

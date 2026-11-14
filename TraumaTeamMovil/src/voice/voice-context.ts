@@ -75,6 +75,6 @@ export const VoiceContext = createContext<VoiceCtx | null>(null);
 
 export function useVoice() {
   const ctx = useContext(VoiceContext);
-  if (!ctx) throw new Error('useVoice debe usarse dentro de <VoiceProvider>');
+  if (!ctx) throw new Error('useVoice must be used inside <VoiceProvider>');
   return ctx;
 }

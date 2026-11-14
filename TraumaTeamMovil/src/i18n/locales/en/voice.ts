@@ -1,7 +1,5 @@
-import type es from '../es/voice';
-
 /** Voice control, described screens, environments and metrics (en). */
-const voice: Record<keyof typeof es, string> = {
+const voice: Record<string, string> = {
   'route./': 'Vital Monitoring',
   'route./explore': 'Body View',
   'route./missions': 'Missions & Journey',
@@ -122,7 +120,7 @@ const voice: Record<keyof typeof es, string> = {
   'error.silent': "I didn't hear you. Tap the orb and try again.",
   'error.generic': 'Voice error ({code})',
 
-  'examples': 'Open vital signs|How is my heart rate?|Start daily check-in|My left back hurts|Go to missions',
+  'examples': 'Open vital signs|How is my heart rate?|My left back hurts|You can also speak Spanish|Start daily check-in|Go to missions',
 };
 
 export default voice;

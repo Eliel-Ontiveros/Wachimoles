@@ -1,7 +1,7 @@
 /**
  * Intérprete de comandos de voz (lenguaje natural → intención).
  * Módulo puro, sin dependencias de React ni de Expo: funciona offline,
- * en español e inglés, y es testeable con `node --test`.
+ * entiende español e inglés (las respuestas son siempre en inglés) y es testeable con `node --test`.
  */
 
 export type Route = '/' | '/explore' | '/missions';
@@ -21,7 +21,7 @@ export const MISSION_IDS = [
   'env-marte-resp',
 ] as const;
 export type VoiceMissionId = (typeof MISSION_IDS)[number];
-export const HEALTH_SYMPTOMS = ['Ninguno', 'Mareo 0g', 'Congestión', 'Fatiga', 'Cefalea'] as const;
+export const HEALTH_SYMPTOMS = ['None', 'Zero-G dizziness', 'Congestion', 'Fatigue', 'Headache'] as const;
 
 /** Campos del cuestionario diario que la voz puede rellenar (nunca se guarda solo). */
 export type HealthPrefill = {
@@ -63,7 +63,6 @@ export type VoiceIntent =
   | { type: 'vital-history'; metric: VitalMetric }
   | { type: 'dismiss-alert' }
   | { type: 'set-theme'; theme: 'system' | 'light' | 'dark' }
-  | { type: 'set-locale'; locale: 'es' | 'en' }
   | { type: 'toggle-treadmill' }
   | { type: 'read-vitals' }
   | { type: 'describe-screen'; screen?: Route }
@@ -123,27 +122,27 @@ const hasAny = (text: string, phrases: string[]) => phrases.some((p) => has(text
 type ZoneDef = { base: string; name: string; keys: string[]; sided: boolean; ids?: [string, string] };
 
 const ZONES: ZoneDef[] = [
-  { base: 'cara', name: 'Cara / Región facial', keys: ['cara', 'rostro', 'face'], sided: false },
-  { base: 'cabeza', name: 'Cabeza / Cráneo', keys: ['cabeza', 'craneo', 'head', 'skull'], sided: false },
-  { base: 'cuello', name: 'Cuello', keys: ['cuello', 'neck'], sided: false },
-  { base: 'trapecio', name: 'Trapecio / Nuca', keys: ['trapecio', 'nuca', 'trapezius'], sided: false },
+  { base: 'cara', name: 'Face / Facial region', keys: ['cara', 'rostro', 'face'], sided: false },
+  { base: 'cabeza', name: 'Head / Skull', keys: ['cabeza', 'craneo', 'head', 'skull'], sided: false },
+  { base: 'cuello', name: 'Neck', keys: ['cuello', 'neck'], sided: false },
+  { base: 'trapecio', name: 'Trapezius / Nape', keys: ['trapecio', 'nuca', 'trapezius'], sided: false },
   { base: 'pectoral', name: 'Pectoral', keys: ['pectoral', 'pecho', 'chest'], sided: true },
   { base: 'abdomen', name: 'Abdomen', keys: ['abdomen', 'estomago', 'barriga', 'abs', 'stomach'], sided: false },
-  { base: 'oblicuo', name: 'Oblicuo', keys: ['oblicuo', 'costado', 'oblique'], sided: true },
-  { base: 'dorsal', name: 'Dorsal', keys: ['dorsal', 'espalda', 'back'], sided: true },
-  { base: 'lumbar', name: 'Zona lumbar', keys: ['lumbar', 'cintura', 'lumbago', 'lower back'], sided: false },
-  { base: 'deltoides', name: 'Deltoides', keys: ['deltoides', 'hombro', 'shoulder'], sided: true },
-  { base: 'biceps', name: 'Bíceps', keys: ['biceps', 'bicep'], sided: true },
-  { base: 'triceps', name: 'Tríceps', keys: ['triceps', 'tricep'], sided: true },
-  { base: 'antebrazo', name: 'Antebrazo', keys: ['antebrazo', 'forearm'], sided: true },
-  { base: 'mano', name: 'Mano', keys: ['mano', 'munieca', 'hand', 'wrist'], sided: true },
-  { base: 'gluteo', name: 'Glúteo', keys: ['gluteo', 'gluteos', 'nalga', 'glute'], sided: true },
-  { base: 'abductor', name: 'Abductor / Cadera', keys: ['abductor', 'cadera', 'hip'], sided: true },
-  { base: 'muslo', name: 'Muslo (Cuádriceps)', keys: ['muslo', 'cuadriceps', 'quadriceps', 'quad', 'thigh'], sided: true },
-  { base: 'isquio', name: 'Isquiotibiales', keys: ['isquiotibiales', 'isquios', 'hamstring', 'hamstrings'], sided: true },
-  { base: 'gemelo', name: 'Gemelo (Pantorrilla)', keys: ['gemelo', 'pantorrilla', 'calf'], sided: true },
-  { base: 'espinilla', name: 'Espinilla / Tibial', keys: ['espinilla', 'tibial', 'shin'], sided: true },
-  { base: 'pie', name: 'Pie', keys: ['pie', 'pies', 'foot', 'tobillo', 'ankle'], sided: true },
+  { base: 'oblicuo', name: 'Oblique', keys: ['oblicuo', 'costado', 'oblique'], sided: true },
+  { base: 'dorsal', name: 'Lat', keys: ['dorsal', 'espalda', 'back'], sided: true },
+  { base: 'lumbar', name: 'Lower back', keys: ['lumbar', 'cintura', 'lumbago', 'lower back'], sided: false },
+  { base: 'deltoides', name: 'Deltoid', keys: ['deltoides', 'hombro', 'shoulder'], sided: true },
+  { base: 'biceps', name: 'Biceps', keys: ['biceps', 'bicep'], sided: true },
+  { base: 'triceps', name: 'Triceps', keys: ['triceps', 'tricep'], sided: true },
+  { base: 'antebrazo', name: 'Forearm', keys: ['antebrazo', 'forearm'], sided: true },
+  { base: 'mano', name: 'Hand', keys: ['mano', 'munieca', 'hand', 'wrist'], sided: true },
+  { base: 'gluteo', name: 'Glute', keys: ['gluteo', 'gluteos', 'nalga', 'glute'], sided: true },
+  { base: 'abductor', name: 'Abductor / Hip', keys: ['abductor', 'cadera', 'hip'], sided: true },
+  { base: 'muslo', name: 'Thigh (Quadriceps)', keys: ['muslo', 'cuadriceps', 'quadriceps', 'quad', 'thigh'], sided: true },
+  { base: 'isquio', name: 'Hamstring (Back of leg)', keys: ['isquiotibiales', 'isquios', 'hamstring', 'hamstrings'], sided: true },
+  { base: 'gemelo', name: 'Calf (Gastrocnemius)', keys: ['gemelo', 'pantorrilla', 'calf'], sided: true },
+  { base: 'espinilla', name: 'Shin / Tibialis', keys: ['espinilla', 'tibial', 'shin'], sided: true },
+  { base: 'pie', name: 'Foot', keys: ['pie', 'pies', 'foot', 'tobillo', 'ankle'], sided: true },
 ];
 
 const RIGHT = ['derecho', 'derecha', 'der', 'right'];
@@ -166,10 +165,10 @@ function parseZone(text: string): ParseResult | null {
     return { ok: false, reason: 'ambiguous', zone: z.name, pending: { type: 'body-zone', muscleId: z.base, muscleName: z.name } };
   }
   const side = right ? 'der' : 'izq';
-  const sideName = right ? 'derecho' : 'izquierdo';
+  const sideName = right ? 'Right' : 'Left';
   return {
     ok: true,
-    intent: { type: 'body-zone', muscleId: `${z.base}_${side}`, muscleName: `${z.name} ${sideName}` },
+    intent: { type: 'body-zone', muscleId: `${z.base}_${side}`, muscleName: `${sideName} ${z.name}` },
     confidence: 0.9,
   };
 }
@@ -179,12 +178,12 @@ export function zoneNeedsSide(muscleId: string): boolean {
   return ZONES.some((z) => z.sided && z.base === muscleId);
 }
 
-/** Nombre legible de una zona a partir de su id (`deltoides_izq` → "Deltoides izquierdo"). */
+/** Nombre legible de una zona a partir de su id (`deltoides_izq` → "Left Deltoid"). */
 export function zoneNameFor(muscleId: string): string {
   const m = /^(.*?)(?:_(der|izq))?$/.exec(muscleId);
   const def = ZONES.find((z) => z.base === (m?.[1] ?? muscleId));
   if (!def) return muscleId;
-  return m?.[2] ? `${def.name} ${m[2] === 'der' ? 'derecho' : 'izquierdo'}` : def.name;
+  return m?.[2] ? `${m[2] === 'der' ? 'Right' : 'Left'} ${def.name}` : def.name;
 }
 
 // ---------------------------------------------------------------- comandos
@@ -217,11 +216,7 @@ export function parseCommand(raw: string): ParseResult {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // ---- Ajustes: idioma y tema (S7)
-  const langWord = hasAny(text, ['ingles', 'english']) ? 'en' : hasAny(text, ['espanol', 'castellano', 'spanish']) ? 'es' : null;
-  if (langWord && (hasAny(text, ['idioma', 'lenguaje', 'language']) || /^(?:cambia|cambiar|pon|poner|switch|change|set)(?: (?:a|to|the app to|la app en|the app in))? (?:ingles|english|espanol|castellano|spanish)$/.test(text))) {
-    return ok({ type: 'set-locale', locale: langWord }, 0.95);
-  }
+  // ---- Ajustes: tema (el idioma de la interfaz es solo inglés)
   if (hasAny(text, ['modo', 'tema', 'mode', 'theme'])) {
     const theme = hasAny(text, ['oscuro', 'dark', 'noche'])
       ? 'dark'
@@ -326,15 +321,15 @@ export function parseCommand(raw: string): ParseResult {
   }
   const symptoms: string[] = [];
   const symptomWords: [string, string[]][] = [
-    ['Mareo 0g', ['mareo', 'mareado', 'mareada', 'dizzy', 'dizziness']],
-    ['Congestión', ['congestion', 'congestionado', 'congestionada', 'congested', 'stuffy']],
-    ['Fatiga', ['fatiga', 'fatigue', 'fatigued']],
-    ['Cefalea', ['cefalea', 'migrana', 'headache']],
+    ['Zero-G dizziness', ['mareo', 'mareado', 'mareada', 'dizzy', 'dizziness']],
+    ['Congestion', ['congestion', 'congestionado', 'congestionada', 'congested', 'stuffy']],
+    ['Fatigue', ['fatiga', 'fatigue', 'fatigued']],
+    ['Headache', ['cefalea', 'migrana', 'headache']],
   ];
   for (const [name, w] of symptomWords) if (hasAny(text, w)) symptoms.push(name);
   const hasOtherField = Object.keys(health).length > 0;
   if (!symptoms.length && (hasOtherField || hasAny(text, ['sintoma', 'sintomas', 'symptom', 'symptoms'])) && has(text, 'dolor de cabeza')) {
-    symptoms.push('Cefalea');
+    symptoms.push('Headache');
   }
   const wantsSymptoms = hasAny(text, ['tengo', 'siento', 'sintoma', 'sintomas', 'i have', 'i feel', 'symptom', 'symptoms']) || hasOtherField;
   if (symptoms.length && wantsSymptoms) health.symptoms = symptoms;
@@ -398,21 +393,21 @@ export function parseCommand(raw: string): ParseResult {
     return zone;
   }
 
-  if (hasAny(text, ['registros', 'historial', 'records', 'history'])) return ok({ type: 'body-tab', tab: 'records', label: 'Registros' });
-  if (hasAny(text, ['vista 3d', 'modelo 3d', '3d model', 'cuerpo en 3d'])) return ok({ type: 'body-tab', tab: 'body', label: 'Vista 3D' });
+  if (hasAny(text, ['registros', 'historial', 'records', 'history'])) return ok({ type: 'body-tab', tab: 'records', label: 'Records' });
+  if (hasAny(text, ['vista 3d', 'modelo 3d', '3d model', 'cuerpo en 3d'])) return ok({ type: 'body-tab', tab: 'body', label: '3D View' });
 
   const goVerb = hasAny(text, GO);
   if (hasAny(text, ['signos vitales', 'monitoreo', 'monitor', 'vitales', 'vital signs', 'vitals', 'pulso', 'inicio', 'home', 'dashboard', 'ecg', 'ritmo cardiaco', 'frecuencia cardiaca', 'corazon', 'latidos', 'pulsaciones', 'oxigeno', 'saturacion', 'spo2', 'estres', 'heart rate', 'heart', 'oxygen', 'stress'])) {
     // Solo es específico si nombra la pantalla de forma explícita; una métrica suelta es ambigua.
     const screenName = hasAny(text, ['signos vitales', 'monitoreo', 'monitor', 'vital signs', 'vitals', 'vitales']);
     const specific = hasAny(text, ['signos vitales', 'vital signs', 'monitoreo vital']) || (screenName && goVerb);
-    return ok({ type: 'navigate', route: '/', label: 'Monitoreo Vital' }, specific ? 0.85 : BARE_NAV_CONFIDENCE);
+    return ok({ type: 'navigate', route: '/', label: 'Vital Monitoring' }, specific ? 0.85 : BARE_NAV_CONFIDENCE);
   }
   if (hasAny(text, ['vista corporal', 'cuerpo', 'body', 'explorar', 'explore', 'lesion', 'lesiones'])) {
-    return ok({ type: 'navigate', route: '/explore', label: 'Vista Corporal' }, goVerb || has(text, 'vista corporal') ? 0.85 : BARE_NAV_CONFIDENCE);
+    return ok({ type: 'navigate', route: '/explore', label: 'Body View' }, goVerb || has(text, 'vista corporal') ? 0.85 : BARE_NAV_CONFIDENCE);
   }
   if (hasAny(text, ['misiones', 'mision', 'viaje', 'nave', 'racha', 'missions', 'journey', 'streak'])) {
-    return ok({ type: 'navigate', route: '/missions', label: 'Misiones y Viaje' }, goVerb ? 0.85 : BARE_NAV_CONFIDENCE);
+    return ok({ type: 'navigate', route: '/missions', label: 'Missions & Journey' }, goVerb ? 0.85 : BARE_NAV_CONFIDENCE);
   }
 
   return { ok: false, reason: 'unknown' };

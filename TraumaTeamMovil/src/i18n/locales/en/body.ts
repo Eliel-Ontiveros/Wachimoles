@@ -1,7 +1,5 @@
-import type es from '../es/body';
-
 /** Vista corporal (en). */
-const body: Record<keyof typeof es, string> = {
+const body: Record<string, string> = {
   'body.muscle.cara': 'Face / Facial region',
   'body.muscle.cabeza': 'Head / Skull',
   'body.muscle.cuello': 'Neck',

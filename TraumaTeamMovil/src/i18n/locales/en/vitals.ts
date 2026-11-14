@@ -1,7 +1,5 @@
-import type es from '../es/vitals';
-
 /** Monitoreo vital (en). */
-const vitals: Record<keyof typeof es, string> = {
+const vitals: Record<string, string> = {
   'vital.title.heart_rate': 'Heart rate history',
   'vital.title.spo2': 'Oxygen history',
   'vital.title.stress': 'Stress history',

@@ -172,7 +172,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (!isMounted) return;
-        console.warn('No se pudieron cargar los cuestionarios diarios.', error);
+        console.warn('Could not load the daily questionnaires.', error);
         Alert.alert(
           translate(localeRef.current, 'missions.healthLoad.title'),
           translate(localeRef.current, 'missions.healthLoad.msg')
