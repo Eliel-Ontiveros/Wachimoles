@@ -123,39 +123,37 @@ export function MissionsView() {
           </View>
 
           <View>
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: -5,
-              left: -5,
-              right: -5,
-              bottom: -5,
-              borderRadius: 16,
-              borderWidth: 2,
-              borderColor: '#f59e0b',
-              opacity: pulse,
-              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.06] }) }],
-            }}
-          />
-          <Pressable
-            onPress={doDailyCheckIn}
-            disabled={checkedInToday}
-            className={`flex-row items-center rounded-xl border px-3.5 py-2.5 ${
-              checkedInToday
-                ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950'
-                : 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt active:opacity-75'
-            }`}>
-            <Check size={14} color={checkedInToday ? colors.success : scheme === 'dark' ? colors.text : '#0f172a'} strokeWidth={2.5} />
-            <Text
-              className={`ml-1.5 font-mono text-xs font-bold ${
-                checkedInToday
-                  ? 'text-emerald-700 dark:text-emerald-300'
-                  : 'text-trauma-ink dark:text-trauma-nightInk'
-              }`}>
-              {checkedInToday ? t('missions.checkin.done') : t('missions.checkin.today')}
-            </Text>
-          </Pressable>
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: -5,
+                left: -5,
+                right: -5,
+                bottom: -5,
+                borderRadius: 16,
+                borderWidth: 2,
+                borderColor: '#f59e0b',
+                opacity: pulse,
+                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.06] }) }],
+              }}
+            />
+            <Pressable
+              onPress={doDailyCheckIn}
+              disabled={checkedInToday}
+              className={`flex-row items-center rounded-xl border px-3.5 py-2.5 ${checkedInToday
+                  ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950'
+                  : 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt active:opacity-75'
+                }`}>
+              <Check size={14} color={checkedInToday ? colors.success : scheme === 'dark' ? colors.text : '#0f172a'} strokeWidth={2.5} />
+              <Text
+                className={`ml-1.5 font-mono text-xs font-bold ${checkedInToday
+                    ? 'text-emerald-700 dark:text-emerald-300'
+                    : 'text-trauma-ink dark:text-trauma-nightInk'
+                  }`}>
+                {checkedInToday ? t('missions.checkin.done') : t('missions.checkin.today')}
+              </Text>
+            </Pressable>
           </View>
         </View>
 
@@ -166,11 +164,10 @@ export function MissionsView() {
             return (
               <View key={idx} className="items-center">
                 <View
-                  className={`h-7 w-7 items-center justify-center rounded-full border ${
-                    active
+                  className={`h-7 w-7 items-center justify-center rounded-full border ${active
                       ? 'border-amber-300 dark:border-amber-700 bg-amber-100 dark:bg-amber-900'
                       : 'border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt'
-                  }`}>
+                    }`}>
                   {active ? (
                     <Flame size={13} color="#ea580c" fill="#fb923c" />
                   ) : (
@@ -223,19 +220,17 @@ export function MissionsView() {
             <Pressable
               key={mission.id}
               onPress={() => toggleMission(mission.id)}
-              className={`rounded-2xl border p-3.5 shadow-xs active:opacity-85 ${
-                mission.completed
+              className={`rounded-2xl border p-3.5 shadow-xs active:opacity-85 ${mission.completed
                   ? 'border-trauma-cyanEdge bg-sky-50/40 dark:bg-sky-950/40'
                   : 'border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night'
-              }`}>
+                }`}>
               <View className="flex-row items-center justify-between">
                 <View className="flex-1 flex-row items-center pr-2">
                   <View
-                    className={`mr-3 h-9 w-9 items-center justify-center rounded-xl ${
-                      mission.completed
+                    className={`mr-3 h-9 w-9 items-center justify-center rounded-xl ${mission.completed
                         ? 'bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
                         : 'bg-slate-100 dark:bg-trauma-nightAlt'
-                    }`}>
+                      }`}>
                     <MissionIcon category={mission.category} completed={mission.completed} />
                   </View>
                   <View className="flex-1">

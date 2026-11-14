@@ -22,7 +22,11 @@ import {
   markEarlyArrivalInBackend,
   syncAstronautMissionStateToBackend,
   fetchAstronautLocationFromBackend,
+  fetchAstronautStreakFromBackend,
+  fetchDailyMissionProgressFromBackend,
+  syncDailyMissionsProgressToBackend,
 } from '../../services/mission-api';
+import { playStreakCheckin } from '../streak/streak-checkin';
 import {
   CriticalAlert,
   DailyHealthCheck,
@@ -143,6 +147,29 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       .then((loc) => {
         if (!isMounted || !loc) return;
         setEnvironmentState(loc.entorno);
+      })
+      .catch(() => {});
+
+    // Carga racha acumulada y misiones completadas del día
+    void fetchAstronautStreakFromBackend()
+      .then((streak) => {
+        if (!isMounted || !streak) return;
+        setStreakDays(streak.rachaActual);
+      })
+      .catch(() => {});
+
+    void fetchDailyMissionProgressFromBackend()
+      .then((progreso) => {
+        if (!isMounted || !progreso) return;
+        if (progreso.racha) {
+          setStreakDays(progreso.racha.rachaActual);
+        }
+        if (progreso.misiones) {
+          setCompletedOverrides((prev) => ({ ...prev, ...progreso.misiones }));
+          if (progreso.misiones['checkin-diario'] || progreso.misiones['daily-checkin']) {
+            setCheckedInToday(true);
+          }
+        }
       })
       .catch(() => {});
 
@@ -290,7 +317,11 @@ export function MissionProvider({ children }: { children: ReactNode }) {
   const doDailyCheckIn = useCallback(() => {
     if (!checkedInToday) {
       setCheckedInToday(true);
-      setStreakDays((d) => d + 1);
+      setCompletedOverrides((prev) => ({
+        ...prev,
+        'checkin-diario': true,
+        'daily-checkin': true,
+      }));
       setMissionDay((d) => {
         const total = calculateMissionStateFromDeparture(
           origin,
@@ -368,15 +399,15 @@ export function MissionProvider({ children }: { children: ReactNode }) {
 
   const toggleMission = useCallback(
     (id: string) => {
-      if (id === 'daily-checkin') {
+      if (id === 'daily-checkin' || id === 'checkin-diario') {
         doDailyCheckIn();
         return;
       }
-      if (id === 'treadmill-steps') {
+      if (id === 'treadmill-steps' || id.includes('treadmill')) {
         toggleTreadmillRoutine();
         return;
       }
-      if (id === 'daily-steps') return;
+      if (id === 'daily-steps' || id.includes('pasos')) return;
       setCompletedOverrides((prev) => ({ ...prev, [id]: !prev[id] }));
     },
     [doDailyCheckIn, toggleTreadmillRoutine]
@@ -428,9 +459,9 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           );
 
     return baseMissions.map((m) => {
-      if (m.category === 'exercise' && completedOverrides[m.id] !== undefined) {
+      if (completedOverrides[m.id] !== undefined) {
         const done = completedOverrides[m.id];
-        return { ...m, completed: done, currentValue: done ? m.targetValue : 0 };
+        return { ...m, completed: done, currentValue: done ? m.targetValue : m.currentValue };
       }
       return m;
     });
@@ -443,6 +474,26 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     completedOverrides,
     locale,
   ]);
+
+  // Sincroniza cumplimiento de misiones con la base de datos y otorga racha al completar todas
+  const streakPointAwardedTodayRef = useRef(false);
+  useEffect(() => {
+    if (missions.length === 0) return;
+
+    void syncDailyMissionsProgressToBackend(missions).then((res) => {
+      if (!res) return;
+      if (res.racha) {
+        setStreakDays(res.racha.rachaActual);
+      }
+      if (res.puntoRachaOtorgado && !streakPointAwardedTodayRef.current) {
+        streakPointAwardedTodayRef.current = true;
+        playStreakCheckin({
+          streak: res.racha.rachaActual,
+          todayIndex: new Date().getDay(),
+        });
+      }
+    });
+  }, [missions]);
 
   const submitHealthCheck = useCallback(
     (checkData: Omit<DailyHealthCheck, 'id' | 'dateIso' | 'recordedAt'>): DailyHealthCheck => {

@@ -1469,3 +1469,191 @@ export async function syncHealthCheckToBackend(
   }
 }
 
+export interface AstronautStreak {
+  rachaActual: number;
+  rachaMaxima: number;
+  totalDiasCompletados: number;
+  ultimaFechaCompletada: string | null;
+  todasCompletadasHoy: boolean;
+}
+
+export interface DailyMissionProgressResponse {
+  fecha: string;
+  totalMisiones: number;
+  misionesCompletadas: number;
+  todasCompletadas: boolean;
+  puntoRachaOtorgado: boolean;
+  racha: AstronautStreak;
+  misiones: Array<{
+    misionId: string;
+    completada: boolean;
+    valorActual: number;
+    valorObjetivo: number;
+  }>;
+}
+
+// Consulta la racha acumulada del astronauta desde la base de datos
+export async function fetchAstronautStreakFromBackend(): Promise<AstronautStreak | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const path = '/dashboard/missions/streak';
+  try {
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'GET',
+        headers: { ...headers, Accept: 'application/json' },
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (response && response.ok) {
+      const data: unknown = await response.json();
+      if (isRecord(data)) {
+        return {
+          rachaActual: Number(data.rachaActual ?? data.currentStreak ?? 0),
+          rachaMaxima: Number(data.rachaMaxima ?? data.maxStreak ?? 0),
+          totalDiasCompletados: Number(data.totalDiasCompletados ?? data.totalCompletedDays ?? 0),
+          ultimaFechaCompletada: (data.ultimaFechaCompletada as string) ?? (data.lastCompletedDate as string) ?? null,
+          todasCompletadasHoy: Boolean(data.todasCompletadasHoy ?? data.allCompletedToday),
+        };
+      }
+    }
+  } catch {
+    // Si no hay red, opera localmente
+  }
+  return null;
+}
+
+// Consulta el cumplimiento de misiones del día desde el backend
+export async function fetchDailyMissionProgressFromBackend(
+  fecha?: string
+): Promise<{
+  misiones: Record<string, boolean>;
+  todasCompletadas: boolean;
+  racha: AstronautStreak;
+} | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const queryFecha = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+  const path = `/dashboard/missions/daily/progress${queryFecha}`;
+  try {
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'GET',
+        headers: { ...headers, Accept: 'application/json' },
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (response && response.ok) {
+      const data: unknown = await response.json();
+      if (isRecord(data)) {
+        const misionesMap: Record<string, boolean> = {};
+        if (Array.isArray(data.misiones)) {
+          for (const m of data.misiones) {
+            if (isRecord(m) && typeof m.misionId === 'string') {
+              misionesMap[m.misionId] = Boolean(m.completada ?? m.completed);
+            }
+          }
+        }
+        const rachaRaw = isRecord(data.racha) ? data.racha : {};
+        const racha: AstronautStreak = {
+          rachaActual: Number(rachaRaw.rachaActual ?? rachaRaw.currentStreak ?? 0),
+          rachaMaxima: Number(rachaRaw.rachaMaxima ?? rachaRaw.maxStreak ?? 0),
+          totalDiasCompletados: Number(rachaRaw.totalDiasCompletados ?? rachaRaw.totalCompletedDays ?? 0),
+          ultimaFechaCompletada: (rachaRaw.ultimaFechaCompletada as string) ?? null,
+          todasCompletadasHoy: Boolean(rachaRaw.todasCompletadasHoy),
+        };
+        const resumen = isRecord(data.resumen) ? data.resumen : null;
+        return {
+          misiones: misionesMap,
+          todasCompletadas: Boolean(resumen?.todasCompletadas ?? resumen?.allCompleted),
+          racha,
+        };
+      }
+    }
+  } catch {
+    // Si no hay red, continúa
+  }
+  return null;
+}
+
+// Sincroniza el cumplimiento de todas las misiones del día y actualiza la racha en la base de datos
+export async function syncDailyMissionsProgressToBackend(
+  misiones: DailyMission[],
+  fecha?: string
+): Promise<DailyMissionProgressResponse | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const payload = {
+    fecha: fecha || getTodayIsoDate(),
+    misiones: misiones.map((m) => ({
+      misionId: m.id,
+      completada: m.completed,
+      valorActual: m.currentValue,
+      valorObjetivo: m.targetValue,
+    })),
+  };
+
+  const path = '/dashboard/missions/daily/progress';
+  try {
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'PUT',
+        headers: {
+          ...baseHeaders,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (response && response.ok) {
+      const data: unknown = await response.json();
+      if (isRecord(data)) {
+        const rachaRaw = isRecord(data.racha) ? data.racha : {};
+        return {
+          fecha: (data.fecha as string) || payload.fecha,
+          totalMisiones: Number(data.totalMisiones || 0),
+          misionesCompletadas: Number(data.misionesCompletadas || 0),
+          todasCompletadas: Boolean(data.todasCompletadas),
+          puntoRachaOtorgado: Boolean(data.puntoRachaOtorgado),
+          racha: {
+            rachaActual: Number(rachaRaw.rachaActual ?? rachaRaw.currentStreak ?? 0),
+            rachaMaxima: Number(rachaRaw.rachaMaxima ?? rachaRaw.maxStreak ?? 0),
+            totalDiasCompletados: Number(rachaRaw.totalDiasCompletados ?? rachaRaw.totalCompletedDays ?? 0),
+            ultimaFechaCompletada: (rachaRaw.ultimaFechaCompletada as string) ?? null,
+            todasCompletadasHoy: Boolean(rachaRaw.todasCompletadasHoy),
+          },
+          misiones: Array.isArray(data.misiones)
+            ? data.misiones.map((item: any) => ({
+                misionId: item.misionId,
+                completada: Boolean(item.completada),
+                valorActual: Number(item.valorActual || 0),
+                valorObjetivo: Number(item.valorObjetivo || 1),
+              }))
+            : [],
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[mission-api] No se pudo sincronizar el progreso de misiones con el backend:', err);
+  }
+  return null;
+}
+
+

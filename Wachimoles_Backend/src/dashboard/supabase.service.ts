@@ -33,11 +33,23 @@ import {
   EstadoMisionAstronauta,
   UbicacionEntorno,
   UbicacionAstronauta,
-  SupabaseAstronautLocationRow
+  SupabaseAstronautLocationRow,
+  MisionDiariaProgreso,
+  ResumenDiaMisiones,
+  RachaAstronauta,
+  RespuestaProgresoMisiones,
+  SupabaseDailyMissionCompletionRow,
+  SupabaseDailyMissionDayRow,
+  SupabaseAstronautStreakRow
 } from "./dashboard.types";
 import { SaveDailyHealthCheckDto } from "./daily-health-checks.dto";
 import { SaveBodyConditionDto } from "./body-conditions.dto";
-import { ConsultarMisionesQueryDto } from "./missions.dto";
+import {
+  ConsultarMisionesQueryDto,
+  SincronizarProgresoMisionesDto,
+  ActualizarItemMisionDto,
+  ItemProgresoMisionDto
+} from "./missions.dto";
 import {
   GuardarEstadoMisionDto,
   LlegadaAnticipadaDto,
@@ -422,6 +434,86 @@ function mapAstronautLocation(
     label: config.etiqueta,
     gravityLabel: config.gravedadEtiqueta,
     updatedAt: actualizadoEn
+  };
+}
+
+function calcularDiferenciaDias(fechaReciente: string, fechaAnterior: string): number {
+  const d1 = new Date(fechaReciente + "T00:00:00Z").getTime();
+  const d2 = new Date(fechaAnterior + "T00:00:00Z").getTime();
+  return Math.round((d1 - d2) / 86400000);
+}
+
+function mapAstronautStreak(
+  row: SupabaseAstronautStreakRow,
+  fechaHoy?: string
+): RachaAstronauta {
+  const ahoraIso = new Date().toISOString();
+  const hoy = fechaHoy ?? ahoraIso.slice(0, 10);
+  const rachaActual = Math.max(0, Number(row.racha_actual || 0));
+  const rachaMaxima = Math.max(rachaActual, Number(row.racha_maxima || 0));
+  const totalDias = Math.max(0, Number(row.total_dias_completados || 0));
+  const ultimaFecha = row.ultima_fecha_completada ?? null;
+  const todasCompletadasHoy = ultimaFecha === hoy;
+  const actualizadoEn = row.actualizado_en ?? ahoraIso;
+
+  return {
+    usuarioId: row.user_id,
+    rachaActual,
+    rachaMaxima,
+    totalDiasCompletados: totalDias,
+    ultimaFechaCompletada: ultimaFecha,
+    todasCompletadasHoy,
+    actualizadoEn,
+    userId: row.user_id,
+    currentStreak: rachaActual,
+    maxStreak: rachaMaxima,
+    totalCompletedDays: totalDias,
+    lastCompletedDate: ultimaFecha,
+    allCompletedToday: todasCompletadasHoy,
+    updatedAt: actualizadoEn
+  };
+}
+
+function mapDailyMissionCompletion(
+  row: SupabaseDailyMissionCompletionRow
+): MisionDiariaProgreso {
+  const valorActual = Number(row.valor_actual || 0);
+  const valorObjetivo = Number(row.valor_objetivo || 1);
+  const completada = Boolean(row.completada);
+
+  return {
+    misionId: row.mision_id,
+    completada,
+    valorActual,
+    valorObjetivo,
+    actualizadoEn: row.actualizado_en,
+    missionId: row.mision_id,
+    completed: completada,
+    currentValue: valorActual,
+    targetValue: valorObjetivo
+  };
+}
+
+function mapDailyMissionDay(
+  row: SupabaseDailyMissionDayRow
+): ResumenDiaMisiones {
+  const total = Number(row.total_misiones || 0);
+  const completadas = Number(row.misiones_completadas || 0);
+  const todas = Boolean(row.todas_completadas);
+  const punto = Boolean(row.punto_racha_otorgado);
+
+  return {
+    fecha: row.fecha,
+    totalMisiones: total,
+    misionesCompletadas: completadas,
+    todasCompletadas: todas,
+    puntoRachaOtorgado: punto,
+    actualizadoEn: row.actualizado_en,
+    date: row.fecha,
+    totalMissions: total,
+    completedMissions: completadas,
+    allCompleted: todas,
+    streakPointAwarded: punto
   };
 }
 
@@ -2190,5 +2282,365 @@ export class SupabaseService {
     } catch {
       // Ignorar fallas secundarias al actualizar astronaut_mission_states
     }
+  }
+
+  private getDailyMissionCompletionsUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/daily_mission_completions`);
+  }
+
+  private getDailyMissionDaysUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/daily_mission_days`);
+  }
+
+  private getAstronautStreaksUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/astronaut_streaks`);
+  }
+
+  async obtenerRachaAstronauta(usuarioId: string): Promise<RachaAstronauta> {
+    const url = this.getAstronautStreaksUrl();
+    url.searchParams.set("select", "*");
+    url.searchParams.set("user_id", `eq.${usuarioId}`);
+    url.searchParams.set("limit", "1");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        { method: "GET" },
+        "astronaut streak"
+      );
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return mapAstronautStreak(rows[0] as SupabaseAstronautStreakRow);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo obtener la racha en Supabase para el usuario ${usuarioId}`,
+        err
+      );
+    }
+
+    const ahoraIso = new Date().toISOString();
+    return {
+      usuarioId,
+      rachaActual: 0,
+      rachaMaxima: 0,
+      totalDiasCompletados: 0,
+      ultimaFechaCompletada: null,
+      todasCompletadasHoy: false,
+      actualizadoEn: ahoraIso,
+      userId: usuarioId,
+      currentStreak: 0,
+      maxStreak: 0,
+      totalCompletedDays: 0,
+      lastCompletedDate: null,
+      allCompletedToday: false,
+      updatedAt: ahoraIso
+    };
+  }
+
+  async obtenerProgresoMisionesDelDia(
+    usuarioId: string,
+    fecha?: string
+  ): Promise<{
+    resumen: ResumenDiaMisiones | null;
+    misiones: MisionDiariaProgreso[];
+    racha: RachaAstronauta;
+  }> {
+    const fechaConsulta = fecha ?? new Date().toISOString().slice(0, 10);
+    const racha = await this.obtenerRachaAstronauta(usuarioId);
+
+    let resumen: ResumenDiaMisiones | null = null;
+    const misiones: MisionDiariaProgreso[] = [];
+
+    // 1. Consultar resumen del día
+    try {
+      const urlDia = this.getDailyMissionDaysUrl();
+      urlDia.searchParams.set("select", "*");
+      urlDia.searchParams.set("user_id", `eq.${usuarioId}`);
+      urlDia.searchParams.set("fecha", `eq.${fechaConsulta}`);
+      urlDia.searchParams.set("limit", "1");
+
+      const resDia = await this.requestSupabaseTable(
+        urlDia,
+        { method: "GET" },
+        "daily mission day summary"
+      );
+      const rowsDia = (await resDia.json()) as unknown;
+      if (Array.isArray(rowsDia) && rowsDia.length > 0) {
+        resumen = mapDailyMissionDay(rowsDia[0] as SupabaseDailyMissionDayRow);
+      }
+    } catch (err) {
+      this.logger.warn("No se pudo obtener el resumen del día de misiones", err);
+    }
+
+    // 2. Consultar misiones completadas del día
+    try {
+      const urlMisiones = this.getDailyMissionCompletionsUrl();
+      urlMisiones.searchParams.set("select", "*");
+      urlMisiones.searchParams.set("user_id", `eq.${usuarioId}`);
+      urlMisiones.searchParams.set("fecha", `eq.${fechaConsulta}`);
+
+      const resMisiones = await this.requestSupabaseTable(
+        urlMisiones,
+        { method: "GET" },
+        "daily mission completions"
+      );
+      const rowsMisiones = (await resMisiones.json()) as unknown;
+      if (Array.isArray(rowsMisiones)) {
+        for (const row of rowsMisiones) {
+          misiones.push(
+            mapDailyMissionCompletion(row as SupabaseDailyMissionCompletionRow)
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn("No se pudieron obtener las misiones completadas", err);
+    }
+
+    return { resumen, misiones, racha };
+  }
+
+  async sincronizarProgresoMisionesDiarias(
+    usuarioId: string,
+    dto: SincronizarProgresoMisionesDto
+  ): Promise<RespuestaProgresoMisiones> {
+    const ahoraIso = new Date().toISOString();
+    const fecha = dto.fecha ?? ahoraIso.slice(0, 10);
+    const misionesInput = dto.misiones ?? [];
+
+    const totalMisiones = misionesInput.length;
+    const misionesCompletadas = misionesInput.filter((m) => m.completada).length;
+    const todasCompletadas =
+      totalMisiones > 0 && misionesCompletadas >= totalMisiones;
+
+    // 1. Guardar o actualizar misiones individuales en daily_mission_completions
+    for (const item of misionesInput) {
+      const payloadMision = {
+        user_id: usuarioId,
+        fecha,
+        mision_id: item.misionId,
+        completada: item.completada,
+        valor_actual: item.valorActual ?? (item.completada ? 1 : 0),
+        valor_objetivo: item.valorObjetivo ?? 1,
+        actualizado_en: ahoraIso
+      };
+
+      try {
+        const urlItem = this.getDailyMissionCompletionsUrl();
+        urlItem.searchParams.set("on_conflict", "user_id,fecha,mision_id");
+        await this.requestSupabaseTable(
+          urlItem,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            },
+            body: JSON.stringify(payloadMision)
+          },
+          "upsert daily mission completion"
+        );
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo guardar la misión ${item.misionId} en Supabase`,
+          err
+        );
+      }
+    }
+
+    // 2. Obtener estado previo del día para ver si ya se había otorgado el punto de racha
+    let puntoRachaOtorgadoPreviamente = false;
+    try {
+      const urlDiaCheck = this.getDailyMissionDaysUrl();
+      urlDiaCheck.searchParams.set("select", "punto_racha_otorgado");
+      urlDiaCheck.searchParams.set("user_id", `eq.${usuarioId}`);
+      urlDiaCheck.searchParams.set("fecha", `eq.${fecha}`);
+      urlDiaCheck.searchParams.set("limit", "1");
+
+      const resCheck = await this.requestSupabaseTable(
+        urlDiaCheck,
+        { method: "GET" },
+        "check daily mission day streak point"
+      );
+      const rows = (await resCheck.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        puntoRachaOtorgadoPreviamente = Boolean(
+          (rows[0] as { punto_racha_otorgado?: boolean }).punto_racha_otorgado
+        );
+      }
+    } catch {
+      // Ignorar fallo de lectura previa
+    }
+
+    // 3. Evaluar y actualizar racha si todas las tareas del día están completadas
+    let rachaActualizada = await this.obtenerRachaAstronauta(usuarioId);
+    let nuevoPuntoOtorgado = false;
+
+    if (todasCompletadas && !puntoRachaOtorgadoPreviamente) {
+      nuevoPuntoOtorgado = true;
+      const ultimaFecha = rachaActualizada.ultimaFechaCompletada;
+
+      let nuevaRacha = 1;
+      if (ultimaFecha) {
+        const diffDias = calcularDiferenciaDias(fecha, ultimaFecha);
+        if (diffDias === 0) {
+          nuevaRacha = rachaActualizada.rachaActual;
+        } else if (diffDias === 1) {
+          nuevaRacha = rachaActualizada.rachaActual + 1;
+        } else {
+          nuevaRacha = 1;
+        }
+      }
+
+      const nuevaRachaMaxima = Math.max(
+        rachaActualizada.rachaMaxima,
+        nuevaRacha
+      );
+      const nuevoTotalDias = rachaActualizada.totalDiasCompletados + 1;
+
+      const payloadRacha = {
+        user_id: usuarioId,
+        racha_actual: nuevaRacha,
+        racha_maxima: nuevaRachaMaxima,
+        total_dias_completados: nuevoTotalDias,
+        ultima_fecha_completada: fecha,
+        actualizado_en: ahoraIso
+      };
+
+      try {
+        const urlRacha = this.getAstronautStreaksUrl();
+        urlRacha.searchParams.set("on_conflict", "user_id");
+        await this.requestSupabaseTable(
+          urlRacha,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            },
+            body: JSON.stringify(payloadRacha)
+          },
+          "upsert astronaut streak"
+        );
+      } catch (err) {
+        this.logger.warn("No se pudo guardar la racha en Supabase", err);
+      }
+
+      rachaActualizada = {
+        usuarioId,
+        rachaActual: nuevaRacha,
+        rachaMaxima: nuevaRachaMaxima,
+        totalDiasCompletados: nuevoTotalDias,
+        ultimaFechaCompletada: fecha,
+        todasCompletadasHoy: true,
+        actualizadoEn: ahoraIso,
+        userId: usuarioId,
+        currentStreak: nuevaRacha,
+        maxStreak: nuevaRachaMaxima,
+        totalCompletedDays: nuevoTotalDias,
+        lastCompletedDate: fecha,
+        allCompletedToday: true,
+        updatedAt: ahoraIso
+      };
+    }
+
+    const puntoRachaFinal = puntoRachaOtorgadoPreviamente || nuevoPuntoOtorgado;
+
+    // 4. Guardar o actualizar daily_mission_days
+    const payloadDia = {
+      user_id: usuarioId,
+      fecha,
+      total_misiones: totalMisiones,
+      misiones_completadas: misionesCompletadas,
+      todas_completadas: todasCompletadas,
+      punto_racha_otorgado: puntoRachaFinal,
+      actualizado_en: ahoraIso
+    };
+
+    try {
+      const urlDia = this.getDailyMissionDaysUrl();
+      urlDia.searchParams.set("on_conflict", "user_id,fecha");
+      await this.requestSupabaseTable(
+        urlDia,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal"
+          },
+          body: JSON.stringify(payloadDia)
+        },
+        "upsert daily mission days summary"
+      );
+    } catch (err) {
+      this.logger.warn("No se pudo guardar el día en Supabase", err);
+    }
+
+    const misionesMapeadas: MisionDiariaProgreso[] = misionesInput.map((m) => ({
+      misionId: m.misionId,
+      completada: m.completada,
+      valorActual: m.valorActual ?? (m.completada ? 1 : 0),
+      valorObjetivo: m.valorObjetivo ?? 1,
+      actualizadoEn: ahoraIso,
+      missionId: m.misionId,
+      completed: m.completada,
+      currentValue: m.valorActual ?? (m.completada ? 1 : 0),
+      targetValue: m.valorObjetivo ?? 1
+    }));
+
+    return {
+      fecha,
+      totalMisiones,
+      misionesCompletadas,
+      todasCompletadas,
+      puntoRachaOtorgado: puntoRachaFinal,
+      racha: rachaActualizada,
+      misiones: misionesMapeadas
+    };
+  }
+
+  async actualizarItemMisionDiaria(
+    usuarioId: string,
+    misionId: string,
+    dto: ActualizarItemMisionDto
+  ): Promise<RespuestaProgresoMisiones> {
+    const fecha = dto.fecha ?? new Date().toISOString().slice(0, 10);
+    const estadoPrevio = await this.obtenerProgresoMisionesDelDia(
+      usuarioId,
+      fecha
+    );
+
+    const misionesMap = new Map<
+      string,
+      { completada: boolean; valorActual: number; valorObjetivo: number }
+    >();
+    for (const m of estadoPrevio.misiones) {
+      misionesMap.set(m.misionId, {
+        completada: m.completada,
+        valorActual: m.valorActual,
+        valorObjetivo: m.valorObjetivo
+      });
+    }
+
+    misionesMap.set(misionId, {
+      completada: dto.completada,
+      valorActual: dto.valorActual ?? (dto.completada ? 1 : 0),
+      valorObjetivo: dto.valorObjetivo ?? 1
+    });
+
+    const listaMisiones: ItemProgresoMisionDto[] = [];
+    for (const [id, vals] of misionesMap.entries()) {
+      listaMisiones.push({
+        misionId: id,
+        completada: vals.completada,
+        valorActual: vals.valorActual,
+        valorObjetivo: vals.valorObjetivo
+      });
+    }
+
+    return this.sincronizarProgresoMisionesDiarias(usuarioId, {
+      fecha,
+      misiones: listaMisiones
+    });
   }
 }
