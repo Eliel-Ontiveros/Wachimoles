@@ -13,7 +13,12 @@ async function bootstrap(): Promise<void> {
       origin: string | undefined,
       callback: (error: Error | null, allow?: boolean) => void
     ) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      const isLocalDevOrigin =
+        typeof origin === "string" &&
+        /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(
+          origin
+        );
+      if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin) {
         callback(null, true);
         return;
       }

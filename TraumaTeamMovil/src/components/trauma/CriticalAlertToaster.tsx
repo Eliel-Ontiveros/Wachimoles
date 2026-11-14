@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, Text, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlertTriangle, X } from 'lucide-react-native';
 import { useMission } from './mission-context';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 // Pop-up flotante en pantalla exclusivo para anomalías médicas graves
 export function CriticalAlertToaster() {
@@ -20,7 +22,7 @@ export function CriticalAlertToaster() {
       toValue: 0,
       damping: 18,
       stiffness: 180,
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
 
     const timer = setTimeout(() => {
@@ -28,7 +30,7 @@ export function CriticalAlertToaster() {
         toValue: -140,
         duration: 220,
         easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }).start(({ finished }) => {
         if (finished) dismissToaster();
       });

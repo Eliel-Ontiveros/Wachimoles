@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -42,6 +43,8 @@ import {
   getBodyConditionsFromBackend,
   syncObservationToBackend,
 } from '../../services/mission-api';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 // Vista de exploración anatómica y registro de malestares
 interface BodyViewProps {
@@ -107,7 +110,7 @@ function ProblemDetailModal({
           damping: 20,
           stiffness: 180,
           mass: 0.8,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(barAnim, {
           toValue: (muscle.observation.painIntensity || 0) / 10,

@@ -1,8 +1,9 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   BackHandler,
   Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -15,6 +16,8 @@ import { router, usePathname, type Href } from 'expo-router';
 import { Activity, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
 
 import { useDrawer } from './drawer-context';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 // Geometría y tiempos de la animación hexagonal
 const R = 28;
@@ -137,8 +140,8 @@ export function HexDrawer() {
 
   const drawerW = Math.min(width * 0.82, 330);
   const [mounted, setMounted] = useState(false);
-  const progress = useRef(new Animated.Value(0)).current;
-  const content = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
+  const [content] = useState(() => new Animated.Value(0));
 
   // Origen de la onda: botón ☰ en la esquina superior izquierda
   const tiles = useMemo(
@@ -146,41 +149,41 @@ export function HexDrawer() {
     [drawerW, height, insets.top]
   );
 
-  useEffect(() => {
-    if (isOpen) setMounted(true);
-  }, [isOpen]);
+  const shouldRender = isOpen || mounted;
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!shouldRender) return;
     progress.stopAnimation();
     content.stopAnimation();
     if (isOpen) {
+      const frameId = requestAnimationFrame(() => setMounted(true));
       Animated.parallel([
         Animated.timing(progress, {
           toValue: 1,
           duration: OPEN_MS,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(content, {
           toValue: 1,
           duration: 280,
           delay: OPEN_MS * 0.55,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ]).start();
+      return () => cancelAnimationFrame(frameId);
     } else {
       Animated.sequence([
-        Animated.timing(content, { toValue: 0, duration: 130, useNativeDriver: true }),
+        Animated.timing(content, { toValue: 0, duration: 130, useNativeDriver: USE_NATIVE_DRIVER }),
         Animated.timing(progress, {
           toValue: 0,
           duration: CLOSE_MS,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ]).start(({ finished }) => finished && setMounted(false));
     }
-  }, [mounted, isOpen, progress, content]);
+  }, [shouldRender, isOpen, progress, content]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -191,7 +194,7 @@ export function HexDrawer() {
     return () => sub.remove();
   }, [isOpen, close]);
 
-  if (!mounted) return null;
+  if (!shouldRender) return null;
 
   // Capa blanca continua que asegura 100% blanco sólido y nítido una vez desplegado
   const solidWhiteOpacity = progress.interpolate({

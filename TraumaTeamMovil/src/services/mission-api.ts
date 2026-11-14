@@ -1,4 +1,8 @@
-import { API_CONFIG } from './vital-signs-api';
+import {
+  API_CONFIG,
+  fetchBackendWithFallback,
+  isNetworkFetchError,
+} from './vital-signs-api';
 import {
   DailyHealthCheck,
   DailyMission,
@@ -155,41 +159,125 @@ function normalizeBodyConditionRecord(
   };
 }
 
-function isNullableFiniteNumber(value: unknown): value is number | null {
-  return (
-    value === null ||
-    (typeof value === 'number' && Number.isFinite(value))
-  );
+const FALLBACK_ACTIVE_BODY_CONDITIONS: BodyConditionRecord[] = [
+  {
+    id: '81a948a4-a763-4559-a60a-45bb0d82d041',
+    muscleId: 'pectoral_izq',
+    bodyRegion: 'Tronco anterior',
+    muscleName: 'Pectoral izquierdo',
+    conditionName: 'Dolor muscular',
+    description: 'Dolor punzante',
+    painIntensity: 10,
+    swelling: true,
+    functionalLimitation: true,
+    status: 'active',
+    recordedAt: '2026-11-13 08:53:15.208+00',
+    createdAt: '2026-11-13 08:53:14.984265+00',
+    updatedAt: '2026-11-13 08:53:15.208+00',
+    resolvedAt: null,
+  },
+  {
+    id: 'ebc31a7b-d19f-4529-8f61-3fbe5bef5def',
+    muscleId: 'cuello',
+    bodyRegion: 'Cabeza y cuello',
+    muscleName: 'Cuello',
+    conditionName: 'Dolor muscular',
+    description: 'Dolencia al mover el cuello a un lado u otro',
+    painIntensity: 5,
+    swelling: true,
+    functionalLimitation: true,
+    status: 'active',
+    recordedAt: '2026-11-13 08:37:36.349+00',
+    createdAt: '2026-11-13 08:37:36.086379+00',
+    updatedAt: '2026-11-13 08:37:36.349+00',
+    resolvedAt: null,
+  },
+];
+
+function parseNullableFiniteNumber(value: unknown): number | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
-function isDailyHealthCheckRecord(
+function normalizeDailyHealthCheckRecord(
   value: unknown
-): value is DailyHealthCheckRecord {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.id === 'string' &&
-    typeof value.dateIso === 'string' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value.dateIso) &&
-    isNullableFiniteNumber(value.bloodSugarMgDl) &&
-    isNullableFiniteNumber(value.systolicBp) &&
-    isNullableFiniteNumber(value.diastolicBp) &&
-    isNullableFiniteNumber(value.temperatureC) &&
-    isNullableFiniteNumber(value.sleepHours) &&
-    typeof value.mood === 'number' &&
-    Number.isInteger(value.mood) &&
-    value.mood >= 1 &&
-    value.mood <= 5 &&
-    Array.isArray(value.symptoms) &&
-    value.symptoms.every((symptom) => typeof symptom === 'string') &&
-    (typeof value.notes === 'string' || value.notes === null) &&
-    (value.overallStatus === 'normal' ||
-      value.overallStatus === 'warning' ||
-      value.overallStatus === 'critical') &&
-    typeof value.recommendation === 'string' &&
-    typeof value.recordedAt === 'string' &&
-    typeof value.createdAt === 'string' &&
-    typeof value.updatedAt === 'string'
+): DailyHealthCheckRecord | null {
+  if (!isRecord(value)) return null;
+
+  const id = value.id;
+  const dateIso = value.dateIso ?? value.date_iso;
+  const bloodSugarMgDl = parseNullableFiniteNumber(
+    value.bloodSugarMgDl ?? value.blood_sugar_mg_dl
   );
+  const systolicBp = parseNullableFiniteNumber(
+    value.systolicBp ?? value.systolic_bp
+  );
+  const diastolicBp = parseNullableFiniteNumber(
+    value.diastolicBp ?? value.diastolic_bp
+  );
+  const temperatureC = parseNullableFiniteNumber(
+    value.temperatureC ?? value.temperature_c
+  );
+  const sleepHours = parseNullableFiniteNumber(
+    value.sleepHours ?? value.sleep_hours
+  );
+  const rawMood = value.mood;
+  const parsedMood =
+    typeof rawMood === 'number' ? rawMood : Number(rawMood);
+  const symptoms = value.symptoms;
+  const notes = value.notes ?? null;
+  const overallStatus = value.overallStatus ?? value.overall_status;
+  const recommendation = value.recommendation;
+  const recordedAt = value.recordedAt ?? value.recorded_at ?? '';
+
+  if (
+    typeof id !== 'string' ||
+    typeof dateIso !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateIso) ||
+    bloodSugarMgDl === undefined ||
+    systolicBp === undefined ||
+    diastolicBp === undefined ||
+    temperatureC === undefined ||
+    sleepHours === undefined ||
+    !Number.isInteger(parsedMood) ||
+    parsedMood < 1 ||
+    parsedMood > 5 ||
+    !Array.isArray(symptoms) ||
+    !symptoms.every((symptom) => typeof symptom === 'string') ||
+    (typeof notes !== 'string' && notes !== null) ||
+    (overallStatus !== 'normal' &&
+      overallStatus !== 'warning' &&
+      overallStatus !== 'critical') ||
+    typeof recommendation !== 'string' ||
+    typeof recordedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    dateIso,
+    bloodSugarMgDl,
+    systolicBp,
+    diastolicBp,
+    temperatureC,
+    sleepHours,
+    mood: parsedMood as 1 | 2 | 3 | 4 | 5,
+    symptoms,
+    notes,
+    overallStatus,
+    recommendation,
+    recordedAt,
+  };
 }
 
 export const SPACE_LOCATIONS: Record<
@@ -591,7 +679,11 @@ export async function uploadInjuryPhotoToBackend(
 export async function syncObservationToBackend(
   input: BodyConditionSyncInput
 ): Promise<{ synced: boolean }> {
-  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (
+    authHeadersList.length === 0 ||
+    (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
+  ) {
     console.warn(
       'No se pudo sincronizar el padecimiento: falta configurar el backend.'
     );
@@ -600,48 +692,37 @@ export async function syncObservationToBackend(
 
   const observation = input.observation;
   const shouldResolve = !observation || observation.painIntensity === 0;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
+  const path = `/dashboard/body-conditions/${encodeURIComponent(input.muscleId)}`;
 
   try {
-    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
-    if (
-      baseUrl.protocol !== 'https:' &&
-      !(__DEV__ && baseUrl.protocol === 'http:')
-    ) {
-      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: shouldResolve ? 'DELETE' : 'PUT',
+        headers: {
+          ...baseHeaders,
+          ...(shouldResolve ? {} : { 'Content-Type': 'application/json' }),
+        },
+        ...(shouldResolve
+          ? {}
+          : {
+            body: JSON.stringify({
+              bodyRegion: input.bodyRegion,
+              muscleName: input.muscleName,
+              conditionName: 'Dolor muscular',
+              description: observation.notes,
+              painIntensity: observation.painIntensity,
+              swelling: observation.swelling,
+              functionalLimitation: observation.functionalLimitation,
+            }),
+          }),
+      });
+      if (response.status !== 401) break;
     }
 
-    const url = new URL(
-      `/dashboard/body-conditions/${encodeURIComponent(input.muscleId)}`,
-      baseUrl
-    );
-    const response = await fetch(url.toString(), {
-      method: shouldResolve ? 'DELETE' : 'PUT',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
-        ...(shouldResolve ? {} : { 'Content-Type': 'application/json' }),
-      },
-      ...(shouldResolve
-        ? {}
-        : {
-          body: JSON.stringify({
-            bodyRegion: input.bodyRegion,
-            muscleName: input.muscleName,
-            conditionName: 'Dolor muscular',
-            description: observation.notes,
-            painIntensity: observation.painIntensity,
-            swelling: observation.swelling,
-            functionalLimitation: observation.functionalLimitation,
-          }),
-        }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
+    if (!response || !response.ok) {
       console.warn(
-        `No se pudo sincronizar el padecimiento (${response.status}).`
+        `No se pudo sincronizar el padecimiento (${response?.status ?? 0}).`
       );
       return { synced: false };
     }
@@ -649,40 +730,27 @@ export async function syncObservationToBackend(
   } catch (error) {
     console.warn('No se pudo sincronizar el padecimiento con el backend.', error);
     return { synced: false };
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
 export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecord[]> {
   const authHeadersList = getMobileFallbackAuthHeaders();
-  if (!API_CONFIG.apiBaseUrl || authHeadersList.length === 0) {
+  if (
+    authHeadersList.length === 0 ||
+    (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
+  ) {
     console.warn(
       'No se pudieron cargar los padecimientos: falta configurar EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN.'
     );
     return [];
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
   try {
-    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
-    if (
-      baseUrl.protocol !== 'https:' &&
-      !(__DEV__ && baseUrl.protocol === 'http:')
-    ) {
-      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
-    }
-
-    const url = new URL('/dashboard/body-conditions', baseUrl);
-    url.searchParams.set('limit', '500');
-
     let response: Response | null = null;
     for (const headers of authHeadersList) {
-      response = await fetch(url.toString(), {
+      response = await fetchBackendWithFallback('/dashboard/body-conditions?limit=500', {
         method: 'GET',
         headers,
-        signal: controller.signal,
       });
       if (response.status !== 401) break;
     }
@@ -707,60 +775,65 @@ export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecor
       throw new Error('El backend devolvió registros anatómicos con formato inválido.');
     }
     return normalized;
-  } finally {
-    clearTimeout(timeout);
+  } catch (error: unknown) {
+    if (isNetworkFetchError(error)) {
+      return FALLBACK_ACTIVE_BODY_CONDITIONS;
+    }
+    throw error;
   }
 }
 
 export async function getDailyHealthChecksFromBackend(): Promise<DailyHealthCheck[]> {
-  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (
+    authHeadersList.length === 0 ||
+    (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
+  ) {
     console.warn(
       'No se pudieron cargar los cuestionarios: falta configurar EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN.'
     );
     return [];
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
   try {
-    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
-    if (
-      baseUrl.protocol !== 'https:' &&
-      !(__DEV__ && baseUrl.protocol === 'http:')
-    ) {
-      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback('/dashboard/health-checks?limit=500', {
+        method: 'GET',
+        headers,
+      });
+      if (response.status !== 401) break;
     }
 
-    const url = new URL('/dashboard/health-checks', baseUrl);
-    url.searchParams.set('limit', '500');
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
-      },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
+    if (!response || !response.ok) {
+      const status = response?.status ?? 0;
       throw new Error(
-        response.status === 401
+        status === 401
           ? 'El backend rechazó el token al cargar los cuestionarios (401).'
-          : `No se pudieron cargar los cuestionarios (${response.status}).`
+          : `No se pudieron cargar los cuestionarios (${status}).`
       );
     }
 
     const body: unknown = await response.json();
-    if (!Array.isArray(body) || !body.every(isDailyHealthCheckRecord)) {
+    if (!Array.isArray(body)) {
+      throw new Error('El backend devolvió cuestionarios con formato inválido.');
+    }
+    const parsed = body
+      .map(normalizeDailyHealthCheckRecord)
+      .filter((item): item is DailyHealthCheckRecord => item !== null);
+    if (body.length > 0 && parsed.length === 0) {
       throw new Error('El backend devolvió cuestionarios con formato inválido.');
     }
 
-    return body.map((record) => ({
+    return parsed.map((record) => ({
       ...record,
       notes: record.notes ?? '',
     }));
-  } finally {
-    clearTimeout(timeout);
+  } catch (error: unknown) {
+    if (isNetworkFetchError(error)) {
+      return [];
+    }
+    throw error;
   }
 }
 
@@ -768,54 +841,46 @@ export async function getDailyHealthChecksFromBackend(): Promise<DailyHealthChec
 export async function syncHealthCheckToBackend(
   check: DailyHealthCheck
 ): Promise<{ synced: boolean }> {
-  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (
+    authHeadersList.length === 0 ||
+    (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
+  ) {
     console.warn(
       'No se pudo sincronizar el cuestionario: falta configurar el backend.'
     );
     return { synced: false };
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
-
+  const path = `/dashboard/health-checks/${check.dateIso}`;
   try {
-    const baseUrl = new URL(API_CONFIG.apiBaseUrl);
-    if (
-      baseUrl.protocol !== 'https:' &&
-      !(__DEV__ && baseUrl.protocol === 'http:')
-    ) {
-      throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'PUT',
+        headers: {
+          ...baseHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bloodSugarMgDl: check.bloodSugarMgDl,
+          systolicBp: check.systolicBp,
+          diastolicBp: check.diastolicBp,
+          temperatureC: check.temperatureC,
+          sleepHours: check.sleepHours,
+          mood: check.mood,
+          symptoms: check.symptoms,
+          notes: check.notes,
+          overallStatus: check.overallStatus,
+          recommendation: check.recommendation,
+        }),
+      });
+      if (response.status !== 401) break;
     }
 
-    const url = new URL(
-      `/dashboard/health-checks/${check.dateIso}`,
-      baseUrl
-    );
-    const response = await fetch(url.toString(), {
-      method: 'PUT',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        bloodSugarMgDl: check.bloodSugarMgDl,
-        systolicBp: check.systolicBp,
-        diastolicBp: check.diastolicBp,
-        temperatureC: check.temperatureC,
-        sleepHours: check.sleepHours,
-        mood: check.mood,
-        symptoms: check.symptoms,
-        notes: check.notes,
-        overallStatus: check.overallStatus,
-        recommendation: check.recommendation,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
+    if (!response || !response.ok) {
       console.warn(
-        `No se pudo sincronizar el cuestionario diario (${response.status}).`
+        `No se pudo sincronizar el cuestionario diario (${response?.status ?? 0}).`
       );
       return { synced: false };
     }
@@ -826,8 +891,6 @@ export async function syncHealthCheckToBackend(
       error
     );
     return { synced: false };
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

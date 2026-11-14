@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -31,6 +32,8 @@ import {
 import { SpaceLocation } from '../../types/mission';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const MONTHS_FULL = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -70,21 +73,28 @@ function SpaceDateCalendar({
   const today = useMemo(() => new Date(), []);
   const todayIso = useMemo(() => getTodayIsoDate(), []);
 
-  const initialParts = selectedIso.split('-').map(Number);
-  const [viewYear, setViewYear] = useState(
-    initialParts.length === 3 && !isNaN(initialParts[0]) ? initialParts[0] : today.getFullYear()
-  );
-  const [viewMonth, setViewMonth] = useState(
-    initialParts.length === 3 && !isNaN(initialParts[1]) ? initialParts[1] - 1 : today.getMonth()
-  );
-
-  useEffect(() => {
+  const parsedSelected = useMemo(() => {
     const parts = selectedIso.split('-').map(Number);
     if (parts.length === 3 && !parts.some(isNaN)) {
-      setViewYear(parts[0]);
-      setViewMonth(parts[1] - 1);
+      return { year: parts[0], month: parts[1] - 1 };
     }
-  }, [selectedIso]);
+    return { year: today.getFullYear(), month: today.getMonth() };
+  }, [selectedIso, today]);
+
+  const [browsedMonth, setBrowsedMonth] = useState<{
+    forIso: string;
+    year: number;
+    month: number;
+  } | null>(null);
+
+  const viewYear =
+    browsedMonth && browsedMonth.forIso === selectedIso
+      ? browsedMonth.year
+      : parsedSelected.year;
+  const viewMonth =
+    browsedMonth && browsedMonth.forIso === selectedIso
+      ? browsedMonth.month
+      : parsedSelected.month;
 
   const cells = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1);
@@ -99,8 +109,11 @@ function SpaceDateCalendar({
 
   const shiftMonth = (delta: number) => {
     const next = new Date(viewYear, viewMonth + delta, 1);
-    setViewYear(next.getFullYear());
-    setViewMonth(next.getMonth());
+    setBrowsedMonth({
+      forIso: selectedIso,
+      year: next.getFullYear(),
+      month: next.getMonth(),
+    });
   };
 
   return (
@@ -196,6 +209,8 @@ function SpaceDateCalendar({
   );
 }
 
+const LOCATION_OPTIONS: SpaceLocation[] = ['tierra', 'nave', 'luna', 'marte'];
+
 // Modal de Plan de Vuelo blanco (manteniendo la tarjeta de trayectoria espacial oscura)
 export function MissionOnboardingModal() {
   const {
@@ -208,34 +223,54 @@ export function MissionOnboardingModal() {
     configureMission,
   } = useMission();
 
+  if (!missionSetupOpen) return null;
+
+  return (
+    <MissionOnboardingModalContent
+      origin={origin}
+      destination={destination}
+      departureDate={departureDate}
+      arrivalDate={arrivalDate}
+      closeMissionSetup={closeMissionSetup}
+      configureMission={configureMission}
+    />
+  );
+}
+
+function MissionOnboardingModalContent({
+  origin,
+  destination,
+  departureDate,
+  arrivalDate,
+  closeMissionSetup,
+  configureMission,
+}: {
+  origin: SpaceLocation;
+  destination: SpaceLocation;
+  departureDate: string;
+  arrivalDate: string | null;
+  closeMissionSetup: () => void;
+  configureMission: (setup: {
+    origin: SpaceLocation;
+    destination: SpaceLocation;
+    departureDate: string;
+    arrivalDate?: string | null;
+  }) => void;
+}) {
+  const locationOptions = LOCATION_OPTIONS;
   const [selectedOrigin, setSelectedOrigin] = useState<SpaceLocation>(origin);
-  const [selectedDest, setSelectedDest] = useState<SpaceLocation>(destination);
+  const [selectedDest, setSelectedDest] = useState<SpaceLocation>(
+    destination !== origin
+      ? destination
+      : LOCATION_OPTIONS.find((loc) => loc !== origin) ?? 'luna'
+  );
   const [selectedDate, setSelectedDate] = useState<string>(departureDate || getTodayIsoDate());
   const [selectedArrivalDate, setSelectedArrivalDate] = useState<string | null>(arrivalDate);
   const [dateStep, setDateStep] = useState<'departure' | 'arrival'>('departure');
   const [calendarOpen, setCalendarOpen] = useState<boolean>(false);
 
-  const calendarAnim = useRef(new Animated.Value(0)).current;
-  const chevronAnim = useRef(new Animated.Value(0)).current;
-
-  const locationOptions: SpaceLocation[] = ['tierra', 'nave', 'luna', 'marte'];
-
-  useEffect(() => {
-    if (missionSetupOpen) {
-      setSelectedOrigin(origin);
-      setSelectedDest(
-        destination !== origin
-          ? destination
-          : locationOptions.find((loc) => loc !== origin) ?? 'luna'
-      );
-      setSelectedDate(departureDate || getTodayIsoDate());
-      setSelectedArrivalDate(arrivalDate);
-      setDateStep('departure');
-      setCalendarOpen(false);
-      calendarAnim.setValue(0);
-      chevronAnim.setValue(0);
-    }
-  }, [missionSetupOpen, origin, destination, departureDate, arrivalDate, calendarAnim, chevronAnim]);
+  const [calendarAnim] = useState(() => new Animated.Value(0));
+  const [chevronAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.parallel([
@@ -249,7 +284,7 @@ export function MissionOnboardingModal() {
         toValue: calendarOpen ? 1 : 0,
         duration: 240,
         easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
   }, [calendarOpen, calendarAnim, chevronAnim]);
@@ -264,8 +299,6 @@ export function MissionOnboardingModal() {
       ),
     [selectedOrigin, selectedDest, selectedDate, selectedArrivalDate]
   );
-
-  if (!missionSetupOpen) return null;
 
   const isSameRoute = selectedOrigin === selectedDest;
   const defaultRouteDays = getRouteTotalDays(selectedOrigin, selectedDest);
@@ -350,7 +383,7 @@ export function MissionOnboardingModal() {
 
   return (
     <Modal
-      visible={missionSetupOpen}
+      visible
       transparent
       animationType="fade"
       onRequestClose={closeMissionSetup}>

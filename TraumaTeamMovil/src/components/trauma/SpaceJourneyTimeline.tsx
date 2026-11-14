@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Image, Pressable, Text, View } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Flag } from 'lucide-react-native';
 import { ENVIRONMENTS, SPACE_LOCATIONS } from '../../services/mission-api';
 import { EnvironmentType, SpaceLocation } from '../../types/mission';
 import { useMission } from './mission-context';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const SHIP_SIZE = 32;
 const TRACK_HEIGHT = 76;
@@ -47,7 +49,7 @@ function SpaceBodyBadge({ loc, isOrigin = false }: { loc: SpaceLocation; isOrigi
           toValue: 1,
           duration: 9000,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         })
       );
       loop.start();
@@ -60,13 +62,13 @@ function SpaceBodyBadge({ loc, isOrigin = false }: { loc: SpaceLocation; isOrigi
           toValue: 1.09,
           duration: 1500,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(anim, {
           toValue: 1,
           duration: 1500,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
     );
@@ -209,7 +211,7 @@ export function SpaceJourneyTimeline({
       toValue: ratio,
       duration: 750,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   }, [ratio, progressAnim]);
 
@@ -220,13 +222,13 @@ export function SpaceJourneyTimeline({
           toValue: -2.5,
           duration: 1300,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(floatAnim, {
           toValue: 2.5,
           duration: 1300,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
     );

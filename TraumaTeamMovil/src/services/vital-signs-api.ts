@@ -59,11 +59,136 @@ function parseSamples(value: unknown): DashboardSample[] {
   });
 }
 
+function getBackendCandidateBases(): string[] {
+  const candidates: string[] = [];
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    candidates.push(`${window.location.origin.replace(/\/+$/, '')}/__api_proxy`);
+  }
+  if (API_CONFIG.apiBaseUrl) {
+    candidates.push(API_CONFIG.apiBaseUrl.replace(/\/+$/, ''));
+  }
+  for (const localUrl of API_CONFIG.localUrls) {
+    if (localUrl) {
+      candidates.push(localUrl.replace(/\/+$/, ''));
+    }
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location?.hostname?.trim();
+    if (host) {
+      candidates.push(`http://${host}:3000`);
+    }
+    candidates.push('http://localhost:3000', 'http://127.0.0.1:3000');
+  }
+
+  const unique: string[] = [];
+  for (const entry of candidates) {
+    if (entry && !unique.includes(entry)) {
+      unique.push(entry);
+    }
+  }
+  return unique;
+}
+
+export function isNetworkFetchError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === 'TypeError' || error.name === 'AbortError';
+}
+
+export async function fetchBackendWithFallback(
+  pathWithQuery: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const normalizedPath = pathWithQuery.startsWith('/')
+    ? pathWithQuery
+    : `/${pathWithQuery}`;
+  const candidates = getBackendCandidateBases();
+
+  if (candidates.length === 0) {
+    throw new Error('Configura EXPO_PUBLIC_API_BASE_URL para conectar con el backend.');
+  }
+
+  let lastError: unknown = null;
+
+  for (const base of candidates) {
+    const isProxy = base.endsWith('/__api_proxy');
+    let targetUrl = `${base}${normalizedPath}`;
+
+    if (!isProxy) {
+      try {
+        const parsedBase = new URL(base);
+        if (
+          parsedBase.protocol !== 'https:' &&
+          !(__DEV__ && parsedBase.protocol === 'http:')
+        ) {
+          continue;
+        }
+        targetUrl = new URL(normalizedPath, parsedBase).toString();
+      } catch (err) {
+        lastError = err;
+        continue;
+      }
+    }
+
+    const controller = new AbortController();
+    const timeoutMs = isProxy ? Math.min(API_CONFIG.timeoutMs, 3000) : API_CONFIG.timeoutMs;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const externalSignal = init.signal;
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        clearTimeout(timer);
+        const abortErr = new Error('Aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      }
+      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+
+    try {
+      const response = await fetch(targetUrl, {
+        ...init,
+        signal: controller.signal,
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      const isProxyUnavailable =
+        isProxy &&
+        (response.status === 404 ||
+          response.status === 502 ||
+          response.status === 503 ||
+          response.status === 504 ||
+          contentType.includes('text/html'));
+
+      if (isProxyUnavailable) {
+        lastError = new TypeError('Failed to fetch via proxy');
+        continue;
+      }
+
+      return response;
+    } catch (error: unknown) {
+      lastError = error;
+      if (externalSignal?.aborted) {
+        throw error;
+      }
+    } finally {
+      clearTimeout(timer);
+      if (externalSignal) {
+        externalSignal.removeEventListener('abort', onExternalAbort);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('No se pudo conectar con el backend.');
+}
+
 async function requestSamples(
   limit: number,
   metric?: SampleMetric
 ): Promise<DashboardSample[]> {
-  if (!API_CONFIG.apiBaseUrl) {
+  if (!API_CONFIG.apiBaseUrl && typeof window === 'undefined') {
     throw new Error('Configura EXPO_PUBLIC_API_BASE_URL para conectar con el backend.');
   }
   if (!API_CONFIG.dashboardApiToken) {
@@ -73,27 +198,18 @@ async function requestSamples(
     throw new Error('El límite de muestras debe estar entre 1 y 500.');
   }
 
-  const baseUrl = new URL(API_CONFIG.apiBaseUrl);
-  if (baseUrl.protocol !== 'https:' && !(__DEV__ && baseUrl.protocol === 'http:')) {
-    throw new Error('El backend debe usar HTTPS fuera del modo de desarrollo.');
-  }
+  const query = metric
+    ? `limit=${limit}&metric=${encodeURIComponent(metric)}`
+    : `limit=${limit}`;
+  const pathWithQuery = `/dashboard/samples?${query}`;
 
-  const url = new URL('/dashboard/samples', baseUrl);
-  url.searchParams.set('limit', String(limit));
-  if (metric) {
-    url.searchParams.set('metric', metric);
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), API_CONFIG.timeoutMs);
   try {
-    const response = await fetch(url.toString(), {
+    const response = await fetchBackendWithFallback(pathWithQuery, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
         Accept: 'application/json',
       },
-      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -109,8 +225,6 @@ async function requestSamples(
       throw new Error('La solicitud al backend agotó el tiempo de espera.');
     }
     throw error;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

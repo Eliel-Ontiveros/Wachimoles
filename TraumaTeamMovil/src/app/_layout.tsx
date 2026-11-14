@@ -1,8 +1,9 @@
+import '../utils/web-interop-init';
 import '../global.css';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { LogBox } from 'react-native';
+import { LogBox, Platform } from 'react-native';
 
 import { CriticalAlertToaster } from '@/components/trauma/CriticalAlertToaster';
 import { DrawerProvider } from '@/components/trauma/DrawerProvider';
@@ -10,13 +11,14 @@ import { MissionOnboardingModal } from '@/components/trauma/MissionOnboardingMod
 import { MissionProvider } from '@/components/trauma/MissionProvider';
 import { StartupSplashAnimation } from '@/components/trauma/StartupSplashAnimation';
 
-LogBox.ignoreLogs(['ImageBackground is deprecated']);
+LogBox.ignoreLogs(['ImageBackground is deprecated', 'useNativeDriver']);
 
 const originalConsoleWarn = console.warn;
 console.warn = (...args: unknown[]) => {
   if (
     typeof args[0] === 'string' &&
-    args[0].includes('ImageBackground is deprecated')
+    (args[0].includes('ImageBackground is deprecated') ||
+      (Platform.OS === 'web' && args[0].includes('useNativeDriver')))
   ) {
     return;
   }

@@ -3,6 +3,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -29,6 +30,8 @@ import { DashboardSample } from '../../types/vital-signs';
 import { EnvironmentSelector } from './EnvironmentSelector';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 // Plantilla de ciclo cardíaco normalizado
 const BEAT_TEMPLATE = [
@@ -69,7 +72,7 @@ function RealtimeEcgChart({
           toValue: -BEAT_WIDTH,
           duration: beatPeriodMs,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         })
       );
 
@@ -80,13 +83,13 @@ function RealtimeEcgChart({
             toValue: 1.15,
             duration: Math.round(beatPeriodMs * 0.2),
             easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(waveGlowAnim, {
             toValue: 1,
             duration: Math.round(beatPeriodMs * 0.8),
             easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ])
       );
@@ -105,7 +108,7 @@ function RealtimeEcgChart({
           toValue: -BEAT_WIDTH,
           duration: 3800,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         })
       );
       waitLoop.start();
@@ -389,13 +392,13 @@ function HistorySkeleton() {
           toValue: 0.95,
           duration: 650,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0.45,
           duration: 650,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
     );
@@ -820,13 +823,13 @@ export function VitalMonitorView() {
             toValue: 1.28,
             duration: Math.round(cycleDuration * 0.18),
             easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(heartBeatAnim, {
             toValue: 1,
             duration: Math.round(cycleDuration * 0.82),
             easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ])
       );
