@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Platform } from 'react-native';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 
@@ -8,11 +8,12 @@ import { useDrawer } from '@/components/trauma/drawer-context';
 import { useMission } from '@/components/trauma/mission-context';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
-import { interpretWithLlm, MAX_HISTORY_TURNS, type VoiceTurn } from '@/services/voice-api';
+import { interpretWithLlm, MAX_HISTORY_TURNS, type VoiceRequestContext, type VoiceTurn } from '@/services/voice-api';
 
 import { answer as dialogAnswer, needsDialog, startDialog, type DialogState, type Question } from './dialog';
 import { haptic } from './haptics';
-import { parseCommand, zoneNameFor, type ParseResult, type VoiceIntent } from './parser';
+import { describeScreen, isScreen } from './capabilities';
+import { isLowConfidence, parseCommand, zoneNameFor, type ParseResult, type VoiceIntent } from './parser';
 import {
   VoiceContext,
   type AlertsIntent,
@@ -21,6 +22,7 @@ import {
   type MissionsIntent,
   type VitalsIntent,
   type VoiceFeedback,
+  getBodyTab,
 } from './voice-context';
 import { WarpTransition, type WarpTrip } from './WarpTransition';
 
@@ -50,6 +52,7 @@ const LLM_KEYS: Record<'not-configured' | 'unreachable' | 'disabled' | 'failed',
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const drawer = useDrawer();
   const mission = useMission();
+  const pathname = usePathname();
   const { t, locale, speech } = useI18n();
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
@@ -82,6 +85,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nonce = useRef(0);
   const tripActions = useRef(new Map<number, () => void>());
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
   const missionRef = useRef(mission);
   useEffect(() => {
     missionRef.current = mission;
@@ -350,15 +357,30 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           report({ kind: 'info', text: parts.length ? parts.join(', ') : t('vitals.none') }, true);
           return;
         }
-        case 'help':
-          report({ kind: 'info', text: t('action.help') });
+        case 'describe-screen':
+        case 'help': {
+          const current = pathnameRef.current;
+          const screen = (intent.type === 'describe-screen' ? intent.screen : undefined) ?? (isScreen(current) ? current : undefined);
+          if (!screen) {
+            report({ kind: 'info', text: t('action.help') }, true);
+            return;
+          }
+          const d = describeScreen(screen, t);
+          const text =
+            intent.type === 'help'
+              ? `${t('action.help')} ${t('describe.here', { screen: d.title, summary: d.summary })}`
+              : d.summary;
+          setPanelOpen(true);
+          report({ kind: 'info', text, items: d.examples });
+          say(`${text} ${t('describe.try')} ${d.examples.join('. ')}`);
           return;
+        }
         case 'stop':
           report({ kind: 'info', text: t('action.cancelled') });
           return;
       }
     },
-    [drawer, pushAlertsIntent, pushBodyIntent, pushHealthIntent, pushMissionsIntent, pushVitalsIntent, report, t, warpTo]
+    [drawer, pushAlertsIntent, pushBodyIntent, pushHealthIntent, pushMissionsIntent, pushVitalsIntent, report, say, t, warpTo]
   );
 
   /** Termina el diálogo/aclaración: olvida el estado y la pregunta mostrada. */
@@ -435,16 +457,29 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     [t]
   );
 
-  /** Pregunta al LLM (con el historial de la aclaración en curso, S8). */
+  /** Contexto de pantalla para el LLM (S5): solo pantallas válidas; la pestaña solo en '/explore'. */
+  const llmContext = useCallback((): VoiceRequestContext | undefined => {
+    const screen = pathnameRef.current;
+    if (!isScreen(screen)) return undefined;
+    return screen === '/explore' ? { screen, tab: getBodyTab() } : { screen };
+  }, []);
+
+  /**
+   * Pregunta al LLM (con el historial de la aclaración en curso, S8).
+   * `localFallback`: resultado local de baja confianza (S7); si el LLM no está
+   * disponible, falla o solo pide aclaración, se ejecuta en vez de dejar al usuario atascado.
+   */
   const askLlm = useCallback(
-    (text: string, fallback: string) => {
+    (text: string, fallback: string, localFallback?: VoiceIntent) => {
       setThinking(true);
       report({ kind: 'info', text: t('voice.thinking') });
       const history = llmHistory.current;
-      void interpretWithLlm(text, locale, history).then((llm) => {
+      void interpretWithLlm(text, locale, history, llmContext()).then((llm) => {
         setThinking(false);
         if (llm.ok && llm.intent) {
           run(llm.intent);
+        } else if (localFallback) {
+          run(localFallback);
         } else if (llm.ok) {
           const message = llm.message ?? fallback;
           const turns: VoiceTurn[] = [...history, { role: 'user', content: text }, { role: 'assistant', content: message }];
@@ -466,7 +501,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         }
       });
     },
-    [ask, endConversation, locale, report, run, t]
+    [ask, endConversation, llmContext, locale, report, run, t]
   );
 
   const runText = useCallback(
@@ -486,7 +521,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       }
       const result = parseCommand(text);
       if (result.ok) {
-        run(result.intent);
+        // S7: coincidencia genérica → el LLM decide con contexto; si no responde, se ejecuta la local.
+        if (isLowConfidence(result)) askLlm(text, t('parse.unknown'), result.intent);
+        else run(result.intent);
         return;
       }
       if (result.reason === 'ambiguous' && result.pending) {

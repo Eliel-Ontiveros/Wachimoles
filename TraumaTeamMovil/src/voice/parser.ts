@@ -64,6 +64,7 @@ export type VoiceIntent =
   | { type: 'dismiss-alert' }
   | { type: 'toggle-treadmill' }
   | { type: 'read-vitals' }
+  | { type: 'describe-screen'; screen?: Route }
   | { type: 'help' }
   | { type: 'stop' };
 
@@ -71,6 +72,14 @@ export type ParseResult =
   | { ok: true; intent: VoiceIntent; confidence: number }
   | { ok: false; reason: 'empty' | 'unknown' }
   | { ok: false; reason: 'ambiguous'; zone: string; pending?: VoiceIntent };
+
+/** Por debajo de este umbral el resultado local es genérico y conviene consultar al LLM primero. */
+export const LOW_CONFIDENCE_THRESHOLD = 0.8;
+const BARE_NAV_CONFIDENCE = 0.6;
+
+export function isLowConfidence(result: ParseResult): boolean {
+  return result.ok && result.confidence < LOW_CONFIDENCE_THRESHOLD;
+}
 
 export function normalize(input: string): string {
   return input
@@ -211,6 +220,17 @@ export function parseCommand(raw: string): ParseResult {
     return ok({ type: 'dismiss-alert' });
   }
 
+  if (hasAny(text, ['que puedo hacer', 'what can i do', 'que hay en esta pantalla', 'que hay aqui', 'on this screen', 'what is here', 'esta pantalla'])) {
+    const screen: Route | undefined = hasAny(text, ['misiones', 'mision', 'viaje', 'missions', 'mission', 'journey'])
+      ? '/missions'
+      : hasAny(text, ['vista corporal', 'cuerpo', 'body', 'explorar'])
+        ? '/explore'
+        : hasAny(text, ['monitoreo', 'signos vitales', 'vitales', 'monitor', 'vital signs', 'vitals'])
+          ? '/'
+          : undefined;
+    return ok(screen ? { type: 'describe-screen', screen } : { type: 'describe-screen' }, 1);
+  }
+
   const metricWord = (
     [
       ['heart_rate', ['pulso', 'ritmo', 'corazon', 'cardiaco', 'cardiaca', 'latidos', 'heart']],
@@ -219,8 +239,11 @@ export function parseCommand(raw: string): ParseResult {
       ['sleep', ['sueno', 'dormir', 'sleep']],
     ] as [VitalMetric, string[]][]
   ).find(([, words]) => hasAny(text, words));
-  if (metricWord && hasAny(text, ['historial', 'history', 'historico', 'historic'])) {
-    return ok({ type: 'vital-history', metric: metricWord[0] });
+  if (
+    metricWord &&
+    hasAny(text, ['historial', 'history', 'historico', 'historic', 'detalle', 'detalles', 'detail', 'details', 'grafica', 'grafico', 'chart', 'graph', 'evolucion', 'evolution', 'tendencia', 'tendencias', 'trend', 'trends'])
+  ) {
+    return ok({ type: 'vital-history', metric: metricWord[0] }, 0.9);
   }
 
   if (hasAny(text, ['llegamos antes', 'llegada anticipada', 'llegar antes', 'adelantar llegada', 'arrive early', 'arrived early', 'early arrival'])) {
@@ -360,14 +383,18 @@ export function parseCommand(raw: string): ParseResult {
   if (hasAny(text, ['registros', 'historial', 'records', 'history'])) return ok({ type: 'body-tab', tab: 'records', label: 'Registros' });
   if (hasAny(text, ['vista 3d', 'modelo 3d', '3d model', 'cuerpo en 3d'])) return ok({ type: 'body-tab', tab: 'body', label: 'Vista 3D' });
 
+  const goVerb = hasAny(text, GO);
   if (hasAny(text, ['signos vitales', 'monitoreo', 'monitor', 'vitales', 'vital signs', 'vitals', 'pulso', 'inicio', 'home', 'dashboard', 'ecg', 'ritmo cardiaco', 'frecuencia cardiaca', 'corazon', 'latidos', 'pulsaciones', 'oxigeno', 'saturacion', 'spo2', 'estres', 'heart rate', 'heart', 'oxygen', 'stress'])) {
-    return ok({ type: 'navigate', route: '/', label: 'Monitoreo Vital' });
+    // Solo es específico si nombra la pantalla de forma explícita; una métrica suelta es ambigua.
+    const screenName = hasAny(text, ['signos vitales', 'monitoreo', 'monitor', 'vital signs', 'vitals', 'vitales']);
+    const specific = hasAny(text, ['signos vitales', 'vital signs', 'monitoreo vital']) || (screenName && goVerb);
+    return ok({ type: 'navigate', route: '/', label: 'Monitoreo Vital' }, specific ? 0.85 : BARE_NAV_CONFIDENCE);
   }
   if (hasAny(text, ['vista corporal', 'cuerpo', 'body', 'explorar', 'explore', 'lesion', 'lesiones'])) {
-    return ok({ type: 'navigate', route: '/explore', label: 'Vista Corporal' });
+    return ok({ type: 'navigate', route: '/explore', label: 'Vista Corporal' }, goVerb || has(text, 'vista corporal') ? 0.85 : BARE_NAV_CONFIDENCE);
   }
   if (hasAny(text, ['misiones', 'mision', 'viaje', 'nave', 'racha', 'missions', 'journey', 'streak'])) {
-    return ok({ type: 'navigate', route: '/missions', label: 'Misiones y Viaje' });
+    return ok({ type: 'navigate', route: '/missions', label: 'Misiones y Viaje' }, goVerb ? 0.85 : BARE_NAV_CONFIDENCE);
   }
 
   return { ok: false, reason: 'unknown' };

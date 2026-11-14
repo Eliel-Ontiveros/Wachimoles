@@ -153,6 +153,11 @@ export function VoiceFab() {
               <Text style={{ color: pill.text, fontSize: 12, fontWeight: '600', textAlign: 'center' }}>{fb.text}</Text>
             </View>
           )}
+          {fb?.items?.map((item) => (
+            <Text key={item} style={{ color: '#e0f2fe', fontSize: 14, fontWeight: '600', marginTop: 6, textAlign: 'center' }}>
+              • “{item}”
+            </Text>
+          ))}
           {idle &&
             examples.map((e) => (
               <Text

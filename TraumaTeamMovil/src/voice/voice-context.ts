@@ -3,7 +3,14 @@ import type { Animated } from 'react-native';
 
 import type { BodyTab, HealthPrefill, ObservationPrefill, VitalMetric } from './parser';
 
-export type VoiceFeedback = { kind: 'success' | 'error' | 'info'; text: string };
+export type VoiceFeedback = { kind: 'success' | 'error' | 'info'; text: string; /** Lista opcional (p. ej. ejemplos de comandos). */ items?: string[] };
+
+// Pestaña visible de la vista corporal (la reporta BodyView; no es estado de React).
+let bodyTab: BodyTab = 'body';
+export const reportBodyTab = (tab: BodyTab) => {
+  bodyTab = tab;
+};
+export const getBodyTab = (): BodyTab => bodyTab;
 
 /** Intención pendiente para la pantalla corporal (se consume al montarse). */
 export type BodyIntent = {

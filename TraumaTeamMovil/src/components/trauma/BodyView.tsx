@@ -39,7 +39,7 @@ import { InjuryTimelapseModal } from './InjuryTimelapseModal';
 import { HealthQuestionnaireSection } from './HealthQuestionnaireSection';
 import { useMission } from './mission-context';
 import type { ObservationPrefill } from '@/voice/parser';
-import { useVoice } from '@/voice/voice-context';
+import { reportBodyTab, useVoice } from '@/voice/voice-context';
 import {
   getBodyConditionsFromBackend,
   syncObservationToBackend,
@@ -367,7 +367,13 @@ function ProblemDetailModal({
 export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   const { injuryPhotos } = useMission();
   const { bodyIntent, consumeBodyIntent } = useVoice();
-  const [tab, setTab] = useState<'body' | 'health' | 'records'>('body');
+  const [tab, setTabState] = useState<'body' | 'health' | 'records'>('body');
+  // La voz necesita saber en qué pestaña está el usuario (S5): se reporta en cada cambio.
+  const setTab = (next: 'body' | 'health' | 'records') => {
+    reportBodyTab(next);
+    setTabState(next);
+  };
+  useEffect(() => () => reportBodyTab('body'), []);
   const [muscles, setMuscles] = useState<MuscleData[]>(INITIAL_MUSCLES);
   const [selectedName, setSelectedName] = useState<string>('Cuello');
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});

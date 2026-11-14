@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCommand } from '../src/voice/parser.ts';
+import { parseCommand, LOW_CONFIDENCE_THRESHOLD, isLowConfidence } from '../src/voice/parser.ts';
 
 const intent = (s) => {
   const r = parseCommand(s);
@@ -140,4 +140,58 @@ test('fill health check', () => {
 test('dismiss alert vs open alerts', () => {
   assert.equal(intent('cerrar alerta').type, 'dismiss-alert');
   assert.equal(intent('ver mis alertas').type, 'open-alerts');
+});
+
+test('S2 vital detail/history phrases → vital-history', () => {
+  const cases = [
+    ['ver los detalles de mi oxígeno', 'spo2'],
+    ['historial de mi pulso', 'heart_rate'],
+    ['gráfica de mi ritmo cardíaco', 'heart_rate'],
+    ['evolución de mi frecuencia cardíaca', 'heart_rate'],
+    ['tendencia de mi saturación', 'spo2'],
+    ['detalles de mi estrés', 'stress'],
+    ['detalles de mi sueño', 'sleep'],
+    ['show me my oxygen details', 'spo2'],
+    ['heart rate history', 'heart_rate'],
+    ['stress trend', 'stress'],
+    ['sleep chart', 'sleep'],
+  ];
+  for (const [phrase, metric] of cases) {
+    const r = parseCommand(phrase);
+    assert.equal(r.ok, true, phrase);
+    assert.equal(r.intent.type, 'vital-history', phrase);
+    assert.equal(r.intent.metric, metric, phrase);
+    assert.equal(isLowConfidence(r), false, phrase);
+  }
+  // los detalles de una zona siguen siendo de la zona
+  assert.equal(intent('detalles del bíceps derecho').type, 'zone-detail');
+});
+
+test('S7 confidence: bare keywords are low, specific commands are high', () => {
+  assert.ok(LOW_CONFIDENCE_THRESHOLD <= 0.8);
+  for (const bare of ['oxígeno', 'cuerpo', 'misiones', 'pulso', 'oxygen', 'ver mi oxígeno']) {
+    const r = parseCommand(bare);
+    assert.equal(r.ok, true, bare);
+    assert.equal(r.intent.type, 'navigate', bare);
+    assert.equal(isLowConfidence(r), true, bare);
+  }
+  for (const specific of ['abre signos vitales', 'llévame a misiones', 've a la vista corporal', 'open vital signs', 'ayuda', 'abrir menú', 'iniciar chequeo diario']) {
+    const r = parseCommand(specific);
+    assert.equal(r.ok, true, specific);
+    assert.equal(isLowConfidence(r), false, specific);
+  }
+  assert.equal(isLowConfidence(parseCommand('blah blah')), false);
+});
+
+test('S6 describe-screen phrases', () => {
+  for (const p of ['¿qué puedo hacer aquí?', 'qué hay en esta pantalla', 'what can I do here', 'what is on this screen']) {
+    const i = intent(p);
+    assert.equal(i.type, 'describe-screen', p);
+    assert.equal(i.screen, undefined, p);
+  }
+  assert.equal(intent('qué puedo hacer en misiones').screen, '/missions');
+  assert.equal(intent('qué puedo hacer en la vista corporal').screen, '/explore');
+  assert.equal(intent('qué puedo hacer en monitoreo').screen, '/');
+  assert.equal(intent('what can I do in missions').screen, '/missions');
+  assert.equal(intent('qué puedo decir').type, 'help');
 });

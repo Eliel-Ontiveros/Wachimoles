@@ -11,8 +11,8 @@ Branch feat/voice-commands. Builds on odd/tasks/voice-all-actions.md and odd/tas
 - S7 Routing: specific local matches run immediately (fast path); generic local matches (a bare screen/metric keyword resolved only to `navigate`) are low confidence and are sent to the LLM with context first; if the LLM is unavailable or fails, the local result runs.
 
 ## Tasks
-- T1 S3-S6 backend catalog, prompt generation, context DTO, describe-screen whitelist — worker
-- T2 S2,S5-S7 app catalog mirror for describe-screen/help, context in requests, confidence routing, parser fix — worker (after voice-dialog T2 lands)
+- T1 S3-S6 backend catalog, prompt generation, context DTO, describe-screen whitelist — worker — done d5efda1
+- T2 S2,S5-S7 app catalog mirror for describe-screen/help, context in requests, confidence routing, parser fix — worker (after voice-dialog T2 lands) — done
 
 ## Log
 - L1 Screenshot: "ver los detalles de mi oxígeno" went to Monitoreo Vital instead of opening the oxygen history.
