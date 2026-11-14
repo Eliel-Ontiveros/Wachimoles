@@ -1,4 +1,5 @@
 import type {
+  BodyConditionImageRecord,
   BodyConditionRecord,
   DailyHealthCheck,
   DailyMetricSummary,
@@ -149,7 +150,7 @@ function parseDailyHealthCheck(value: unknown): DailyHealthCheck | null {
     !Number.isFinite(value.mood) ||
     !Array.isArray(value.symptoms) ||
     !value.symptoms.every((s) => typeof s === 'string') ||
-    (typeof value.notes !== 'string' && value.notes !== null) ||
+    (typeof value.notes !== 'string' && value.notes !== null && value.notes !== undefined) ||
     (value.overallStatus !== 'normal' &&
       value.overallStatus !== 'warning' &&
       value.overallStatus !== 'critical') ||
@@ -158,6 +159,8 @@ function parseDailyHealthCheck(value: unknown): DailyHealthCheck | null {
   ) {
     return null;
   }
+
+  const notes: string = typeof value.notes === 'string' ? value.notes : '';
 
   return {
     id: value.id,
@@ -169,7 +172,7 @@ function parseDailyHealthCheck(value: unknown): DailyHealthCheck | null {
     sleepHours,
     mood: value.mood as DailyHealthCheck['mood'],
     symptoms: value.symptoms,
-    notes: value.notes,
+    notes,
     overallStatus: value.overallStatus,
     recommendation: value.recommendation,
     recordedAt: value.recordedAt,
@@ -187,6 +190,15 @@ function isInjuryPhoto(value: unknown): value is InjuryPhoto {
     typeof value.uri === 'string' &&
     typeof value.dayNumber === 'number' &&
     typeof value.capturedAt === 'string'
+  );
+}
+
+function isBodyConditionImageRecord(value: unknown): value is BodyConditionImageRecord {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.path === 'string' &&
+    typeof value.signedUrl === 'string' &&
+    typeof value.expiresAt === 'string'
   );
 }
 
@@ -401,6 +413,65 @@ export async function resolveBodyConditionInBackend(muscleId: string): Promise<v
         : `No se pudo resolver la lesión (${res.status}).`
     );
   }
+}
+
+export async function cureBodyConditionWithHistoryInBackend(
+  muscleId: string,
+  finalPayload: SaveBodyConditionPayload
+): Promise<void> {
+  const clampedPain = Math.max(1, Math.min(10, Math.round(finalPayload.painIntensity || 1)));
+  await saveBodyConditionToBackend(muscleId, {
+    ...finalPayload,
+    painIntensity: clampedPain,
+  });
+  await resolveBodyConditionInBackend(muscleId);
+}
+
+export async function fetchBodyConditionImagesFromBackend(
+  muscleId: string
+): Promise<BodyConditionImageRecord[]> {
+  const url = resolveUrl(`/dashboard/body-conditions/${encodeURIComponent(muscleId)}/images`);
+  const res = await fetchWithBearerOrBasic(url, { method: 'GET' });
+  if (!res.ok) {
+    throw new ApiRequestError(
+      res.status,
+      res.status === 401
+        ? 'Acceso protegido con token en /dashboard/body-conditions/images (401).'
+        : `No se pudieron cargar las fotos del padecimiento (${res.status}).`
+    );
+  }
+  const body: unknown = await res.json();
+  if (!Array.isArray(body) || !body.every(isBodyConditionImageRecord)) {
+    throw new Error('Formato inválido recibido desde /dashboard/body-conditions/images.');
+  }
+  return body;
+}
+
+export async function uploadBodyConditionImageToBackend(
+  muscleId: string,
+  file: File
+): Promise<BodyConditionImageRecord> {
+  const url = resolveUrl(`/dashboard/body-conditions/${encodeURIComponent(muscleId)}/images`);
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const res = await fetchWithBearerOrBasic(url, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new ApiRequestError(
+      res.status,
+      res.status === 401
+        ? 'No autorizado (401). Configura DASHBOARD_API_TOKEN para subir fotos.'
+        : `No se pudo subir la imagen (${res.status}).`
+    );
+  }
+  const body: unknown = await res.json();
+  if (!isBodyConditionImageRecord(body)) {
+    throw new Error('Respuesta inválida al subir imagen de padecimiento.');
+  }
+  return body;
 }
 
 export async function fetchDailyHealthChecksFromBackend(

@@ -642,21 +642,33 @@ export function HexagonalVaultBackground({ themeMode }: HexagonalVaultBackground
     drawHexLatticeFrame(ctx, lattice, [], width, height, 0, themeMode === 'dark');
   }, [themeMode]);
 
+  const isDarkTheme = themeMode === 'dark';
+
   return (
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="fixed inset-0 z-0 h-full w-full overflow-hidden pointer-events-none select-none bg-[#d9e3ef] dark:bg-[#060d1f] transition-colors duration-300"
+      className={`fixed inset-0 z-0 h-full w-full overflow-hidden pointer-events-none select-none transition-colors duration-300 ${
+        isDarkTheme ? 'bg-[#060d1f]' : 'bg-[#d9e3ef]'
+      }`}
     >
       <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
 
       {/* Profundidad radial suave y viñeta sutil en los bordes */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_36%_42%,rgba(147,222,255,0.16)_0%,transparent_52%),radial-gradient(ellipse_at_center,transparent_48%,rgba(145,168,194,0.24)_100%)] dark:bg-[radial-gradient(circle_at_36%_42%,rgba(147,222,255,0.08)_0%,transparent_52%),radial-gradient(ellipse_at_center,transparent_45%,rgba(2,6,23,0.62)_100%)]" />
+      <div
+        className={`pointer-events-none absolute inset-0 ${
+          isDarkTheme
+            ? 'bg-[radial-gradient(circle_at_36%_42%,rgba(147,222,255,0.08)_0%,transparent_52%),radial-gradient(ellipse_at_center,transparent_45%,rgba(2,6,23,0.62)_100%)]'
+            : 'bg-[radial-gradient(circle_at_36%_42%,rgba(147,222,255,0.16)_0%,transparent_52%),radial-gradient(ellipse_at_center,transparent_48%,rgba(145,168,194,0.24)_100%)]'
+        }`}
+      />
 
       {/* Textura de grano fino tipo bóveda mate */}
       {grainDataUrl && (
         <div
-          className="pointer-events-none absolute inset-0 bg-repeat opacity-[0.42] mix-blend-soft-light dark:opacity-[0.22]"
+          className={`pointer-events-none absolute inset-0 bg-repeat mix-blend-soft-light ${
+            isDarkTheme ? 'opacity-[0.22]' : 'opacity-[0.42]'
+          }`}
           style={{ backgroundImage: `url(${grainDataUrl})`, backgroundSize: '128px 128px' }}
         />
       )}
