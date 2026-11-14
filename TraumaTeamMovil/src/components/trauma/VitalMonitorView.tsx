@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -9,7 +9,17 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { Line, Path, Polyline, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Defs,
+  Line,
+  LinearGradient,
+  Path,
+  RadialGradient,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import {
@@ -17,14 +27,13 @@ import {
   Heart,
   Activity,
   ChevronRight,
-  Clock,
+  Droplets,
   X,
   TrendingUp,
   History,
   Flame,
-  ArrowUpRight,
-  ArrowDownRight,
   Moon,
+  Zap,
 } from 'lucide-react-native';
 import { DashboardSample } from '../../types/vital-signs';
 import { EnvironmentSelector } from './EnvironmentSelector';
@@ -332,6 +341,44 @@ function formatMetricValue(metric: HistoryMetric, value: number): string {
   return metric === 'sleep' ? value.toFixed(1) : String(Math.round(value));
 }
 
+function formatDateTimeShort(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '--';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm} ${hh}:${min}`;
+}
+
+function buildSmoothCurvePath(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return '';
+  if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  if (pts.length === 2) {
+    return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+  }
+
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const midX = (pts[i].x + pts[i + 1].x) / 2;
+    const midY = (pts[i].y + pts[i + 1].y) / 2;
+    d += ` Q ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)} ${midX.toFixed(1)} ${midY.toFixed(1)}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${last.x.toFixed(1)} ${last.y.toFixed(1)}`;
+  return d;
+}
+
+const BANNER_STARS = [
+  { x: 24, y: 16, r: 1.1, o: 0.6 },
+  { x: 78, y: 42, r: 0.9, o: 0.45 },
+  { x: 138, y: 14, r: 1.3, o: 0.75 },
+  { x: 210, y: 54, r: 1.0, o: 0.5 },
+  { x: 295, y: 20, r: 1.2, o: 0.7 },
+  { x: 350, y: 48, r: 1.1, o: 0.6 },
+  { x: 392, y: 18, r: 1.3, o: 0.78 },
+];
+
 const METRIC_META: Record<
   HistoryMetric,
   {
@@ -342,34 +389,46 @@ const METRIC_META: Record<
     softBg: string;
     minBound: number;
     maxBound: number;
+    nominalMin?: number;
+    nominalMax?: number;
+    nominalLabel?: string;
   }
 > = {
   heart_rate: {
-    title: 'Historial de Pulso',
+    title: 'Frecuencia Cardíaca',
     tabLabel: 'Pulso',
     unit: 'Lpm',
     accent: '#ef4444',
     softBg: '#fef2f2',
     minBound: 30,
     maxBound: 220,
+    nominalMin: 60,
+    nominalMax: 100,
+    nominalLabel: 'Nominal 60–100 Lpm',
   },
   spo2: {
-    title: 'Historial de Oxígeno',
+    title: 'Oxígeno SpO2',
     tabLabel: 'Oxígeno',
     unit: '%',
     accent: '#0284c7',
     softBg: '#f0f9ff',
     minBound: 70,
     maxBound: 100,
+    nominalMin: 95,
+    nominalMax: 100,
+    nominalLabel: 'Nominal ≥ 95%',
   },
   stress: {
-    title: 'Historial de Estrés',
+    title: 'Nivel de Estrés',
     tabLabel: 'Estrés',
     unit: '/100',
-    accent: '#f97316',
-    softBg: '#fff7ed',
+    accent: '#f59e0b',
+    softBg: '#fffbeb',
     minBound: 0,
     maxBound: 100,
+    nominalMin: 0,
+    nominalMax: 65,
+    nominalLabel: 'Zona controlada ≤ 65/100',
   },
   sleep: {
     title: 'Historial de Sueño',
@@ -379,8 +438,24 @@ const METRIC_META: Record<
     softBg: '#f5f3ff',
     minBound: 0,
     maxBound: 12,
+    nominalMin: 7,
+    nominalMax: 9,
+    nominalLabel: 'Meta 7–9 h',
   },
 };
+
+function renderHistoryTabIcon(metric: HistoryMetric, color: string, size = 12) {
+  switch (metric) {
+    case 'heart_rate':
+      return <Heart size={size} color={color} />;
+    case 'spo2':
+      return <Droplets size={size} color={color} />;
+    case 'stress':
+      return <Zap size={size} color={color} />;
+    case 'sleep':
+      return <Moon size={size} color={color} />;
+  }
+}
 
 // Esqueleto animado de carga mientras obtiene historial de métricas
 function HistorySkeleton() {
@@ -432,7 +507,7 @@ function HistorySkeleton() {
   );
 }
 
-// Modal de historial agrupado por día para Pulso, Oxígeno y Estrés
+// Modal Bitácora de Vuelo: historial agrupado y evolución para Pulso, Oxígeno, Estrés y Sueño
 function VitalHistoryModal({
   visible,
   metric,
@@ -451,19 +526,38 @@ function VitalHistoryModal({
   loading: boolean;
 }) {
   const [chartWidth, setChartWidth] = useState(0);
+  const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
   const meta = METRIC_META[metric];
+
+  useEffect(() => {
+    setSelectedPointIdx(null);
+  }, [metric, visible]);
 
   const validSamples = useMemo(() => {
     return history.filter((s) => s.metric === metric && Number(s.value) > 0);
   }, [history, metric]);
 
+  const metricSeries = useMemo(() => {
+    const sorted = validSamples
+      .slice()
+      .sort((a, b) => new Date(a.measuredAt).getTime() - new Date(b.measuredAt).getTime());
+    return sorted.length > 30 ? sorted.slice(sorted.length - 30) : sorted;
+  }, [validSamples]);
+
   const dailySummaries = useMemo(() => groupSamplesByDay(validSamples), [validSamples]);
 
   const stats = useMemo(() => {
-    if (validSamples.length === 0) {
-      return { min: 0, max: 0, avg: 0, latest: currentValue || 0 };
+    if (metricSeries.length === 0) {
+      return {
+        min: 0,
+        max: 0,
+        avg: 0,
+        latest: currentValue || 0,
+        latestTime: null as string | null,
+        count: 0,
+      };
     }
-    const vals = validSamples.map((s) =>
+    const vals = metricSeries.map((s) =>
       metric === 'sleep' ? s.value : Math.round(s.value)
     );
     const min = Math.min(...vals);
@@ -473,28 +567,111 @@ function VitalHistoryModal({
       metric === 'sleep'
         ? Math.round((sum / vals.length) * 10) / 10
         : Math.round(sum / vals.length);
-    const latest = currentValue ?? vals[0];
-    return { min, max, avg, latest };
-  }, [metric, validSamples, currentValue]);
+    const latestSample = metricSeries[metricSeries.length - 1];
+    const latest = currentValue ?? vals[vals.length - 1];
+    return {
+      min,
+      max,
+      avg,
+      latest,
+      latestTime: latestSample?.measuredAt ?? null,
+      count: metricSeries.length,
+    };
+  }, [metric, metricSeries, currentValue]);
 
-  const chartPoints = useMemo(() => {
-    if (chartWidth <= 0 || validSamples.length < 2) return '';
+  const chartGeometry = useMemo(() => {
+    const height = 148;
+    const padLeft = 32;
+    const padRight = 12;
+    const padTop = 14;
+    const padBottom = 16;
+    const width = Math.max(0, chartWidth);
+    const innerW = Math.max(1, width - padLeft - padRight);
+    const innerH = height - padTop - padBottom;
 
-    const pointsData = [...validSamples.slice(0, 18)].reverse();
-    const minVal = Math.max(meta.minBound, stats.min - 5);
-    const maxVal = Math.min(meta.maxBound, stats.max + 5);
-    const range = maxVal - minVal || 1;
-    const h = 100;
+    if (width <= 0 || metricSeries.length === 0) {
+      return {
+        width,
+        height,
+        padLeft,
+        padRight,
+        padTop,
+        padBottom,
+        innerW,
+        innerH,
+        minVal: 0,
+        maxVal: 100,
+        points: [] as { sample: DashboardSample; x: number; y: number }[],
+        linePathD: '',
+        areaPathD: '',
+        nominalMinY: null as number | null,
+        nominalMaxY: null as number | null,
+      };
+    }
 
-    return pointsData
-      .map((s, idx) => {
-        const x = (idx / (pointsData.length - 1)) * (chartWidth - 20) + 10;
-        const normY = (s.value - minVal) / range;
-        const y = h - normY * (h - 24) - 12;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(' ');
-  }, [chartWidth, validSamples, stats, meta]);
+    let minVal = Math.min(...metricSeries.map((p) => p.value));
+    let maxVal = Math.max(...metricSeries.map((p) => p.value));
+    if (meta.nominalMin !== undefined) minVal = Math.min(minVal, meta.nominalMin);
+    if (meta.nominalMax !== undefined) maxVal = Math.max(maxVal, meta.nominalMax);
+
+    if (minVal === maxVal) {
+      minVal = Math.max(meta.minBound, minVal - 5);
+      maxVal = Math.min(meta.maxBound, maxVal + 5);
+    } else {
+      const span = maxVal - minVal;
+      minVal = Math.max(meta.minBound, minVal - span * 0.12);
+      maxVal = Math.min(meta.maxBound, maxVal + span * 0.12);
+    }
+
+    const span = Math.max(0.001, maxVal - minVal);
+    const points = metricSeries.map((sample, idx) => {
+      const rx = metricSeries.length === 1 ? 0.5 : idx / (metricSeries.length - 1);
+      const ry = (sample.value - minVal) / span;
+      return {
+        sample,
+        x: padLeft + rx * innerW,
+        y: padTop + innerH - ry * innerH,
+      };
+    });
+
+    const linePathD = buildSmoothCurvePath(points);
+    let areaPathD = '';
+    if (points.length >= 2 && linePathD) {
+      const baseY = padTop + innerH;
+      const first = points[0];
+      const last = points[points.length - 1];
+      areaPathD = `${linePathD} L ${last.x.toFixed(1)} ${baseY.toFixed(1)} L ${first.x.toFixed(1)} ${baseY.toFixed(1)} Z`;
+    }
+
+    const toY = (v?: number) => {
+      if (v === undefined) return null;
+      const y = padTop + innerH - ((v - minVal) / span) * innerH;
+      return y >= padTop && y <= padTop + innerH ? y : null;
+    };
+
+    return {
+      width,
+      height,
+      padLeft,
+      padRight,
+      padTop,
+      padBottom,
+      innerW,
+      innerH,
+      minVal,
+      maxVal,
+      points,
+      linePathD,
+      areaPathD,
+      nominalMinY: toY(meta.nominalMin),
+      nominalMaxY: toY(meta.nominalMax),
+    };
+  }, [chartWidth, metricSeries, meta]);
+
+  const activePoint =
+    selectedPointIdx !== null && chartGeometry.points[selectedPointIdx]
+      ? chartGeometry.points[selectedPointIdx]
+      : chartGeometry.points[chartGeometry.points.length - 1] ?? null;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -502,128 +679,197 @@ function VitalHistoryModal({
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: 'rgba(15,23,42,0.45)',
+          backgroundColor: 'rgba(5, 11, 25, 0.58)',
           justifyContent: 'flex-end',
         }}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={{ height: '82%' }}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={{ height: '86%' }}>
           <View
             style={{ flex: 1 }}
-            className="overflow-hidden rounded-t-3xl border-t border-slate-200 bg-white shadow-2xl">
-            <View className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-slate-200" />
+            className="overflow-hidden rounded-t-3xl bg-[#f8fafc] shadow-2xl">
+            {/* Banner espacial superior estilo Bitácora de Vuelo (Web) */}
+            <View style={{ backgroundColor: '#060b19', position: 'relative' }}>
+              <Svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 420 96"
+                preserveAspectRatio="xMidYMid slice"
+                style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
+                <Defs>
+                  <LinearGradient id="mobileHistorySky" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0%" stopColor="#060b19" />
+                    <Stop offset="100%" stopColor="#0b1633" />
+                  </LinearGradient>
+                  <RadialGradient id="mobileEarth" cx="35%" cy="30%" r="65%">
+                    <Stop offset="0%" stopColor="#38bdf8" />
+                    <Stop offset="100%" stopColor="#0369a1" />
+                  </RadialGradient>
+                  <RadialGradient id="mobileMoon" cx="35%" cy="30%" r="65%">
+                    <Stop offset="0%" stopColor="#f1f5f9" />
+                    <Stop offset="100%" stopColor="#94a3b8" />
+                  </RadialGradient>
+                </Defs>
+                <Rect x={0} y={0} width={420} height={96} fill="url(#mobileHistorySky)" />
+                {BANNER_STARS.map((st, idx) => (
+                  <Circle key={idx} cx={st.x} cy={st.y} r={st.r} fill="#e0f2fe" opacity={st.o} />
+                ))}
+                <Path
+                  d="M 226 68 Q 312 18 390 54"
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth={1.3}
+                  strokeDasharray="4 4"
+                  opacity={0.5}
+                />
+                <Circle cx={226} cy={68} r={9} fill="url(#mobileEarth)" opacity={0.92} />
+                <Circle cx={390} cy={54} r={7.5} fill="url(#mobileMoon)" opacity={0.92} />
+                <Circle cx={312} cy={38} r={4} fill="#7dd3fc" opacity={0.9} />
+                <Circle cx={312} cy={38} r={9} fill="rgba(125,211,252,0.18)" />
+              </Svg>
 
-            {/* Cabecera del modal */}
-            <View className="flex-row items-center justify-between border-b border-slate-100 px-5 pb-3 pt-3">
-              <View className="flex-row items-center">
-                <View
-                  style={{ backgroundColor: meta.softBg }}
-                  className="mr-2.5 h-9 w-9 items-center justify-center rounded-xl">
-                  {metric === 'heart_rate' ? (
-                    <Heart size={18} color={meta.accent} fill={meta.accent} />
-                  ) : metric === 'sleep' ? (
-                    <Moon size={18} color={meta.accent} />
-                  ) : (
-                    <Activity size={18} color={meta.accent} />
-                  )}
-                </View>
-                <View>
-                  <Text className="font-mono text-base font-extrabold text-slate-900">
-                    {meta.title}
-                  </Text>
-                  <Text className="font-mono text-[10px] text-slate-400">
-                    {metric === 'sleep'
-                      ? 'Duración de sueño registrada por noche'
-                      : 'Resumen agrupado por día (pico, promedio y mínimo)'}
-                  </Text>
+              <View className="px-5 pb-3.5 pt-2.5">
+                <View className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-white/25" />
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 pr-3">
+                    <Text className="font-mono text-[9px] font-bold uppercase tracking-[1.6px] text-sky-300">
+                      BITÁCORA DE VUELO
+                    </Text>
+                    <Text className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                      {meta.title}
+                    </Text>
+                    <Text className="mt-0.5 font-mono text-[10px] text-slate-300">
+                      {stats.count > 0 && stats.latestTime
+                        ? `${stats.count} registros recientes · última ${formatDateTimeShort(stats.latestTime)}`
+                        : 'Sin lecturas sincronizadas para esta señal'}
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    onPress={onClose}
+                    accessibilityLabel="Cerrar historial"
+                    style={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                      borderColor: 'rgba(125, 211, 252, 0.35)',
+                      borderWidth: 1,
+                    }}
+                    className="h-8 w-8 items-center justify-center rounded-full active:opacity-70">
+                    <X size={16} color="#e0f2fe" />
+                  </Pressable>
                 </View>
               </View>
-
-              <Pressable
-                onPress={onClose}
-                className="h-8 w-8 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200">
-                <X size={16} color="#475569" />
-              </Pressable>
             </View>
 
-            {/* Pestañas para alternar entre métricas */}
-            <View className="flex-row gap-2 px-5 pt-3">
-              {(['heart_rate', 'spo2', 'stress', 'sleep'] as HistoryMetric[]).map((mKey) => {
-                const active = mKey === metric;
-                return (
-                  <Pressable
-                    key={mKey}
-                    onPress={() => onSelectMetric(mKey)}
-                    className={`flex-1 items-center rounded-xl border py-2 ${active
-                      ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-                      : 'border-slate-200 bg-[#f8fafc]'
-                      }`}>
-                    <Text
-                      className={`font-mono text-[10.5px] font-bold ${active ? 'text-trauma-ink' : 'text-slate-500'
-                        }`}>
-                      {METRIC_META[mKey].tabLabel}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+            {/* Pestañas oscuras estilo Web para alternar entre métricas */}
+            <View className="border-b border-slate-200/80 bg-white px-4 py-2.5">
+              <View className="flex-row gap-1.5 rounded-2xl bg-slate-100 p-1">
+                {(['heart_rate', 'spo2', 'stress', 'sleep'] as HistoryMetric[]).map((mKey) => {
+                  const active = mKey === metric;
+                  const tabMeta = METRIC_META[mKey];
+                  return (
+                    <Pressable
+                      key={mKey}
+                      onPress={() => onSelectMetric(mKey)}
+                      style={
+                        active
+                          ? {
+                              backgroundColor: '#060b19',
+                              shadowColor: '#020617',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.16,
+                              shadowRadius: 4,
+                              elevation: 2,
+                            }
+                          : undefined
+                      }
+                      className="flex-1 flex-row items-center justify-center gap-1 rounded-xl py-2">
+                      {renderHistoryTabIcon(
+                        mKey,
+                        active ? tabMeta.accent : '#64748b',
+                        12
+                      )}
+                      <Text
+                        numberOfLines={1}
+                        style={{ color: active ? tabMeta.accent : '#64748b' }}
+                        className="font-mono text-[10px] font-bold">
+                        {tabMeta.tabLabel}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
-            <ScrollView className="flex-1 px-5 pt-3.5" showsVerticalScrollIndicator={false}>
+            <ScrollView className="flex-1 px-4 pt-3.5" showsVerticalScrollIndicator={false}>
               {loading ? (
                 <HistorySkeleton />
               ) : (
                 <>
-                  {/* Tarjetas de Estadísticas Generales */}
+                  {/* Estadísticas clave */}
                   {metric === 'sleep' ? (
                     <View className="flex-row justify-between gap-2.5">
-                      <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                        <Text className="font-mono text-[9px] uppercase text-slate-400">Actual</Text>
-                        <Text className="font-mono text-lg font-extrabold text-slate-900">
-                          {stats.latest ? formatMetricValue(metric, stats.latest) : '--'}
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400">
+                          Actual
                         </Text>
-                        <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
+                        <Text
+                          style={{ color: meta.accent }}
+                          className="mt-0.5 font-mono text-lg font-extrabold">
+                          {stats.latest ? `${formatMetricValue(metric, stats.latest)} ${meta.unit}` : '--'}
+                        </Text>
                       </View>
 
-                      <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                        <Text className="font-mono text-[9px] uppercase text-slate-400">Máximo</Text>
-                        <Text className="font-mono text-lg font-extrabold text-violet-700">
-                          {stats.max ? formatMetricValue(metric, stats.max) : '--'}
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400">
+                          Máximo
                         </Text>
-                        <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
+                        <Text className="mt-0.5 font-mono text-lg font-extrabold text-slate-900">
+                          {stats.max ? `${formatMetricValue(metric, stats.max)} ${meta.unit}` : '--'}
+                        </Text>
                       </View>
                     </View>
                   ) : (
                     <View className="flex-row justify-between gap-2">
-                      <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                        <Text className="font-mono text-[9px] uppercase text-slate-400">Actual</Text>
-                        <Text className="font-mono text-lg font-extrabold text-slate-900">
-                          {stats.latest ? formatMetricValue(metric, stats.latest) : '--'}
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400">
+                          Última lectura
                         </Text>
-                        <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
+                        <Text
+                          numberOfLines={1}
+                          style={{ color: meta.accent }}
+                          className="mt-0.5 font-mono text-base font-extrabold">
+                          {stats.latest ? `${formatMetricValue(metric, stats.latest)} ${meta.unit}` : '--'}
+                        </Text>
                       </View>
 
-                      <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                        <Text className="font-mono text-[9px] uppercase text-slate-400">Promedio</Text>
-                        <Text className="font-mono text-lg font-extrabold text-sky-600">
-                          {stats.avg ? formatMetricValue(metric, stats.avg) : '--'}
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400">
+                          Promedio
                         </Text>
-                        <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
+                        <Text
+                          numberOfLines={1}
+                          className="mt-0.5 font-mono text-base font-extrabold text-sky-600">
+                          {stats.avg ? `${formatMetricValue(metric, stats.avg)} ${meta.unit}` : '--'}
+                        </Text>
                       </View>
 
-                      <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                        <Text className="font-mono text-[9px] uppercase text-slate-400">Mín / Máx</Text>
-                        <Text className="mt-0.5 font-mono text-sm font-extrabold text-slate-900">
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400">
+                          Mín – Máx
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          className="mt-1 font-mono text-xs font-extrabold text-slate-900">
                           {stats.min && stats.max
-                            ? `${formatMetricValue(metric, stats.min)} - ${formatMetricValue(metric, stats.max)}`
+                            ? `${formatMetricValue(metric, stats.min)}–${formatMetricValue(metric, stats.max)} ${meta.unit}`
                             : '--'}
                         </Text>
-                        <Text className="font-mono text-[8.5px] text-slate-500">Rango</Text>
                       </View>
                     </View>
                   )}
 
-                  {/* Gráfica: barras por día para sueño, línea de tendencia para el resto */}
+                  {/* Gráfica: barras por día para sueño, curva suavizada interactiva para el resto */}
                   {metric === 'sleep' ? (
                     dailySummaries.length > 0 && (
-                      <View className="mt-3.5 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs">
+                      <View className="mt-3.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
                         <View className="mb-3 flex-row items-center justify-between">
                           <View className="flex-row items-center">
                             <TrendingUp size={13} color={meta.accent} />
@@ -679,148 +925,294 @@ function VitalHistoryModal({
                       </View>
                     )
                   ) : (
-                    validSamples.length >= 2 && (
-                    <View className="mt-3.5 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs">
-                      <View className="mb-2 flex-row items-center justify-between">
+                    <View className="mt-3.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
+                      <View className="mb-2.5 flex-row items-center justify-between gap-2">
                         <View className="flex-row items-center">
                           <TrendingUp size={13} color={meta.accent} />
                           <Text className="ml-1.5 font-mono text-xs font-bold text-slate-800">
-                            Tendencia reciente
+                            Evolución reciente
                           </Text>
                         </View>
-                        <Text className="font-mono text-[9.5px] text-slate-400">
-                          Últimas {Math.min(18, validSamples.length)} lecturas
-                        </Text>
-                      </View>
 
-                      <View
-                        style={{ height: 100, width: '100%' }}
-                        onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
-                        {chartWidth > 0 && chartPoints && (
-                          <Svg width={chartWidth} height={100}>
-                            <Defs>
-                              <LinearGradient id="pulseLineGrad" x1="0" y1="0" x2="0" y2="1">
-                                <Stop offset="0%" stopColor={meta.accent} stopOpacity="0.4" />
-                                <Stop offset="100%" stopColor={meta.accent} stopOpacity="0" />
-                              </LinearGradient>
-                            </Defs>
-                            <Line x1={0} y1={22} x2={chartWidth} y2={22} stroke="#f1f5f9" strokeWidth={1} />
-                            <Line x1={0} y1={50} x2={chartWidth} y2={50} stroke="#f1f5f9" strokeWidth={1} />
-                            <Line x1={0} y1={78} x2={chartWidth} y2={78} stroke="#f1f5f9" strokeWidth={1} />
-
-                            <Polyline
-                              points={chartPoints}
-                              fill="none"
-                              stroke={meta.accent}
-                              strokeWidth={2.4}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </Svg>
+                        {activePoint && (
+                          <View
+                            style={{ borderColor: meta.accent, borderWidth: 1, backgroundColor: meta.softBg }}
+                            className="flex-row items-center gap-1.5 rounded-full px-2.5 py-0.5">
+                            <Text style={{ color: meta.accent }} className="font-mono text-[10px] font-extrabold">
+                              {formatMetricValue(metric, activePoint.sample.value)} {meta.unit}
+                            </Text>
+                            <Text className="font-mono text-[9px] text-slate-500">
+                              {formatDateTimeShort(activePoint.sample.measuredAt)}
+                            </Text>
+                          </View>
                         )}
                       </View>
+
+                      {metricSeries.length === 0 ? (
+                        <View className="items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 py-7">
+                          <Activity size={16} color="#94a3b8" />
+                          <Text className="mt-1.5 font-mono text-[11px] text-slate-400">
+                            Sin lecturas de {meta.tabLabel.toLowerCase()} registradas
+                          </Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View
+                            style={{ height: chartGeometry.height, width: '100%' }}
+                            onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
+                            {chartGeometry.width > 0 && chartGeometry.points.length > 0 && (
+                              <Svg width={chartGeometry.width} height={chartGeometry.height}>
+                                <Defs>
+                                  <LinearGradient id={`histArea-${metric}`} x1="0" y1="0" x2="0" y2="1">
+                                    <Stop offset="0%" stopColor={meta.accent} stopOpacity="0.26" />
+                                    <Stop offset="100%" stopColor={meta.accent} stopOpacity="0.01" />
+                                  </LinearGradient>
+                                </Defs>
+
+                                {[0, 0.5, 1].map((t, idx) => {
+                                  const y = chartGeometry.padTop + t * chartGeometry.innerH;
+                                  const val =
+                                    chartGeometry.maxVal -
+                                    t * (chartGeometry.maxVal - chartGeometry.minVal);
+                                  return (
+                                    <Fragment key={idx}>
+                                      <Line
+                                        x1={chartGeometry.padLeft}
+                                        y1={y}
+                                        x2={chartGeometry.width - chartGeometry.padRight}
+                                        y2={y}
+                                        stroke="#e2e8f0"
+                                        strokeWidth={1}
+                                        strokeDasharray="3 4"
+                                      />
+                                      <SvgText
+                                        x={chartGeometry.padLeft - 5}
+                                        y={y + 3}
+                                        textAnchor="end"
+                                        fill="#94a3b8"
+                                        fontSize="9">
+                                        {formatMetricValue(metric, val)}
+                                      </SvgText>
+                                    </Fragment>
+                                  );
+                                })}
+
+                                {chartGeometry.nominalMinY !== null && (
+                                  <Line
+                                    x1={chartGeometry.padLeft}
+                                    y1={chartGeometry.nominalMinY}
+                                    x2={chartGeometry.width - chartGeometry.padRight}
+                                    y2={chartGeometry.nominalMinY}
+                                    stroke="#38bdf8"
+                                    strokeWidth={1.2}
+                                    strokeDasharray="4 4"
+                                    strokeOpacity={0.75}
+                                  />
+                                )}
+
+                                {chartGeometry.nominalMaxY !== null && (
+                                  <Line
+                                    x1={chartGeometry.padLeft}
+                                    y1={chartGeometry.nominalMaxY}
+                                    x2={chartGeometry.width - chartGeometry.padRight}
+                                    y2={chartGeometry.nominalMaxY}
+                                    stroke="#38bdf8"
+                                    strokeWidth={1.2}
+                                    strokeDasharray="4 4"
+                                    strokeOpacity={0.75}
+                                  />
+                                )}
+
+                                {chartGeometry.areaPathD !== '' && (
+                                  <Path d={chartGeometry.areaPathD} fill={`url(#histArea-${metric})`} />
+                                )}
+
+                                {chartGeometry.linePathD !== '' && (
+                                  <Path
+                                    d={chartGeometry.linePathD}
+                                    fill="none"
+                                    stroke={meta.accent}
+                                    strokeWidth={2.5}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                )}
+
+                                {chartGeometry.points.map((pt, idx) => {
+                                  const isActive =
+                                    activePoint?.sample.sampleId === pt.sample.sampleId &&
+                                    activePoint?.sample.measuredAt === pt.sample.measuredAt;
+                                  return (
+                                    <Fragment key={`${pt.sample.id}-${idx}`}>
+                                      <Circle
+                                        cx={pt.x}
+                                        cy={pt.y}
+                                        r={isActive ? 4.6 : 2.3}
+                                        fill={isActive ? '#ffffff' : meta.accent}
+                                        stroke={meta.accent}
+                                        strokeWidth={isActive ? 2.2 : 1}
+                                      />
+                                      <Circle
+                                        cx={pt.x}
+                                        cy={pt.y}
+                                        r={12}
+                                        fill="transparent"
+                                        onPress={() => setSelectedPointIdx(idx)}
+                                      />
+                                    </Fragment>
+                                  );
+                                })}
+                              </Svg>
+                            )}
+                          </View>
+
+                          <View className="mt-1 flex-row items-center justify-between border-t border-slate-100 pt-2">
+                            <View className="flex-row items-center">
+                              <View
+                                style={{ backgroundColor: '#38bdf8' }}
+                                className="mr-1.5 h-1.5 w-3 rounded-full opacity-75"
+                              />
+                              <Text className="font-mono text-[9px] text-slate-400">
+                                {meta.nominalLabel}
+                              </Text>
+                            </View>
+                            <Text className="font-mono text-[8.5px] text-slate-400">
+                              Toca un punto para inspeccionar
+                            </Text>
+                          </View>
+                        </>
+                      )}
                     </View>
-                  )
                   )}
 
-                  {/* Resumen agrupado por día */}
+                  {/* Resumen por jornada estilo Web */}
                   <View className="mt-4 pb-10">
-                    <View className="mb-2.5 flex-row items-center">
-                      <History size={13} color="#64748b" />
-                      <Text className="ml-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                        Resumen por día ({dailySummaries.length} días)
+                    <View className="mb-2.5 flex-row items-center justify-between">
+                      <View className="flex-row items-center">
+                        <History size={13} color="#64748b" />
+                        <Text className="ml-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                          Resumen por jornada
+                        </Text>
+                      </View>
+                      <Text className="font-mono text-[9.5px] text-slate-400">
+                        {dailySummaries.length} {dailySummaries.length === 1 ? 'día' : 'días'}
                       </Text>
                     </View>
 
                     {dailySummaries.length === 0 ? (
-                      <View className="items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-6">
+                      <View className="items-center rounded-2xl border border-slate-200/80 bg-white p-6">
                         <Text className="font-mono text-xs text-slate-400">
                           No hay registros de {meta.tabLabel.toLowerCase()} guardados aún.
                         </Text>
                       </View>
                     ) : (
-                      dailySummaries.map((day) => (
-                        <View
-                          key={day.dateKey}
-                          className="mb-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
-                          <View className="mb-2.5 flex-row items-center justify-between border-b border-slate-100 pb-2">
-                            <Text className="font-mono text-xs font-extrabold text-slate-800">
-                              {day.dateLabel}
-                            </Text>
-                            <View className="rounded-md bg-slate-100 px-2 py-0.5">
-                              <Text className="font-mono text-[9px] font-bold text-slate-500">
-                                {day.count} {metric === 'sleep'
-                                  ? day.count === 1 ? 'registro' : 'registros'
-                                  : day.count === 1 ? 'lectura' : 'lecturas'}
-                              </Text>
+                      dailySummaries.map((day) => {
+                        const spread = day.max - day.min;
+                        const avgPct =
+                          spread <= 0
+                            ? 50
+                            : Math.min(
+                                96,
+                                Math.max(4, Math.round(((day.avg - day.min) / spread) * 100))
+                              );
+
+                        return (
+                          <View
+                            key={day.dateKey}
+                            className="mb-2.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
+                            <View className="mb-2.5 flex-row items-center justify-between">
+                              <View>
+                                <Text className="font-mono text-xs font-extrabold text-slate-800">
+                                  {day.dateLabel}
+                                </Text>
+                                <Text className="mt-0.5 font-mono text-[9px] text-slate-400">
+                                  {day.count}{' '}
+                                  {metric === 'sleep'
+                                    ? day.count === 1
+                                      ? 'registro'
+                                      : 'registros'
+                                    : day.count === 1
+                                      ? 'lectura'
+                                      : 'lecturas'}
+                                </Text>
+                              </View>
+
+                              <View
+                                style={{ backgroundColor: meta.softBg }}
+                                className="rounded-full px-2.5 py-1">
+                                <Text
+                                  style={{ color: meta.accent }}
+                                  className="font-mono text-[10px] font-extrabold">
+                                  Prom {formatMetricValue(metric, day.avg)} {meta.unit}
+                                </Text>
+                              </View>
                             </View>
+
+                            {metric === 'sleep' ? (
+                              <View className="flex-row items-center justify-between rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2.5">
+                                <Text className="font-mono text-xs font-bold text-violet-800">
+                                  Descanso registrado
+                                </Text>
+                                <Text className="font-mono text-base font-extrabold text-violet-800">
+                                  {formatMetricValue(metric, day.max)} h
+                                </Text>
+                              </View>
+                            ) : (
+                              <View>
+                                <View className="mb-1.5 flex-row items-center justify-between">
+                                  <Text className="font-mono text-[9.5px] text-slate-500">
+                                    Mín{' '}
+                                    <Text className="font-bold text-slate-800">
+                                      {formatMetricValue(metric, day.min)}
+                                    </Text>{' '}
+                                    ({day.minTime})
+                                  </Text>
+                                  <Text className="font-mono text-[9.5px] text-slate-500">
+                                    Máx{' '}
+                                    <Text className="font-bold text-slate-800">
+                                      {formatMetricValue(metric, day.max)}
+                                    </Text>{' '}
+                                    ({day.maxTime})
+                                  </Text>
+                                </View>
+
+                                <View className="relative h-2 w-full justify-center rounded-full bg-slate-100">
+                                  <View
+                                    style={{
+                                      position: 'absolute',
+                                      left: 0,
+                                      right: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      borderRadius: 999,
+                                      backgroundColor: meta.accent,
+                                      opacity: 0.25,
+                                    }}
+                                  />
+                                  <View
+                                    style={{
+                                      position: 'absolute',
+                                      left: `${avgPct}%`,
+                                      marginLeft: -5.5,
+                                      width: 11,
+                                      height: 11,
+                                      borderRadius: 999,
+                                      backgroundColor: '#ffffff',
+                                      borderWidth: 2.5,
+                                      borderColor: meta.accent,
+                                      shadowColor: '#0f172a',
+                                      shadowOffset: { width: 0, height: 1 },
+                                      shadowOpacity: 0.2,
+                                      shadowRadius: 2,
+                                      elevation: 2,
+                                    }}
+                                  />
+                                </View>
+                              </View>
+                            )}
                           </View>
-
-                          {metric === 'sleep' ? (
-                            <View className="flex-row items-center justify-between rounded-xl border border-violet-100 bg-violet-50/60 p-3">
-                              <View className="flex-row items-center">
-                                <Moon size={16} color="#7c3aed" />
-                                <Text className="ml-2 font-mono text-xs font-bold text-violet-800">
-                                  Duración total
-                                </Text>
-                              </View>
-                              <Text className="font-mono text-lg font-extrabold text-violet-800">
-                                {formatMetricValue(metric, day.max)} h
-                              </Text>
-                            </View>
-                          ) : (
-                            <View className="flex-row gap-2">
-                              <View className="flex-1 rounded-xl border border-red-100 bg-red-50/40 p-2.5">
-                                <View className="flex-row items-center">
-                                  <ArrowUpRight size={12} color="#dc2626" />
-                                  <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-red-600">
-                                    Pico más alto
-                                  </Text>
-                                </View>
-                                <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
-                                  {formatMetricValue(metric, day.max)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
-                                </Text>
-                                <View className="mt-1 flex-row items-center">
-                                  <Clock size={10} color="#64748b" />
-                                  <Text className="ml-1 font-mono text-[9px] text-slate-500">
-                                    {day.maxTime}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View className="flex-1 items-center justify-center rounded-xl border border-sky-100 bg-sky-50/50 p-2.5">
-                                <Text className="font-mono text-[8.5px] font-bold uppercase text-sky-700">
-                                  Promedio
-                                </Text>
-                                <Text className="mt-1 font-mono text-base font-extrabold text-sky-700">
-                                  {formatMetricValue(metric, day.avg)}
-                                </Text>
-                                <Text className="mt-0.5 font-mono text-[8.5px] text-slate-500">
-                                  {meta.unit} del día
-                                </Text>
-                              </View>
-
-                              <View className="flex-1 rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5">
-                                <View className="flex-row items-center">
-                                  <ArrowDownRight size={12} color="#059669" />
-                                  <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-emerald-700">
-                                    Más bajo
-                                  </Text>
-                                </View>
-                                <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
-                                  {formatMetricValue(metric, day.min)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
-                                </Text>
-                                <View className="mt-1 flex-row items-center">
-                                  <Clock size={10} color="#64748b" />
-                                  <Text className="ml-1 font-mono text-[9px] text-slate-500">
-                                    {day.minTime}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          )}
-                        </View>
-                      ))
+                        );
+                      })
                     )}
                   </View>
                 </>
