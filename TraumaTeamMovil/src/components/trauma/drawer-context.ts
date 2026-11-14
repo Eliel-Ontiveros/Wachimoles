@@ -6,7 +6,7 @@ export const DrawerContext = createContext<DrawerCtx | null>(null);
 
 export function useDrawer() {
   const ctx = useContext(DrawerContext);
-  if (!ctx) throw new Error('useDrawer debe usarse dentro de <DrawerProvider>');
+  if (!ctx) throw new Error('useDrawer must be used inside <DrawerProvider>');
   return ctx;
 }
 

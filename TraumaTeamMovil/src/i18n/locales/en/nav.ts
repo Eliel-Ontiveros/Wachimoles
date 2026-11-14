@@ -1,7 +1,5 @@
-import type es from '../es/nav';
-
 /** Navegación (drawer) y cabecera (en). */
-const nav: Record<keyof typeof es, string> = {
+const nav: Record<string, string> = {
   'nav.openMenu': 'Open menu',
   'nav.closeMenu': 'Close menu',
   'nav.section': 'NAVIGATION',

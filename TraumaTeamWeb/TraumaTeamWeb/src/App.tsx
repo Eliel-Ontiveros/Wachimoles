@@ -12,10 +12,10 @@ import {
 } from './components/Icons';
 
 function getSeverityTag(intensity: number): string {
-  if (intensity <= 3) return 'Leve';
-  if (intensity <= 6) return 'Moderado';
-  if (intensity <= 8) return 'Severo';
-  return 'Crítico';
+  if (intensity <= 3) return 'Mild';
+  if (intensity <= 6) return 'Moderate';
+  if (intensity <= 8) return 'Severe';
+  return 'Critical';
 }
 import { MuscleDetailAndAiPanel } from './components/MuscleDetailAndAiPanel';
 import { RealtimeEcgMonitor } from './components/RealtimeEcgMonitor';
@@ -45,6 +45,7 @@ import {
   formatShortUpdateDate,
   parseConditionUpdates,
 } from './utils/condition-updates';
+import { getGravityLabel } from './utils/display-labels.ts';
 import type {
   AstronautProfile,
   BodyConditionRecord,
@@ -136,7 +137,7 @@ export function App() {
             ? {
                 ...astro,
                 environment: loc.environment,
-                gravityLabel: loc.gravityLabel,
+                gravityLabel: getGravityLabel(loc.gravityLabel),
               }
             : astro
         )
@@ -199,7 +200,7 @@ export function App() {
           swelling: rec.swelling,
           functionalLimitation: rec.functionalLimitation,
           notes: rec.description ?? '',
-          updatedAt: new Date(rec.updatedAt).toLocaleString('es-MX', {
+          updatedAt: new Date(rec.updatedAt).toLocaleString('en-US', {
             day: '2-digit',
             month: 'short',
             hour: '2-digit',
@@ -286,7 +287,7 @@ export function App() {
       const payload = {
         bodyRegion: muscle.category,
         muscleName: muscle.name,
-        conditionName: muscle.observation?.conditionName || `Dolor en ${muscle.name}`,
+        conditionName: muscle.observation?.conditionName || `Pain in ${muscle.name}`,
         description: serializedDescription,
         painIntensity: isCured ? 1 : Math.max(1, Math.min(10, Math.round(input.painIntensity))),
         swelling: isCured ? false : input.swelling,
@@ -309,7 +310,7 @@ export function App() {
     async (muscle: MuscleData, closingNote?: string) => {
       await handleSaveMuscleUpdate(muscle, {
         updateText:
-          closingNote?.trim() || 'Ya no siento el síntoma, molestia superada.',
+          closingNote?.trim() || 'I no longer feel the symptom; discomfort overcome.',
         painIntensity: 0,
         swelling: false,
         functionalLimitation: false,
@@ -336,14 +337,14 @@ export function App() {
         />
 
       <div className="dashboard-shell">
-        <nav className="stage-switcher-bar" aria-label="Vistas de tablet o móvil">
+        <nav className="stage-switcher-bar" aria-label="Tablet or mobile views">
           <div className="stage-switcher-pills">
             {(
               [
-                ['all', 'Todo'],
-                ['signos', '1. Signos'],
-                ['visor', '2. Visor 3D'],
-                ['musculo', '3. Músculo e IA'],
+                ['all', 'All'],
+                ['signos', '1. Vitals'],
+                ['visor', '2. 3D Viewer'],
+                ['musculo', '3. Muscle & AI'],
               ] as const
             ).map(([key, label]) => (
               <button
@@ -363,14 +364,14 @@ export function App() {
               className="stage-jump-chip"
               onClick={() => setResponsiveStage('musculo')}
             >
-              <span>Ver {selectedMuscle.name}</span>
+              <span>View {selectedMuscle.name}</span>
               <ChevronRightIcon size={14} />
             </button>
           )}
         </nav>
 
         <main className={`stage-grid stage-mode-${responsiveStage}`}>
-          {/* Columna 1: Misión arriba del Pulso + Signos/Síntomas + Tarjeta de Historial */}
+          {/* Column 1: Mission above Pulse + Vitals/Symptoms + History card */}
           <div
             className={`stage-col ${
               responsiveStage === 'all' || responsiveStage === 'signos' ? 'visible' : 'hidden-sm'
@@ -384,7 +385,7 @@ export function App() {
             <HealthChartsPanel vitals={vitals} allSamples={samples} />
           </div>
 
-          {/* Columna 2: Dropdown de Músculo + Cuerpo 3D estirado verticalmente */}
+          {/* Column 2: Muscle dropdown + vertically stretched 3D body */}
           <div
             className={`stage-col stage-col-viewer ${
               responsiveStage === 'all' || responsiveStage === 'visor' ? 'visible' : 'hidden-sm'
@@ -401,7 +402,7 @@ export function App() {
             />
           </div>
 
-          {/* Columna 3: Síntomas en zona + Espacio IA + Fotos (Solo lectura) */}
+          {/* Column 3: Zone symptoms + AI space + Photos (read-only) */}
           <div
             className={`stage-col ${
               responsiveStage === 'all' || responsiveStage === 'musculo' ? 'visible' : 'hidden-sm'
@@ -423,12 +424,12 @@ export function App() {
 
             <section className="panel-card muscle-records-panel" aria-labelledby="muscle-records-title">
               <header className="muscle-records-heading">
-                <h2 id="muscle-records-title">Seguimiento muscular</h2>
+                <h2 id="muscle-records-title">Muscle tracking</h2>
                 <p>{selectedMuscle
-                  ? 'Consulta otra zona o revisa los reportes resueltos.'
-                  : 'Selecciona una zona para consultar sus síntomas, fotos y evolución.'}</p>
+                  ? 'Check another zone or review resolved reports.'
+                  : 'Select a zone to see its symptoms, photos and progress.'}</p>
               </header>
-              <div className="symptoms-tab-switch muscle-records-tabs" role="tablist" aria-label="Filtrar zonas"
+              <div className="symptoms-tab-switch muscle-records-tabs" role="tablist" aria-label="Filter zones"
                 onKeyDown={(event) => {
                   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
                   event.preventDefault();
@@ -443,13 +444,13 @@ export function App() {
                   tabIndex={symptomsViewTab === 'active' ? 0 : -1}
                   className={`symptoms-tab-btn ${symptomsViewTab === 'active' ? 'active' : ''}`}
                   onClick={() => setSymptomsViewTab('active')}
-                >Activos <span>{activeLesions.length}</span></button>
+                >Active <span>{activeLesions.length}</span></button>
                 <button type="button" role="tab" id="muscle-records-history-tab"
                   aria-selected={symptomsViewTab === 'history'} aria-controls="muscle-records-content"
                   tabIndex={symptomsViewTab === 'history' ? 0 : -1}
                   className={`symptoms-tab-btn ${symptomsViewTab === 'history' ? 'active' : ''}`}
                   onClick={() => setSymptomsViewTab('history')}
-                >Historial <span>{resolvedHistory.length}</span></button>
+                >History <span>{resolvedHistory.length}</span></button>
               </div>
               <div id="muscle-records-content" role="tabpanel"
                 aria-labelledby={`muscle-records-${symptomsViewTab}-tab`} tabIndex={0}>
@@ -458,7 +459,7 @@ export function App() {
                 activeLesions.length === 0 ? (
                   <div className="compact-empty-row">
                     <CheckIcon size={14} />
-                    <span>Sin molestias musculares activas.</span>
+                    <span>No active muscle discomfort.</span>
                   </div>
                 ) : (
                   <div className="active-records-list">
@@ -484,24 +485,24 @@ export function App() {
                           </span>
                           <div className="record-text-col">
                             <strong>{m.name}</strong>
-                            <span className="record-condition">{m.observation?.conditionName || 'Con reporte'}</span>
+                            <span className="record-condition">{m.observation?.conditionName || 'Reported'}</span>
                             <div className="record-pain-summary">
                               <span className="record-severity-pill" style={{ color: severityColor,
                                 backgroundColor: `${painColor}16`, borderColor: `${painColor}40` }}>
                                 {sevLabel}
                               </span>
-                              <span className="record-pain-value">Dolor <b>{pain}/10</b></span>
+                              <span className="record-pain-value">Pain <b>{pain}/10</b></span>
                             </div>
                             {(m.observation?.swelling || m.observation?.functionalLimitation) && (
                               <div className="record-mini-flags">
                                 {m.observation?.swelling && (
                                   <span className="record-mini-flag">
-                                    <LayersIcon size={10} /> Edema
+                                    <LayersIcon size={10} /> Swelling
                                   </span>
                                 )}
                                 {m.observation?.functionalLimitation && (
                                   <span className="record-mini-flag">
-                                    <ActivityIcon size={10} /> Limitación
+                                    <ActivityIcon size={10} /> Limitation
                                   </span>
                                 )}
                               </div>
@@ -516,7 +517,7 @@ export function App() {
               ) : resolvedHistory.length === 0 ? (
                 <div className="compact-empty-row">
                   <CheckIcon size={14} />
-                  <span>Sin malestares curados en el historial aún.</span>
+                  <span>No healed discomfort in the history yet.</span>
                 </div>
               ) : (
                 <div className="active-records-list">
@@ -551,14 +552,14 @@ export function App() {
                         </span>
                         <div className="record-text-col">
                           <div className="record-title-row">
-                            <strong>{rec.muscleName}</strong>
-                            <span className="record-severity-pill resolved-pill">Curado</span>
+                            <strong>{recordMuscle?.name ?? rec.muscleName}</strong>
+                            <span className="record-severity-pill resolved-pill">Healed</span>
                           </div>
-                          <span className="record-condition">{rec.conditionName || 'Reporte resuelto'}</span>
+                          <span className="record-condition">{rec.conditionName || 'Resolved report'}</span>
                           <span className="record-subtext">
-                            {updates.length} {updates.length === 1 ? 'actualización' : 'actualizaciones'}
+                            {updates.length} {updates.length === 1 ? 'update' : 'updates'}
                             {isSelected && musclePhotos.status === 'ok' && (
-                              <> · {recPhotos.length} {recPhotos.length === 1 ? 'foto' : 'fotos'}</>
+                              <> · {recPhotos.length} {recPhotos.length === 1 ? 'photo' : 'photos'}</>
                             )}
                             {curedDate ? ` · ${curedDate}` : ''}
                           </span>

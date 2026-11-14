@@ -16,8 +16,9 @@ import { router, usePathname, type Href } from 'expo-router';
 import { Activity, BookOpen, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
 
 import { useI18n } from '@/i18n/I18nProvider';
-import type { Locale, MessageKey } from '@/i18n/messages';
+import type { MessageKey, VoiceLanguage } from '@/i18n/messages';
 import { SegmentedControl } from '@/settings/SegmentedControl';
+import { useSettings } from '@/settings/SettingsProvider';
 import { useAppTheme, type ThemePreference } from '@/theme';
 
 import { useDrawer } from './drawer-context';
@@ -133,7 +134,8 @@ export function HexDrawer() {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const { t, locale, setLocale } = useI18n();
+  const { t } = useI18n();
+  const { voiceLanguage, setVoiceLanguage } = useSettings();
   const { colors, preference, setPreference } = useAppTheme();
 
   const drawerW = Math.min(width * 0.82, 330);
@@ -318,20 +320,20 @@ export function HexDrawer() {
             );
           })}
 
-          {/* Ajustes: idioma y tema */}
+          {/* Ajustes: idioma de entrada de voz y tema */}
           <Text className="mb-2 mt-4 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
             {t('settings.title')}
           </Text>
           <Text className="mb-1.5 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
-            {t('settings.language')}
+            {t('settings.voiceLanguage')}
           </Text>
-          <SegmentedControl<Locale>
-            accessibilityLabel={t('settings.language')}
-            value={locale}
-            onChange={setLocale}
+          <SegmentedControl<VoiceLanguage>
+            accessibilityLabel={t('settings.voiceLanguage')}
+            value={voiceLanguage}
+            onChange={setVoiceLanguage}
             options={[
-              { value: 'es', label: t('settings.lang.es') },
               { value: 'en', label: t('settings.lang.en') },
+              { value: 'es', label: t('settings.lang.es') },
             ]}
           />
           <Text className="mb-1.5 mt-3 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">

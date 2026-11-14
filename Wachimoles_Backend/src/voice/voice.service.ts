@@ -10,7 +10,7 @@ import { buildSystemPrompt } from "./voice-catalog";
 
 export interface InterpretResult {
   intent: VoiceIntent | null;
-  /** Mensaje corto para el usuario cuando no hay una acción clara. */
+  /** Short English message for the user when there is no clear action. */
   message?: string;
 }
 
@@ -19,6 +19,7 @@ export interface VoiceHistoryTurn {
   content: string;
 }
 
+/** Accepted (and ignored) so older clients sending `locale` do not get a 400. Replies are always English. */
 export const VOICE_LOCALES = ["es", "en"] as const;
 export type VoiceLocale = (typeof VOICE_LOCALES)[number];
 
@@ -39,7 +40,6 @@ export class VoiceService {
 
   async interpret(
     text: string,
-    locale: VoiceLocale = "es",
     history: VoiceHistoryTurn[] = [],
     context?: VoiceContext
   ): Promise<InterpretResult> {
@@ -65,7 +65,7 @@ export class VoiceService {
           messages: [
             {
               role: "system",
-              content: buildSystemPrompt(locale, context)
+              content: buildSystemPrompt(context)
             },
             ...history.map(({ role, content }) => ({ role, content })),
             { role: "user", content: text }

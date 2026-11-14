@@ -8,26 +8,43 @@ import { formatDate } from '@/i18n/format';
 export type MuscleStatus = 'normal' | 'warning' | 'critical';
 
 export type BodyRegionCategory =
-  | 'Cabeza y cuello'
-  | 'Tronco anterior'
-  | 'Tronco posterior'
-  | 'Extremidad superior'
-  | 'Cadera y pelvis'
-  | 'Extremidad inferior';
+  | 'Head and neck'
+  | 'Front torso'
+  | 'Back torso'
+  | 'Upper limb'
+  | 'Hip and pelvis'
+  | 'Lower limb';
 
 const CATEGORY_KEYS: Record<BodyRegionCategory, MessageKey> = {
-  'Cabeza y cuello': 'body.category.head_neck',
-  'Tronco anterior': 'body.category.trunk_front',
-  'Tronco posterior': 'body.category.trunk_back',
-  'Extremidad superior': 'body.category.upper_limb',
-  'Cadera y pelvis': 'body.category.hip_pelvis',
-  'Extremidad inferior': 'body.category.lower_limb',
+  'Head and neck': 'body.category.head_neck',
+  'Front torso': 'body.category.trunk_front',
+  'Back torso': 'body.category.trunk_back',
+  'Upper limb': 'body.category.upper_limb',
+  'Hip and pelvis': 'body.category.hip_pelvis',
+  'Lower limb': 'body.category.lower_limb',
 };
 
-/** Clave i18n del nombre visible de una zona (el `name` en español sigue siendo la clave interna de selección). */
+/** Clave i18n del nombre visible de una zona (el `name` en inglés es la clave interna de selección y lo que se envía al backend). */
 export const muscleNameKey = (id: string) => `body.muscle.${id}` as MessageKey;
 /** Clave i18n de la categoría anatómica (el valor en español es el que se envía al backend). */
-export const categoryNameKey = (category: BodyRegionCategory) => CATEGORY_KEYS[category];
+export const categoryNameKey = (category: BodyRegionCategory) => CATEGORY_KEYS[normalizeBodyRegion(category)];
+
+/** Categorías guardadas en español (datos heredados) → categoría en inglés. */
+const LEGACY_REGIONS: Record<string, BodyRegionCategory> = {
+  'cabeza y cuello': 'Head and neck',
+  'tronco anterior': 'Front torso',
+  'tronco posterior': 'Back torso',
+  'extremidad superior': 'Upper limb',
+  'cadera y pelvis': 'Hip and pelvis',
+  'extremidad inferior': 'Lower limb',
+};
+
+/** Acepta una región en inglés o en español heredado; lo desconocido cae en 'Front torso'. */
+export function normalizeBodyRegion(value: string | undefined | null): BodyRegionCategory {
+  const key = (value ?? '').trim();
+  if (key in CATEGORY_KEYS) return key as BodyRegionCategory;
+  return LEGACY_REGIONS[key.toLowerCase()] ?? 'Front torso';
+}
 
 /** Valor de `updatedAt` para "justo ahora" (se traduce al mostrar). */
 export const UPDATED_NOW = '__now__';
@@ -100,8 +117,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== CABEZA Y CUELLO ====================
   {
     id: 'cara',
-    name: 'Cara / Región facial',
-    category: 'Cabeza y cuello',
+    name: 'Face / Facial region',
+    category: 'Head and neck',
     status: 'normal',
     center: [0.0, 0.785, 0.08],
     radii: [0.09, 0.09, 0.075],
@@ -110,8 +127,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'cabeza',
-    name: 'Cabeza / Cráneo',
-    category: 'Cabeza y cuello',
+    name: 'Head / Skull',
+    category: 'Head and neck',
     status: 'normal',
     center: [0.0, 0.83, -0.045],
     radii: [0.095, 0.105, 0.09],
@@ -120,8 +137,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'cuello',
-    name: 'Cuello',
-    category: 'Cabeza y cuello',
+    name: 'Neck',
+    category: 'Head and neck',
     status: 'normal',
     center: [0.0, 0.665, 0.035],
     radii: [0.08, 0.065, 0.065],
@@ -130,8 +147,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'trapecio',
-    name: 'Trapecio / Nuca',
-    category: 'Cabeza y cuello',
+    name: 'Trapezius / Nape',
+    category: 'Head and neck',
     status: 'normal',
     center: [0.0, 0.59, -0.07],
     radii: [0.145, 0.075, 0.08],
@@ -142,8 +159,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== TRONCO ANTERIOR ====================
   {
     id: 'pectoral_der',
-    name: 'Pectoral derecho',
-    category: 'Tronco anterior',
+    name: 'Right pectoral',
+    category: 'Front torso',
     status: 'normal',
     center: [-0.085, 0.40, 0.085],
     radii: [0.09, 0.095, 0.075],
@@ -152,8 +169,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'pectoral_izq',
-    name: 'Pectoral izquierdo',
-    category: 'Tronco anterior',
+    name: 'Left pectoral',
+    category: 'Front torso',
     status: 'normal',
     center: [0.085, 0.40, 0.085],
     radii: [0.09, 0.095, 0.075],
@@ -163,7 +180,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   {
     id: 'abdomen',
     name: 'Abdomen',
-    category: 'Tronco anterior',
+    category: 'Front torso',
     status: 'normal',
     center: [0.0, 0.14, 0.07],
     radii: [0.10, 0.135, 0.07],
@@ -172,8 +189,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'oblicuo_der',
-    name: 'Oblicuo derecho',
-    category: 'Tronco anterior',
+    name: 'Right oblique',
+    category: 'Front torso',
     status: 'normal',
     center: [-0.125, 0.14, 0.015],
     radii: [0.065, 0.115, 0.08],
@@ -182,8 +199,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'oblicuo_izq',
-    name: 'Oblicuo izquierdo',
-    category: 'Tronco anterior',
+    name: 'Left oblique',
+    category: 'Front torso',
     status: 'normal',
     center: [0.125, 0.14, 0.015],
     radii: [0.065, 0.115, 0.08],
@@ -194,8 +211,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== TRONCO POSTERIOR ====================
   {
     id: 'dorsal_der',
-    name: 'Dorsal derecho',
-    category: 'Tronco posterior',
+    name: 'Right lat',
+    category: 'Back torso',
     status: 'normal',
     center: [-0.095, 0.36, -0.115],
     radii: [0.095, 0.125, 0.08],
@@ -204,8 +221,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'dorsal_izq',
-    name: 'Dorsal izquierdo',
-    category: 'Tronco posterior',
+    name: 'Left lat',
+    category: 'Back torso',
     status: 'normal',
     center: [0.095, 0.36, -0.115],
     radii: [0.095, 0.125, 0.08],
@@ -214,8 +231,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'lumbar',
-    name: 'Zona lumbar',
-    category: 'Tronco posterior',
+    name: 'Lower back',
+    category: 'Back torso',
     status: 'normal',
     center: [0.0, 0.13, -0.105],
     radii: [0.115, 0.10, 0.08],
@@ -226,8 +243,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== EXTREMIDAD SUPERIOR ====================
   {
     id: 'deltoides_der',
-    name: 'Deltoides derecho',
-    category: 'Extremidad superior',
+    name: 'Right deltoid',
+    category: 'Upper limb',
     status: 'normal',
     center: [-0.225, 0.46, -0.03],
     radii: [0.08, 0.085, 0.085],
@@ -236,8 +253,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'deltoides_izq',
-    name: 'Deltoides izquierdo',
-    category: 'Extremidad superior',
+    name: 'Left deltoid',
+    category: 'Upper limb',
     status: 'normal',
     center: [0.225, 0.46, -0.03],
     radii: [0.08, 0.085, 0.085],
@@ -246,8 +263,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'biceps_der',
-    name: 'Bíceps derecho',
-    category: 'Extremidad superior',
+    name: 'Right biceps',
+    category: 'Upper limb',
     status: 'normal',
     center: [-0.30, 0.29, 0.015],
     radii: [0.075, 0.09, 0.055],
@@ -256,8 +273,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'biceps_izq',
-    name: 'Bíceps izquierdo',
-    category: 'Extremidad superior',
+    name: 'Left biceps',
+    category: 'Upper limb',
     status: 'normal',
     center: [0.30, 0.29, 0.015],
     radii: [0.075, 0.09, 0.055],
@@ -266,8 +283,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'triceps_der',
-    name: 'Tríceps derecho',
-    category: 'Extremidad superior',
+    name: 'Right triceps',
+    category: 'Upper limb',
     status: 'normal',
     center: [-0.29, 0.30, -0.06],
     radii: [0.075, 0.09, 0.055],
@@ -276,8 +293,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'triceps_izq',
-    name: 'Tríceps izquierdo',
-    category: 'Extremidad superior',
+    name: 'Left triceps',
+    category: 'Upper limb',
     status: 'normal',
     center: [0.29, 0.30, -0.06],
     radii: [0.075, 0.09, 0.055],
@@ -286,8 +303,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'antebrazo_der',
-    name: 'Antebrazo derecho',
-    category: 'Extremidad superior',
+    name: 'Right forearm',
+    category: 'Upper limb',
     status: 'normal',
     center: [-0.365, 0.155, -0.005],
     radii: [0.08, 0.095, 0.08],
@@ -296,8 +313,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'antebrazo_izq',
-    name: 'Antebrazo izquierdo',
-    category: 'Extremidad superior',
+    name: 'Left forearm',
+    category: 'Upper limb',
     status: 'normal',
     center: [0.365, 0.155, -0.005],
     radii: [0.08, 0.095, 0.08],
@@ -306,8 +323,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'mano_der',
-    name: 'Mano derecha',
-    category: 'Extremidad superior',
+    name: 'Right hand',
+    category: 'Upper limb',
     status: 'normal',
     center: [-0.44, 0.015, 0.065],
     radii: [0.075, 0.085, 0.085],
@@ -316,8 +333,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'mano_izq',
-    name: 'Mano izquierda',
-    category: 'Extremidad superior',
+    name: 'Left hand',
+    category: 'Upper limb',
     status: 'normal',
     center: [0.44, 0.015, 0.065],
     radii: [0.075, 0.085, 0.085],
@@ -328,8 +345,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== CADERA Y PELVIS ====================
   {
     id: 'gluteo_der',
-    name: 'Glúteo derecho',
-    category: 'Cadera y pelvis',
+    name: 'Right glute',
+    category: 'Hip and pelvis',
     status: 'normal',
     center: [-0.09, -0.04, -0.105],
     radii: [0.09, 0.095, 0.085],
@@ -338,8 +355,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'gluteo_izq',
-    name: 'Glúteo izquierdo',
-    category: 'Cadera y pelvis',
+    name: 'Left glute',
+    category: 'Hip and pelvis',
     status: 'normal',
     center: [0.09, -0.04, -0.105],
     radii: [0.09, 0.095, 0.085],
@@ -348,8 +365,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'abductor_der',
-    name: 'Abductor / Cadera derecha',
-    category: 'Cadera y pelvis',
+    name: 'Abductor / Right hip',
+    category: 'Hip and pelvis',
     status: 'normal',
     center: [-0.165, -0.08, -0.01],
     radii: [0.06, 0.105, 0.09],
@@ -358,8 +375,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'abductor_izq',
-    name: 'Abductor / Cadera izquierda',
-    category: 'Cadera y pelvis',
+    name: 'Abductor / Left hip',
+    category: 'Hip and pelvis',
     status: 'normal',
     center: [0.165, -0.08, -0.01],
     radii: [0.06, 0.105, 0.09],
@@ -370,8 +387,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== EXTREMIDAD INFERIOR ====================
   {
     id: 'muslo_der',
-    name: 'Muslo derecho (Cuádriceps)',
-    category: 'Extremidad inferior',
+    name: 'Right thigh (Quadriceps)',
+    category: 'Lower limb',
     status: 'normal',
     center: [-0.11, -0.25, 0.045],
     radii: [0.095, 0.17, 0.07],
@@ -380,8 +397,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'muslo_izq',
-    name: 'Muslo izquierdo (Cuádriceps)',
-    category: 'Extremidad inferior',
+    name: 'Left thigh (Quadriceps)',
+    category: 'Lower limb',
     status: 'normal',
     center: [0.11, -0.25, 0.045],
     radii: [0.095, 0.17, 0.07],
@@ -390,8 +407,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'isquio_der',
-    name: 'Isquiotibiales der. (Pierna trasera)',
-    category: 'Extremidad inferior',
+    name: 'Right hamstring (Back of leg)',
+    category: 'Lower limb',
     status: 'normal',
     center: [-0.115, -0.28, -0.065],
     radii: [0.095, 0.165, 0.07],
@@ -400,8 +417,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'isquio_izq',
-    name: 'Isquiotibiales izq. (Pierna trasera)',
-    category: 'Extremidad inferior',
+    name: 'Left hamstring (Back of leg)',
+    category: 'Lower limb',
     status: 'normal',
     center: [0.115, -0.28, -0.065],
     radii: [0.095, 0.165, 0.07],
@@ -410,8 +427,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'gemelo_der',
-    name: 'Gemelo derecho (Pantorrilla)',
-    category: 'Extremidad inferior',
+    name: 'Right calf (Gastrocnemius)',
+    category: 'Lower limb',
     status: 'normal',
     center: [-0.155, -0.63, -0.06],
     radii: [0.075, 0.145, 0.065],
@@ -420,8 +437,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'gemelo_izq',
-    name: 'Gemelo izquierdo (Pantorrilla)',
-    category: 'Extremidad inferior',
+    name: 'Left calf (Gastrocnemius)',
+    category: 'Lower limb',
     status: 'normal',
     center: [0.155, -0.63, -0.06],
     radii: [0.075, 0.145, 0.065],
@@ -430,8 +447,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'espinilla_der',
-    name: 'Espinilla / Tibial derecho',
-    category: 'Extremidad inferior',
+    name: 'Right shin / Tibialis',
+    category: 'Lower limb',
     status: 'normal',
     center: [-0.155, -0.62, 0.01],
     radii: [0.07, 0.14, 0.055],
@@ -440,8 +457,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'espinilla_izq',
-    name: 'Espinilla / Tibial izquierdo',
-    category: 'Extremidad inferior',
+    name: 'Left shin / Tibialis',
+    category: 'Lower limb',
     status: 'normal',
     center: [0.155, -0.62, 0.01],
     radii: [0.07, 0.14, 0.055],
@@ -450,8 +467,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'pie_der',
-    name: 'Pie derecho',
-    category: 'Extremidad inferior',
+    name: 'Right foot',
+    category: 'Lower limb',
     status: 'normal',
     center: [-0.175, -0.90, 0.025],
     radii: [0.08, 0.075, 0.14],
@@ -460,8 +477,8 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'pie_izq',
-    name: 'Pie izquierdo',
-    category: 'Extremidad inferior',
+    name: 'Left foot',
+    category: 'Lower limb',
     status: 'normal',
     center: [0.175, -0.90, 0.025],
     radii: [0.08, 0.075, 0.14],

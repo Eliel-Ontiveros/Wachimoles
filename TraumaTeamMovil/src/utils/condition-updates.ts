@@ -20,8 +20,8 @@ export interface ConditionUpdateItem {
 
 const MAX_DESCRIPTION_LENGTH = 2000;
 const UPDATE_LINE_REGEX =
-  /^Actualizaci[oó]n\s+(\d+)\s*(?:\[([^\]]*)\])?\s*(?:\(([^)]*)\))?\s*-\s*(.*)$/i;
-const TRAILING_PHOTO_TAG_REGEX = /\s*\[Foto:\s*([^\]]+)\]\s*$/i;
+  /^(?:Update|Actualizaci[oó]n)\s+(\d+)\s*(?:\[([^\]]*)\])?\s*(?:\(([^)]*)\))?\s*-\s*(.*)$/i;
+const TRAILING_PHOTO_TAG_REGEX = /\s*\[(?:Photo|Foto):\s*([^\]]+)\]\s*$/i;
 
 export function extractPhotoFileName(pathOrUri?: string | null): string | undefined {
   if (!pathOrUri) return undefined;
@@ -68,13 +68,13 @@ function formatUpdateLine(item: ConditionUpdateItem): string {
   const datePart = item.dateLabel ? ` [${sanitizeInlineText(item.dateLabel)}]` : '';
   let statusPart = '';
   if (item.isResolvedEvent || item.painIntensity === 0) {
-    statusPart = ' (Curado · 0/10)';
+    statusPart = ' (Healed · 0/10)';
   } else if (typeof item.painIntensity === 'number' && Number.isFinite(item.painIntensity)) {
-    statusPart = ` (Dolor ${Math.max(1, Math.min(10, Math.round(item.painIntensity)))}/10)`;
+    statusPart = ` (Pain ${Math.max(1, Math.min(10, Math.round(item.painIntensity)))}/10)`;
   }
-  const cleanText = sanitizeInlineText(item.text) || 'Seguimiento registrado';
-  const photoPart = item.photoFileName ? ` [Foto: ${sanitizeInlineText(item.photoFileName)}]` : '';
-  return `Actualización ${num}${datePart}${statusPart} - ${cleanText}${photoPart}`;
+  const cleanText = sanitizeInlineText(item.text) || 'Follow-up recorded';
+  const photoPart = item.photoFileName ? ` [Photo: ${sanitizeInlineText(item.photoFileName)}]` : '';
+  return `Update ${num}${datePart}${statusPart} - ${cleanText}${photoPart}`;
 }
 
 export function serializeConditionUpdates(
@@ -142,7 +142,7 @@ export function parseConditionUpdates(options: {
       let isResolvedEvent = false;
       let painIntensity: number | undefined;
 
-      if (/curado/i.test(meta)) {
+      if (/cur(?:ado|ed)|heal(?:ed)/i.test(meta)) {
         isResolvedEvent = true;
         painIntensity = 0;
       } else {
@@ -164,7 +164,7 @@ export function parseConditionUpdates(options: {
 
       parsed.push({
         updateNumber,
-        title: `Actualización ${updateNumber}`,
+        title: `Update ${updateNumber}`,
         text: body,
         dateLabel,
         painIntensity,
@@ -176,7 +176,7 @@ export function parseConditionUpdates(options: {
     if (!matchedAny) {
       parsed.push({
         updateNumber: 1,
-        title: 'Actualización 1',
+        title: 'Update 1',
         text: raw,
         dateLabel: fallbackDateLabel ?? '',
         painIntensity: fallbackPain,
@@ -218,8 +218,8 @@ export function parseConditionUpdates(options: {
     if (usedPhotoIndices.has(idx)) return;
     parsed.push({
       updateNumber: nextNum,
-      title: `Actualización ${nextNum}`,
-      text: p.note?.trim() || 'Registro fotográfico de seguimiento',
+      title: `Update ${nextNum}`,
+      text: p.note?.trim() || 'Follow-up photo record',
       dateLabel: p.capturedAt?.trim() || '',
       painIntensity: p.painIntensity,
       photoFileName: extractPhotoFileName(p.path ?? p.id ?? p.uri),
@@ -257,8 +257,8 @@ export function appendConditionUpdate(params: {
   const isResolved = Boolean(params.isResolvedEvent || params.painIntensity === 0);
   const addedUpdate: ConditionUpdateItem = {
     updateNumber: nextNumber,
-    title: `Actualización ${nextNumber}`,
-    text: sanitizeInlineText(params.newText) || (isResolved ? 'Ya no siento el síntoma.' : 'Actualización registrada.'),
+    title: `Update ${nextNumber}`,
+    text: sanitizeInlineText(params.newText) || (isResolved ? 'I no longer feel the symptom.' : 'Update recorded.'),
     dateLabel: formatShortUpdateDate(params.date ?? new Date()),
     painIntensity: isResolved ? 0 : params.painIntensity,
     photoFileName: extractPhotoFileName(params.photoPathOrFileName),

@@ -37,6 +37,8 @@ import {
   formatObservationUpdatedAt,
   getPainColorHex,
   muscleNameKey,
+  normalizeBodyRegion,
+  UPDATED_NOW,
 } from './BodyModelViewer';
 import {
   RegisterObservationModal,
@@ -395,7 +397,7 @@ function ProblemDetailModal({
                 </View>
               </View>
 
-              {/* Línea temporal de Actualización 1, Actualización 2, ... */}
+              {/* Línea temporal de Update 1, Update 2, ... */}
               <View className="mt-3.5 rounded-2xl border border-slate-100 bg-[#f8fafc] p-3.5 dark:bg-trauma-nightBg dark:border-trauma-nightLine">
                 <View className="mb-2.5 flex-row items-center justify-between">
                   <View className="flex-row items-center">
@@ -615,7 +617,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   useEffect(() => () => reportBodyTab('body'), []);
   const [muscles, setMuscles] = useState<MuscleData[]>(INITIAL_MUSCLES);
   const [resolvedConditions, setResolvedConditions] = useState<BodyConditionRecord[]>([]);
-  const [selectedName, setSelectedName] = useState<string>('Cuello');
+  const [selectedName, setSelectedName] = useState<string>('Neck');
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
   const [observationModalOpen, setObservationModalOpen] = useState(false);
 
@@ -686,7 +688,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
       })
       .catch((error: unknown) => {
         if (!isMounted) return;
-        console.warn('No se pudieron cargar los padecimientos del cuerpo 3D.', error);
+        console.warn('Could not load the 3D body conditions.', error);
         Alert.alert(tRef.current('body.alert.loadTitle'), tRef.current('body.alert.loadMsg'));
       });
 
@@ -759,7 +761,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
     );
     if (!muscle) {
       console.error(
-        `No se encontró la zona muscular ${muscleId} para sincronizar.`
+        `Muscle zone ${muscleId} not found for syncing.`
       );
       return;
     }
@@ -771,7 +773,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
         muscleId,
         bodyRegion: muscle.category,
         muscleName: muscle.name,
-        conditionName: `Dolor en ${muscle.name}`,
+        conditionName: `Pain in ${muscle.name}`,
         description: observation.notes,
         painIntensity: 1,
         swelling: false,
@@ -817,7 +819,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
     const existingNotes = muscle.observation?.notes ?? '';
     const { serializedDescription } = appendConditionUpdate({
       existingDescription: existingNotes,
-      newText: 'Ya no siento el síntoma, molestia superada.',
+      newText: 'I no longer feel the symptom; discomfort overcome.',
       painIntensity: 0,
       isResolvedEvent: true,
       fallbackPain: muscle.observation?.painIntensity,
@@ -831,9 +833,9 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
         swelling: false,
         functionalLimitation: false,
         notes: serializedDescription,
-        updatedAt: 'Ahora mismo',
+        updatedAt: UPDATED_NOW,
       },
-      { isCured: true, latestUpdateNote: 'Ya no siento el síntoma, molestia superada.' }
+      { isCured: true, latestUpdateNote: 'I no longer feel the symptom; discomfort overcome.' }
     );
   };
 
@@ -996,7 +998,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
                 ({
                   id: rec.muscleId,
                   name: rec.muscleName,
-                  category: (rec.bodyRegion as MuscleData['category']) || 'Torso y abdomen',
+                  category: normalizeBodyRegion(rec.bodyRegion),
                   status: 'normal',
                 } as MuscleData);
               const recPhotos = injuryPhotos[targetMuscle.id] ?? [];

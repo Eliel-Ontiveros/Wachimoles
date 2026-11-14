@@ -50,10 +50,10 @@ Completa `.env` con:
   llamadas servidor-a-servidor de la API. No se incluye en el frontend web.
 - `DASHBOARD_WEB_PASSWORD`: contraseña independiente de al menos 16 caracteres
   para consultar el dashboard web. El usuario es `dashboard`.
-- `DEEPSEEK_API_KEY` (opcional): habilita `POST /voice/interpret`, que convierte
-  frases libres de voz en acciones de la app con DeepSeek. Sin ella el endpoint
-  responde 503 y la app usa solo el intérprete local. Opcionales:
-  `DEEPSEEK_MODEL` (por defecto `deepseek-chat`) y `DEEPSEEK_BASE_URL`.
+- `DEEPSEEK_API_KEY` (optional): enables `POST /voice/interpret`, which turns
+  free-form voice phrases into app actions with DeepSeek. Without it the
+  endpoint returns 503 and the app uses only the local interpreter. Optional:
+  `DEEPSEEK_MODEL` (default `deepseek-chat`) and `DEEPSEEK_BASE_URL`.
 - `CORS_ORIGINS`: debe incluir el origen del frontend, por defecto
   `http://localhost:5173`.
 
@@ -100,8 +100,8 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
 ## API
 
 - `GET /health` — estado del proceso, sin autenticación.
-- `POST /voice/interpret` `{ "text": "...", "history"?: [{ "role": "user"|"assistant", "content": "≤300" }] (máx. 6), "context"?: { "screen": "/"|"/explore"|"/missions", "tab"?: "body"|"health"|"records" } }` — token privado. `context` es la pantalla/pestaña actual del usuario: el prompt (generado desde el catálogo `src/voice/voice-catalog.ts`) la usa para preferir acciones de esa pantalla si la frase es ambigua; otras claves se rechazan (400); devuelve
-  `{ intent, message? }` con una acción de la lista blanca de la app (DeepSeek).
+- `POST /voice/interpret` `{ "text": "...", "history"?: [{ "role": "user"|"assistant", "content": "≤300" }] (max. 6), "context"?: { "screen": "/"|"/explore"|"/missions", "tab"?: "body"|"health"|"records" }, "locale"?: "es"|"en" }` — private token. `context` is the user's current screen/tab: the prompt (generated from the catalog in `src/voice/voice-catalog.ts`) uses it to prefer actions from that screen when the phrase is ambiguous; other keys are rejected (400). The user may speak Spanish or English (both are understood), but the `message` is ALWAYS in English. `locale` is still accepted so older clients do not get a 400, but it is ignored. Returns
+  `{ intent, message? }` with an action from the app whitelist (DeepSeek). `fill-health-check` symptoms are normalized to English (`None`, `Zero-G dizziness`, `Congestion`, `Fatigue`, `Headache`); legacy Spanish values (`Ninguno`, `Mareo 0g`, `Congestión`, `Fatiga`, `Cefalea`) are accepted too.
 - `GET /dashboard/samples?limit=100&metric=heart_rate` — hasta 500 muestras
   del usuario fijo; `metric` puede ser `heart_rate`, `stress`, `spo2` o
   `steps` o `sleep`.

@@ -67,7 +67,7 @@ export const MissionContext = createContext<MissionCtx | null>(null);
 
 export function useMission() {
   const ctx = useContext(MissionContext);
-  if (!ctx) throw new Error('useMission debe usarse dentro de <MissionProvider>');
+  if (!ctx) throw new Error('useMission must be used inside <MissionProvider>');
   return ctx;
 }
 

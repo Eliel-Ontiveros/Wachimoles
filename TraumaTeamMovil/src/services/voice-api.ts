@@ -1,4 +1,3 @@
-import type { Locale } from '../i18n/messages';
 import type { BodyTab, Route, VoiceIntent } from '../voice/parser';
 import { API_CONFIG } from './vital-signs-api';
 
@@ -19,7 +18,7 @@ export type VoiceRequestContext = { screen: Route; tab?: BodyTab };
  * Respaldo con LLM (DeepSeek vía backend) para frases que el intérprete local
  * no reconoce. Si no está disponible devuelve el motivo, para mostrarlo en la UI.
  */
-export async function interpretWithLlm(text: string, locale: Locale, history: VoiceTurn[] = [], context?: VoiceRequestContext): Promise<LlmInterpretation> {
+export async function interpretWithLlm(text: string, history: VoiceTurn[] = [], context?: VoiceRequestContext): Promise<LlmInterpretation> {
   if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) return { ok: false, reason: 'not-configured' };
 
   const controller = new AbortController();
@@ -33,7 +32,6 @@ export async function interpretWithLlm(text: string, locale: Locale, history: Vo
       },
       body: JSON.stringify({
         text: text.slice(0, 300),
-        locale,
         ...(context ? { context: { screen: context.screen, ...(context.screen === '/explore' && context.tab ? { tab: context.tab } : {}) } } : {}),
         ...(history.length
           ? { history: history.slice(-MAX_HISTORY_TURNS).map((h) => ({ role: h.role, content: h.content.slice(0, 300) })) }

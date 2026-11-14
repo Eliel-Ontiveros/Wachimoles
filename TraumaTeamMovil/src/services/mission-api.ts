@@ -124,7 +124,7 @@ function normalizeBodyConditionRecord(
   const bodyRegion = value.bodyRegion ?? value.body_region;
   const muscleName = value.muscleName ?? value.muscle_name;
   const conditionName =
-    value.conditionName ?? value.condition_name ?? 'Dolor muscular';
+    value.conditionName ?? value.condition_name ?? 'Muscle pain';
   const rawDescription = value.description;
   const rawPain = value.painIntensity ?? value.pain_intensity;
   const painIntensity =
@@ -181,10 +181,10 @@ const FALLBACK_ACTIVE_BODY_CONDITIONS: BodyConditionRecord[] = [
   {
     id: '81a948a4-a763-4559-a60a-45bb0d82d041',
     muscleId: 'pectoral_izq',
-    bodyRegion: 'Tronco anterior',
-    muscleName: 'Pectoral izquierdo',
-    conditionName: 'Dolor muscular',
-    description: 'Dolor punzante',
+    bodyRegion: 'Front torso',
+    muscleName: 'Left pectoral',
+    conditionName: 'Muscle pain',
+    description: 'Sharp pain',
     painIntensity: 10,
     swelling: true,
     functionalLimitation: true,
@@ -197,10 +197,10 @@ const FALLBACK_ACTIVE_BODY_CONDITIONS: BodyConditionRecord[] = [
   {
     id: 'ebc31a7b-d19f-4529-8f61-3fbe5bef5def',
     muscleId: 'cuello',
-    bodyRegion: 'Cabeza y cuello',
-    muscleName: 'Cuello',
-    conditionName: 'Dolor muscular',
-    description: 'Dolencia al mover el cuello a un lado u otro',
+    bodyRegion: 'Head and neck',
+    muscleName: 'Neck',
+    conditionName: 'Muscle pain',
+    description: 'Discomfort when moving the neck from side to side',
     painIntensity: 5,
     swelling: true,
     functionalLimitation: true,
@@ -302,10 +302,10 @@ export const SPACE_LOCATIONS: Record<
   SpaceLocation,
   { id: SpaceLocation; label: string; shortLabel: string }
 > = {
-  tierra: { id: 'tierra', label: 'Tierra', shortLabel: 'Tierra' },
-  estacion: { id: 'estacion', label: 'Estación Espacial (EEI)', shortLabel: 'EEI' },
-  luna: { id: 'luna', label: 'Base Lunar', shortLabel: 'Luna' },
-  marte: { id: 'marte', label: 'Superficie de Marte', shortLabel: 'Marte' },
+  tierra: { id: 'tierra', label: 'Earth', shortLabel: 'Earth' },
+  estacion: { id: 'estacion', label: 'Space Station (ISS)', shortLabel: 'ISS' },
+  luna: { id: 'luna', label: 'Lunar Base', shortLabel: 'Moon' },
+  marte: { id: 'marte', label: 'Martian Surface', shortLabel: 'Mars' },
 };
 
 export const ROUTE_SPECS: readonly RouteDurationSpec[] = [
@@ -541,57 +541,57 @@ export function calculateMissionStateFromDeparture(
 export const ENVIRONMENTS: Record<EnvironmentType, EnvironmentConfig> = {
   nave: {
     id: 'nave',
-    label: 'En la Nave (Órbita)',
-    shortLabel: 'Nave',
-    gravityLabel: '0g Microgravedad',
-    destinationLabel: 'Estación Orbital',
+    label: 'On the Ship (Orbit)',
+    shortLabel: 'Ship',
+    gravityLabel: '0g Microgravity',
+    destinationLabel: 'Orbital Station',
     missionTotalDays: 1,
     dailyStepsGoal: 3000,
-    routineSummary: 'Prevención de pérdida ósea y muscular en microgravedad',
+    routineSummary: 'Preventing bone and muscle loss in microgravity',
   },
   estacion: {
     id: 'estacion',
-    label: 'Estación Espacial (EEI)',
-    shortLabel: 'Estación EEI',
-    gravityLabel: '0g Microgravedad',
-    destinationLabel: 'Estación Espacial (EEI)',
+    label: 'Space Station (ISS)',
+    shortLabel: 'ISS Station',
+    gravityLabel: '0g Microgravity',
+    destinationLabel: 'Space Station (ISS)',
     missionTotalDays: 1,
     dailyStepsGoal: 3500,
-    routineSummary: 'Control en estación orbital, ejercicio ARED y monitoreo 0g',
+    routineSummary: 'Orbital station care, ARED exercise and 0g monitoring',
   },
   luna: {
     id: 'luna',
-    label: 'Base Lunar',
-    shortLabel: 'Luna',
-    gravityLabel: '0.16g Gravedad Lunar',
-    destinationLabel: 'Base Lunar',
+    label: 'Lunar Base',
+    shortLabel: 'Moon',
+    gravityLabel: '0.16g Lunar Gravity',
+    destinationLabel: 'Lunar Base',
     missionTotalDays: 3.5,
     dailyStepsGoal: 6000,
-    routineSummary: 'Movilidad EVA y estabilidad articular en baja gravedad',
+    routineSummary: 'EVA mobility and joint stability in low gravity',
   },
   marte: {
     id: 'marte',
-    label: 'Superficie de Marte',
-    shortLabel: 'Marte',
-    gravityLabel: '0.38g Gravedad Marciana',
-    destinationLabel: 'Marte',
+    label: 'Martian Surface',
+    shortLabel: 'Mars',
+    gravityLabel: '0.38g Martian Gravity',
+    destinationLabel: 'Mars',
     missionTotalDays: 210,
     dailyStepsGoal: 8000,
-    routineSummary: 'Resistencia de carga, recuperación lumbar y control respiratorio',
+    routineSummary: 'Load endurance, lower-back recovery and breathing control',
   },
   tierra: {
     id: 'tierra',
-    label: 'En la Tierra (Base)',
-    shortLabel: 'Tierra',
-    gravityLabel: '1.0g Gravedad Terrestre',
-    destinationLabel: 'Tierra',
+    label: 'On Earth (Base)',
+    shortLabel: 'Earth',
+    gravityLabel: '1.0g Earth Gravity',
+    destinationLabel: 'Earth',
     missionTotalDays: 1,
     dailyStepsGoal: 8000,
-    routineSummary: 'Acondicionamiento pre-misión y readaptación cardiovascular 1g',
+    routineSummary: 'Pre-mission conditioning and 1g cardiovascular readaptation',
   },
 };
 
-/** Textos visibles de un entorno (los `label` de ENVIRONMENTS son el respaldo en español). */
+/** Textos visibles de un entorno (los `label` de ENVIRONMENTS son el respaldo). */
 export function getEnvironmentText(locale: Locale, id: EnvironmentType) {
   const tr = (field: string) => translate(locale, `missions.env.${id}.${field}` as MessageKey);
   return {
@@ -616,7 +616,7 @@ export function getMissionsForEnvironment(
   currentSteps: number,
   checkedInToday: boolean,
   treadmillActive = false,
-  locale: Locale = 'es'
+  locale: Locale = 'en'
 ): DailyMission[] {
   const goal = ENVIRONMENTS[env].dailyStepsGoal;
   const tx = (key: string, params?: Record<string, string | number>) =>
@@ -799,7 +799,7 @@ export function localizeMission(
   env: EnvironmentType,
   treadmillActive: boolean
 ): DailyMission {
-  const has = (key: string) => key in MESSAGES.es;
+  const has = (key: string) => key in MESSAGES.en;
   const baseId =
     m.id === 'treadmill-steps' ? (treadmillActive ? 'treadmill-on' : 'treadmill-off') : m.id;
   const titleKey = `missions.mission.${baseId}.title`;
@@ -824,7 +824,7 @@ export async function fetchDailyMissionsFromBackend(
   checkedInToday = false,
   treadmillActive = false,
   dateIso?: string,
-  locale: Locale = 'es'
+  locale: Locale = 'en'
 ): Promise<DailyMission[]> {
   const authHeadersList = getMobileFallbackAuthHeaders();
   if (!canUseBackend(authHeadersList)) {
@@ -1008,7 +1008,7 @@ export async function fetchAstronautMissionStateFromBackend(): Promise<Astronaut
 
     if (!response || !response.ok) {
       if (response) {
-        console.warn('[mission-api] Error al consultar mission-state:', response.status);
+        console.warn('[mission-api] Error querying mission-state:', response.status);
       }
       return null;
     }
@@ -1024,7 +1024,7 @@ export async function fetchAstronautMissionStateFromBackend(): Promise<Astronaut
     }
     return normalizeAstronautMissionStateRecord(parsed);
   } catch (err) {
-    console.warn('[mission-api] No se pudo cargar el estado de misión desde backend:', err);
+    console.warn('[mission-api] Could not load the mission state from the backend:', err);
     return null;
   }
 }
@@ -1081,12 +1081,12 @@ export async function syncAstronautMissionStateToBackend(
       if (response.status !== 401) break;
     }
     if (!response || !response.ok) {
-      console.warn('[mission-api] Backend rechazó sync de mission-state:', response?.status ?? 0);
+      console.warn('[mission-api] Backend rejected the mission-state sync:', response?.status ?? 0);
       return false;
     }
     return true;
   } catch (err) {
-    console.warn('[mission-api] No se pudo sincronizar ubicación de misión con backend:', err);
+    console.warn('[mission-api] Could not sync the mission location with the backend:', err);
     return false;
   }
 }
@@ -1118,12 +1118,12 @@ export async function markEarlyArrivalInBackend(
       if (response.status !== 401) break;
     }
     if (!response || !response.ok) {
-      console.warn('[mission-api] Error al registrar llegada anticipada:', response?.status ?? 0);
+      console.warn('[mission-api] Error registering early arrival:', response?.status ?? 0);
       return false;
     }
     return true;
   } catch (err) {
-    console.warn('[mission-api] No se pudo registrar llegada anticipada en backend:', err);
+    console.warn('[mission-api] Could not register the early arrival on the backend:', err);
     return false;
   }
 }
@@ -1195,7 +1195,7 @@ export async function saveAstronautLocationToBackend(
       // Intentar siguiente ruta de fallback si hay fallo de red específico
     }
   }
-  console.warn('[mission-api] No se pudo guardar la ubicación actual en backend:', entorno);
+  console.warn('[mission-api] Could not save the current location on the backend:', entorno);
   return false;
 }
 
@@ -1290,7 +1290,7 @@ export async function uploadBodyConditionImageToBackend(
     (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
   ) {
     throw new Error(
-      'Configura EXPO_PUBLIC_API_BASE_URL y la autorización existente para conectar con el backend.'
+      'Set EXPO_PUBLIC_API_BASE_URL and the existing authorization to connect to the backend.'
     );
   }
 
@@ -1301,7 +1301,7 @@ export async function uploadBodyConditionImageToBackend(
   if (Platform.OS === 'web') {
     const imageResponse = await fetch(image.uri);
     if (!imageResponse.ok) {
-      throw new Error('No se pudo leer la imagen seleccionada.');
+      throw new Error('Could not read the selected image.');
     }
     formData.append('image', await imageResponse.blob(), fileName);
   } else {
@@ -1365,20 +1365,20 @@ export async function uploadBodyConditionImageToBackend(
   if (!response || !response.ok) {
     const status = response?.status ?? 0;
     if (status === 413) {
-      throw new Error('La imagen supera el límite de 10 MB.');
+      throw new Error('The image exceeds the 10 MB limit.');
     }
     if (status === 415) {
-      throw new Error('Formato no compatible. Usa una imagen JPEG, PNG o WebP.');
+      throw new Error('Unsupported format. Use a JPEG, PNG or WebP image.');
     }
     if (status === 401) {
-      throw new Error('El backend rechazó la autorización al subir la imagen (401).');
+      throw new Error('The backend rejected the authorization while uploading the image (401).');
     }
-    throw new Error(`No se pudo subir la imagen (${status}).`);
+    throw new Error(`Could not upload the image (${status}).`);
   }
 
   const result: unknown = await response.json();
   if (!isBodyConditionImageRecord(result)) {
-    throw new Error('El backend devolvió una respuesta de imagen inválida.');
+    throw new Error('The backend returned an invalid image response.');
   }
   return result;
 }
@@ -1392,7 +1392,7 @@ export async function getBodyConditionImagesFromBackend(
     (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
   ) {
     throw new Error(
-      'Configura EXPO_PUBLIC_API_BASE_URL y la autorización existente para conectar con el backend.'
+      'Set EXPO_PUBLIC_API_BASE_URL and the existing authorization to connect to the backend.'
     );
   }
 
@@ -1409,14 +1409,14 @@ export async function getBodyConditionImagesFromBackend(
   if (!response || !response.ok) {
     const status = response?.status ?? 0;
     if (status === 401) {
-      throw new Error('El backend rechazó la autorización al cargar las imágenes (401).');
+      throw new Error('The backend rejected the authorization while loading the images (401).');
     }
-    throw new Error(`No se pudieron cargar las imágenes (${status}).`);
+    throw new Error(`Could not load the images (${status}).`);
   }
 
   const result: unknown = await response.json();
   if (!Array.isArray(result) || !result.every(isBodyConditionImageRecord)) {
-    throw new Error('El backend devolvió una lista de imágenes inválida.');
+    throw new Error('The backend returned an invalid image list.');
   }
   return result;
 }
@@ -1431,7 +1431,7 @@ export async function syncObservationToBackend(
     (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
   ) {
     console.warn(
-      'No se pudo sincronizar el padecimiento: falta configurar el backend.'
+      'Could not sync the condition: the backend is not configured.'
     );
     return { synced: false };
   }
@@ -1470,7 +1470,7 @@ export async function syncObservationToBackend(
         JSON.stringify({
           bodyRegion: input.bodyRegion,
           muscleName: input.muscleName,
-          conditionName: input.conditionName?.trim() || 'Dolor muscular',
+          conditionName: input.conditionName?.trim() || 'Muscle pain',
           description: observation.notes,
           painIntensity: clampedPain,
           swelling: observation.swelling,
@@ -1480,7 +1480,7 @@ export async function syncObservationToBackend(
 
       if (!putResponse || !putResponse.ok) {
         console.warn(
-          `No se pudo sincronizar el padecimiento (${putResponse?.status ?? 0}).`
+          `Could not sync the condition (${putResponse?.status ?? 0}).`
         );
         return { synced: false };
       }
@@ -1493,14 +1493,14 @@ export async function syncObservationToBackend(
     const deleteResponse = await sendWithAuth('DELETE');
     if (!deleteResponse || !deleteResponse.ok) {
       console.warn(
-        `No se pudo marcar como resuelto el padecimiento (${deleteResponse?.status ?? 0}).`
+        `Could not mark the condition as resolved (${deleteResponse?.status ?? 0}).`
       );
       return { synced: false };
     }
 
     return { synced: true };
   } catch (error) {
-    console.warn('No se pudo sincronizar el padecimiento con el backend.', error);
+    console.warn('Could not sync the condition with the backend.', error);
     return { synced: false };
   }
 }
@@ -1512,7 +1512,7 @@ export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecor
     (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
   ) {
     console.warn(
-      'No se pudieron cargar los padecimientos: falta configurar EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN.'
+      'Could not load the conditions: EXPO_PUBLIC_API_BASE_URL and EXPO_PUBLIC_DASHBOARD_API_TOKEN are not configured.'
     );
     return [];
   }
@@ -1531,20 +1531,20 @@ export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecor
       const status = response?.status ?? 0;
       throw new Error(
         status === 401
-          ? 'El backend rechazó el token al cargar los padecimientos (401).'
-          : `No se pudieron cargar los padecimientos (${status}).`
+          ? 'The backend rejected the token while loading the conditions (401).'
+          : `Could not load the conditions (${status}).`
       );
     }
 
     const body: unknown = await response.json();
     if (!Array.isArray(body)) {
-      throw new Error('El backend devolvió registros anatómicos con formato inválido.');
+      throw new Error('The backend returned anatomical records with an invalid format.');
     }
     const normalized = body
       .map(normalizeBodyConditionRecord)
       .filter((item): item is BodyConditionRecord => item !== null);
     if (body.length > 0 && normalized.length === 0) {
-      throw new Error('El backend devolvió registros anatómicos con formato inválido.');
+      throw new Error('The backend returned anatomical records with an invalid format.');
     }
     return normalized;
   } catch (error: unknown) {
@@ -1562,7 +1562,7 @@ export async function getDailyHealthChecksFromBackend(): Promise<DailyHealthChec
     (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
   ) {
     console.warn(
-      'No se pudieron cargar los cuestionarios: falta configurar EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN.'
+      'Could not load the questionnaires: EXPO_PUBLIC_API_BASE_URL and EXPO_PUBLIC_DASHBOARD_API_TOKEN are not configured.'
     );
     return [];
   }
@@ -1581,20 +1581,20 @@ export async function getDailyHealthChecksFromBackend(): Promise<DailyHealthChec
       const status = response?.status ?? 0;
       throw new Error(
         status === 401
-          ? 'El backend rechazó el token al cargar los cuestionarios (401).'
-          : `No se pudieron cargar los cuestionarios (${status}).`
+          ? 'The backend rejected the token while loading the questionnaires (401).'
+          : `Could not load the questionnaires (${status}).`
       );
     }
 
     const body: unknown = await response.json();
     if (!Array.isArray(body)) {
-      throw new Error('El backend devolvió cuestionarios con formato inválido.');
+      throw new Error('The backend returned questionnaires with an invalid format.');
     }
     const parsed = body
       .map(normalizeDailyHealthCheckRecord)
       .filter((item): item is DailyHealthCheckRecord => item !== null);
     if (body.length > 0 && parsed.length === 0) {
-      throw new Error('El backend devolvió cuestionarios con formato inválido.');
+      throw new Error('The backend returned questionnaires with an invalid format.');
     }
 
     return parsed.map((record) => ({
@@ -1619,7 +1619,7 @@ export async function syncHealthCheckToBackend(
     (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
   ) {
     console.warn(
-      'No se pudo sincronizar el cuestionario: falta configurar el backend.'
+      'Could not sync the questionnaire: the backend is not configured.'
     );
     return { synced: false };
   }
@@ -1652,14 +1652,14 @@ export async function syncHealthCheckToBackend(
 
     if (!response || !response.ok) {
       console.warn(
-        `No se pudo sincronizar el cuestionario diario (${response?.status ?? 0}).`
+        `Could not sync the daily questionnaire (${response?.status ?? 0}).`
       );
       return { synced: false };
     }
     return { synced: true };
   } catch (error) {
     console.warn(
-      'No se pudo sincronizar el cuestionario diario con el backend.',
+      'Could not sync the daily questionnaire with the backend.',
       error
     );
     return { synced: false };
@@ -1848,7 +1848,7 @@ export async function syncDailyMissionsProgressToBackend(
       }
     }
   } catch (err) {
-    console.warn('[mission-api] No se pudo sincronizar el progreso de misiones con el backend:', err);
+    console.warn('[mission-api] Could not sync the mission progress with the backend:', err);
   }
   return null;
 }

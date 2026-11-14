@@ -113,57 +113,65 @@ export const MISSION_IDS = [
   "env-marte-load",
   "env-marte-resp"
 ] as const;
-export const SYMPTOMS = ["Ninguno", "Mareo 0g", "Congestión", "Fatiga", "Cefalea"] as const;
+export const SYMPTOMS = ["None", "Zero-G dizziness", "Congestion", "Fatigue", "Headache"] as const;
+/** Legacy Spanish symptom values (already stored by older clients) → English. */
+export const LEGACY_SYMPTOMS: Record<string, (typeof SYMPTOMS)[number]> = {
+  Ninguno: "None",
+  "Mareo 0g": "Zero-G dizziness",
+  Congestión: "Congestion",
+  Fatiga: "Fatigue",
+  Cefalea: "Headache"
+};
 
 export const ROUTES: Record<string, string> = {
-  "/": "Monitoreo Vital",
-  "/explore": "Vista Corporal",
-  "/missions": "Misiones y Viaje"
+  "/": "Vital Monitoring",
+  "/explore": "Body View",
+  "/missions": "Missions & Journey"
 };
 
 export const TABS: Record<string, string> = {
-  body: "Vista 3D",
-  health: "Cuestionario",
-  records: "Registros"
+  body: "3D View",
+  health: "Questionnaire",
+  records: "Records"
 };
 
 export const MUSCLES: Record<string, string> = {
-  cara: "Cara / Región facial",
-  cabeza: "Cabeza / Cráneo",
-  cuello: "Cuello",
-  trapecio: "Trapecio / Nuca",
+  cara: "Face / Facial Region",
+  cabeza: "Head / Skull",
+  cuello: "Neck",
+  trapecio: "Trapezius / Nape",
   abdomen: "Abdomen",
-  lumbar: "Zona lumbar",
-  pectoral_der: "Pectoral derecho",
-  pectoral_izq: "Pectoral izquierdo",
-  oblicuo_der: "Oblicuo derecho",
-  oblicuo_izq: "Oblicuo izquierdo",
-  dorsal_der: "Dorsal derecho",
-  dorsal_izq: "Dorsal izquierdo",
-  deltoides_der: "Deltoides derecho",
-  deltoides_izq: "Deltoides izquierdo",
-  biceps_der: "Bíceps derecho",
-  biceps_izq: "Bíceps izquierdo",
-  triceps_der: "Tríceps derecho",
-  triceps_izq: "Tríceps izquierdo",
-  antebrazo_der: "Antebrazo derecho",
-  antebrazo_izq: "Antebrazo izquierdo",
-  mano_der: "Mano derecha",
-  mano_izq: "Mano izquierda",
-  gluteo_der: "Glúteo derecho",
-  gluteo_izq: "Glúteo izquierdo",
-  abductor_der: "Abductor / Cadera derecha",
-  abductor_izq: "Abductor / Cadera izquierda",
-  muslo_der: "Muslo derecho (Cuádriceps)",
-  muslo_izq: "Muslo izquierdo (Cuádriceps)",
-  isquio_der: "Isquiotibiales derecho",
-  isquio_izq: "Isquiotibiales izquierdo",
-  gemelo_der: "Gemelo derecho (Pantorrilla)",
-  gemelo_izq: "Gemelo izquierdo (Pantorrilla)",
-  espinilla_der: "Espinilla / Tibial derecho",
-  espinilla_izq: "Espinilla / Tibial izquierdo",
-  pie_der: "Pie derecho",
-  pie_izq: "Pie izquierdo"
+  lumbar: "Lower Back",
+  pectoral_der: "Right Pectoral",
+  pectoral_izq: "Left Pectoral",
+  oblicuo_der: "Right Oblique",
+  oblicuo_izq: "Left Oblique",
+  dorsal_der: "Right Lat",
+  dorsal_izq: "Left Lat",
+  deltoides_der: "Right Deltoid",
+  deltoides_izq: "Left Deltoid",
+  biceps_der: "Right Biceps",
+  biceps_izq: "Left Biceps",
+  triceps_der: "Right Triceps",
+  triceps_izq: "Left Triceps",
+  antebrazo_der: "Right Forearm",
+  antebrazo_izq: "Left Forearm",
+  mano_der: "Right Hand",
+  mano_izq: "Left Hand",
+  gluteo_der: "Right Glute",
+  gluteo_izq: "Left Glute",
+  abductor_der: "Right Abductor / Hip",
+  abductor_izq: "Left Abductor / Hip",
+  muslo_der: "Right Thigh (Quadriceps)",
+  muslo_izq: "Left Thigh (Quadriceps)",
+  isquio_der: "Right Hamstring",
+  isquio_izq: "Left Hamstring",
+  gemelo_der: "Right Calf",
+  gemelo_izq: "Left Calf",
+  espinilla_der: "Right Shin / Tibialis",
+  espinilla_izq: "Left Shin / Tibialis",
+  pie_der: "Right Foot",
+  pie_izq: "Left Foot"
 };
 
 const SIMPLE = new Set([
@@ -294,9 +302,11 @@ export function sanitizeIntent(raw: unknown): VoiceIntent | null {
     if (Array.isArray(r.symptoms)) {
       const symptoms = [
         ...new Set(
-          r.symptoms.filter(
-            (x): x is string => typeof x === "string" && (SYMPTOMS as readonly string[]).includes(x)
-          )
+          r.symptoms.flatMap((x): string[] => {
+            if (typeof x !== "string") return [];
+            if ((SYMPTOMS as readonly string[]).includes(x)) return [x];
+            return Object.prototype.hasOwnProperty.call(LEGACY_SYMPTOMS, x) ? [LEGACY_SYMPTOMS[x]] : [];
+          })
         )
       ];
       if (symptoms.length) out.symptoms = symptoms;

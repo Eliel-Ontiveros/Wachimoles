@@ -1,7 +1,7 @@
-import { SPEECH, type Locale } from './messages';
+import type { Locale } from './messages';
 
-/** BCP-47 tag para Intl según el idioma de la app ('es-ES' / 'en-US'). */
-export const intlLocale = (locale: Locale) => SPEECH[locale].lang;
+/** BCP-47 tag para Intl: la app formatea siempre en 'en-US'. */
+export const intlLocale = (_locale?: Locale) => 'en-US';
 
 type DateInput = Date | number | string;
 

@@ -1,7 +1,5 @@
-import type es from '../es/common';
-
 /** Palabras compartidas (en). */
-const common: Record<keyof typeof es, string> = {
+const common: Record<string, string> = {
   'common.close': 'Close',
   'common.cancel': 'Cancel',
   'common.save': 'Save',

@@ -246,7 +246,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
     <div
       className={`startup-splash-screen${isDissolving ? ' is-dissolving' : ''}`}
       role="status"
-      aria-label="Cargando aplicación TraumaTeam"
+      aria-label="Loading TraumaTeam application"
     >
       <svg
         className="startup-splash-hex-svg"

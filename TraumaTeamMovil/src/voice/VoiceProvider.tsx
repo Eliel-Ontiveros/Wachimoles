@@ -21,7 +21,7 @@ const useSpeechRecognitionEvent: SpeechRecognitionPkg['useSpeechRecognitionEvent
 import { useDrawer } from '@/components/trauma/drawer-context';
 import { useMission } from '@/components/trauma/mission-context';
 import { useI18n } from '@/i18n/I18nProvider';
-import { SPEECH, translate, type MessageKey } from '@/i18n/messages';
+import { STT_LANG, type MessageKey } from '@/i18n/messages';
 import { useSettings } from '@/settings/SettingsProvider';
 import { interpretWithLlm, MAX_HISTORY_TURNS, type VoiceRequestContext, type VoiceTurn } from '@/services/voice-api';
 
@@ -68,8 +68,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const drawer = useDrawer();
   const mission = useMission();
   const pathname = usePathname();
-  const { t, locale, speech } = useI18n();
+  const { t, speech } = useI18n();
   const settings = useSettings();
+  const { voiceLanguage } = settings;
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [mode, setMode] = useState<'command' | 'dictation' | 'answer' | null>(null);
@@ -316,19 +317,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           settings.setThemePreference(intent.theme);
           report({ kind: 'success', text: t(`settings.themeChanged.${intent.theme}` as MessageKey) }, true);
           return;
-        case 'set-locale': {
-          // La confirmación se dice ya en el idioma nuevo (la voz de `say` es la del idioma anterior).
-          const text = translate(intent.locale, 'settings.localeChanged');
-          settings.setLocale(intent.locale);
-          report({ kind: 'success', text });
-          try {
-            Speech.stop();
-            Speech.speak(text, { language: SPEECH[intent.locale].lang, rate: 1.0, pitch: 1.0 });
-          } catch {
-            // La confirmación hablada es opcional.
-          }
-          return;
-        }
         case 'set-environment': {
           const env = t(`env.${intent.environment}` as MessageKey);
           const changed = m.setEnvironment(intent.environment);
@@ -516,7 +504,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       setThinking(true);
       report({ kind: 'info', text: t('voice.thinking') });
       const history = llmHistory.current;
-      void interpretWithLlm(text, locale, history, llmContext()).then((llm) => {
+      void interpretWithLlm(text, history, llmContext()).then((llm) => {
         setThinking(false);
         if (llm.ok && llm.intent) {
           run(llm.intent);
@@ -543,7 +531,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         }
       });
     },
-    [ask, endConversation, llmContext, locale, report, run, t]
+    [ask, endConversation, llmContext, report, run, t]
   );
 
   const runText = useCallback(
@@ -675,16 +663,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       setFeedback(null);
       setListening(true);
       ExpoSpeechRecognitionModule.start({
-        lang: speech.lang,
+        lang: STT_LANG[voiceLanguage],
         interimResults: true,
         continuous: false,
         addsPunctuation: next === 'dictation',
         volumeChangeEventOptions: { enabled: true, intervalMillis: 80 },
-        contextualStrings: ['signos vitales', 'chequeo diario', 'bíceps', 'isquiotibiales', 'misiones'],
+        contextualStrings:
+          voiceLanguage === 'es'
+            ? ['signos vitales', 'chequeo diario', 'bíceps', 'isquiotibiales', 'misiones']
+            : ['vital signs', 'daily check-in', 'biceps', 'hamstrings', 'missions'],
       });
       timer.current = setTimeout(() => ExpoSpeechRecognitionModule?.stop(), LISTEN_TIMEOUT_MS);
     },
-    [supported, report, t, speech.lang]
+    [supported, report, t, voiceLanguage]
   );
   useEffect(() => {
     beginRef.current = begin;

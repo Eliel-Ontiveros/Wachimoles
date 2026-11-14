@@ -64,18 +64,18 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
 
   const statusMeta = useMemo(() => {
     if (!isAvailable || bpm === null) {
-      return { label: 'Sin señal', color: '#94a3b8', stroke: '#94a3b8' };
+      return { label: 'No signal', color: '#94a3b8', stroke: '#94a3b8' };
     }
     if (bpm >= 115 || bpm < 48) {
-      return { label: 'Pulso crítico', color: '#ef4444', stroke: '#ef4444' };
+      return { label: 'Critical pulse', color: '#ef4444', stroke: '#ef4444' };
     }
     if (bpm >= 100) {
-      return { label: 'Pulso elevado', color: '#f59e0b', stroke: '#f59e0b' };
+      return { label: 'Elevated pulse', color: '#f59e0b', stroke: '#f59e0b' };
     }
     if (bpm < 55) {
-      return { label: 'Pulso bajo', color: '#f59e0b', stroke: '#f59e0b' };
+      return { label: 'Low pulse', color: '#f59e0b', stroke: '#f59e0b' };
     }
-    return { label: 'Pulso en vivo', color: '#0284c7', stroke: '#0284c7' };
+    return { label: 'Live pulse', color: '#0284c7', stroke: '#0284c7' };
   }, [bpm, isAvailable]);
 
   const beatDurationSec = bpm ? Math.max(0.32, Math.min(1.8, 60 / bpm)) : 3.6;
@@ -83,17 +83,17 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
   return (
     <div className="mission-and-pulse-stack">
       {/* Tarjeta de Misión Espacial (#060b19 estilo SpaceJourneyTimeline) arriba del Pulso */}
-      <div className="mission-route-card" aria-label="Trayectoria de misión espacial">
+      <div className="mission-route-card" aria-label="Space mission trajectory">
         <div className="mission-route-head">
           <div className="mission-route-title">
 
             <div>
-              <strong>Misión · {astronaut.shortName}</strong>
+              <strong>Mission · {astronaut.shortName}</strong>
               <span>{LOCATION_LABELS[astronaut.environment] ?? astronaut.environment} · {astronaut.gravityLabel}</span>
             </div>
           </div>
           <span className="mission-dest-pill">
-            RUMBO · {(LOCATION_LABELS[astronaut.destination] ?? astronaut.destination).toUpperCase()}
+            HEADING · {(LOCATION_LABELS[astronaut.destination] ?? astronaut.destination).toUpperCase()}
           </span>
         </div>
 
@@ -191,10 +191,10 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
             {isAvailable && bpm !== null ? (
               <div className="pulse-bpm-group">
                 <strong className="pulse-bpm-number">{bpm}</strong>
-                <span className="pulse-bpm-unit">Lpm</span>
+                <span className="pulse-bpm-unit">BPM</span>
               </div>
             ) : (
-              <span className="pulse-unavailable-text">Pulso no disponible</span>
+              <span className="pulse-unavailable-text">Pulse unavailable</span>
             )}
           </div>
 
@@ -204,12 +204,12 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
               <span>{statusMeta.label}</span>
             </span>
             <span className="pulse-time-label">
-              {vitals.lastMeasuredAt ? `Último: ${vitals.lastMeasuredAt}` : 'Sin lecturas'}
+              {vitals.lastMeasuredAt ? `Last: ${vitals.lastMeasuredAt}` : 'No readings'}
             </span>
           </div>
         </div>
 
-        <div className="pulse-ecg-canvas" aria-label="Trazado ECG continuo">
+        <div className="pulse-ecg-canvas" aria-label="Continuous ECG trace">
           <div className="pulse-ecg-grid" />
           {isAvailable ? (
             <svg
@@ -218,7 +218,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
               viewBox={`0 0 ${ECG_VIEWBOX_WIDTH} ${ECG_HEIGHT}`}
               preserveAspectRatio="none"
               role="img"
-              aria-label={bpm ? `ECG a ${bpm} latidos por minuto` : 'Sin señal ECG'}
+              aria-label={bpm ? `ECG at ${bpm} beats per minute` : 'No ECG signal'}
             >
               <line
                 x1="0"
@@ -245,7 +245,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
               viewBox={`0 0 384 ${ECG_HEIGHT}`}
               preserveAspectRatio="none"
               role="img"
-              aria-label="Sin señal ECG"
+              aria-label="No ECG signal"
             >
               <line
                 x1="0"

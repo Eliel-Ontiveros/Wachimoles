@@ -10,6 +10,7 @@ import type {
   RiskTier,
   VitalSignsData,
 } from '../types/dashboard';
+import { displaySymptom, getRegionCategoryLabel, isNoSymptom } from '../utils/display-labels.ts';
 
 export const PRIMARY_ASTRONAUT: AstronautProfile = {
   id: 'eliel-alfonso',
@@ -17,12 +18,12 @@ export const PRIMARY_ASTRONAUT: AstronautProfile = {
   name: 'Eliel Alfonso',
   shortName: 'E. Alfonso',
   code: 'ASTRO-01',
-  role: 'Astronauta · Sujeto Activo',
-  specialty: 'Telemetría biomédica móvil + smartwatch',
+  role: 'Astronaut · Active Subject',
+  specialty: 'Mobile biomedical telemetry + smartwatch',
   origin: 'tierra',
   destination: 'luna',
   environment: 'nave',
-  gravityLabel: '0g Microgravedad',
+  gravityLabel: '0g Microgravity',
   isPrimary: true,
 };
 
@@ -63,31 +64,31 @@ export function getRiskTierMeta(tier: RiskTier): {
   switch (tier) {
     case 'yellow':
       return {
-        label: 'Riesgo Leve · Amarillo',
-        shortLabel: 'Amarillo',
+        label: 'Mild Risk · Yellow',
+        shortLabel: 'Yellow',
         color: '#ca8a04',
         bg: 'rgba(250, 204, 21, 0.16)',
         border: 'rgba(234, 179, 8, 0.55)',
       };
     case 'orange':
       return {
-        label: 'Riesgo Moderado · Naranja',
-        shortLabel: 'Naranja',
+        label: 'Moderate Risk · Orange',
+        shortLabel: 'Orange',
         color: '#ea580c',
         bg: 'rgba(249, 115, 22, 0.16)',
         border: 'rgba(249, 115, 22, 0.55)',
       };
     case 'red':
       return {
-        label: 'Riesgo Grave · Rojo',
-        shortLabel: 'Rojo Crítico',
+        label: 'Severe Risk · Red',
+        shortLabel: 'Critical Red',
         color: '#dc2626',
         bg: 'rgba(239, 68, 68, 0.18)',
         border: 'rgba(239, 68, 68, 0.65)',
       };
     default:
       return {
-        label: 'Nominal · Sin lesión',
+        label: 'Nominal · No injury',
         shortLabel: 'Nominal',
         color: '#0284c7',
         bg: 'rgba(56, 189, 248, 0.12)',
@@ -98,18 +99,18 @@ export function getRiskTierMeta(tier: RiskTier): {
 
 export function getPainSeverityLabel(intensity: number): string {
   if (intensity <= 0) return 'Nominal';
-  if (intensity <= 3) return 'Leve (Amarillo)';
-  if (intensity <= 6) return 'Moderado (Naranja)';
-  if (intensity <= 8) return 'Severo (Rojo)';
-  return 'Crítico (Rojo intenso)';
+  if (intensity <= 3) return 'Mild (Yellow)';
+  if (intensity <= 6) return 'Moderate (Orange)';
+  if (intensity <= 8) return 'Severe (Red)';
+  return 'Critical (Deep red)';
 }
 
-// Catálogo exacto de zonas anatómicas 3D sincronizado con TraumaTeamMovil
+// Exact catalog of 3D anatomical zones synced with TraumaTeamMovil
 export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== CABEZA Y CUELLO ====================
   {
     id: 'cara',
-    name: 'Cara / Región facial',
+    name: 'Face / Facial region',
     category: 'Cabeza y cuello',
     status: 'normal',
     center: [0.0, 0.785, 0.08],
@@ -119,7 +120,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'cabeza',
-    name: 'Cabeza / Cráneo',
+    name: 'Head / Skull',
     category: 'Cabeza y cuello',
     status: 'normal',
     center: [0.0, 0.83, -0.045],
@@ -129,7 +130,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'cuello',
-    name: 'Cuello',
+    name: 'Neck',
     category: 'Cabeza y cuello',
     status: 'normal',
     center: [0.0, 0.665, 0.035],
@@ -139,7 +140,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'trapecio',
-    name: 'Trapecio / Nuca',
+    name: 'Trapezius / Nape',
     category: 'Cabeza y cuello',
     status: 'normal',
     center: [0.0, 0.59, -0.07],
@@ -151,7 +152,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== TRONCO ANTERIOR ====================
   {
     id: 'pectoral_der',
-    name: 'Pectoral derecho',
+    name: 'Right pectoral',
     category: 'Tronco anterior',
     status: 'normal',
     center: [-0.085, 0.4, 0.085],
@@ -161,7 +162,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'pectoral_izq',
-    name: 'Pectoral izquierdo',
+    name: 'Left pectoral',
     category: 'Tronco anterior',
     status: 'normal',
     center: [0.085, 0.4, 0.085],
@@ -181,7 +182,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'oblicuo_der',
-    name: 'Oblicuo derecho',
+    name: 'Right oblique',
     category: 'Tronco anterior',
     status: 'normal',
     center: [-0.125, 0.14, 0.015],
@@ -191,7 +192,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'oblicuo_izq',
-    name: 'Oblicuo izquierdo',
+    name: 'Left oblique',
     category: 'Tronco anterior',
     status: 'normal',
     center: [0.125, 0.14, 0.015],
@@ -203,7 +204,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== TRONCO POSTERIOR ====================
   {
     id: 'dorsal_der',
-    name: 'Dorsal derecho',
+    name: 'Right latissimus',
     category: 'Tronco posterior',
     status: 'normal',
     center: [-0.095, 0.36, -0.115],
@@ -213,7 +214,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'dorsal_izq',
-    name: 'Dorsal izquierdo',
+    name: 'Left latissimus',
     category: 'Tronco posterior',
     status: 'normal',
     center: [0.095, 0.36, -0.115],
@@ -223,7 +224,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'lumbar',
-    name: 'Zona lumbar',
+    name: 'Lower back',
     category: 'Tronco posterior',
     status: 'normal',
     center: [0.0, 0.13, -0.105],
@@ -235,7 +236,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== EXTREMIDAD SUPERIOR ====================
   {
     id: 'deltoides_der',
-    name: 'Deltoides derecho',
+    name: 'Right deltoid',
     category: 'Extremidad superior',
     status: 'normal',
     center: [-0.225, 0.46, -0.03],
@@ -245,7 +246,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'deltoides_izq',
-    name: 'Deltoides izquierdo',
+    name: 'Left deltoid',
     category: 'Extremidad superior',
     status: 'normal',
     center: [0.225, 0.46, -0.03],
@@ -255,7 +256,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'biceps_der',
-    name: 'Bíceps derecho',
+    name: 'Right biceps',
     category: 'Extremidad superior',
     status: 'normal',
     center: [-0.3, 0.29, 0.015],
@@ -265,7 +266,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'biceps_izq',
-    name: 'Bíceps izquierdo',
+    name: 'Left biceps',
     category: 'Extremidad superior',
     status: 'normal',
     center: [0.3, 0.29, 0.015],
@@ -275,7 +276,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'triceps_der',
-    name: 'Tríceps derecho',
+    name: 'Right triceps',
     category: 'Extremidad superior',
     status: 'normal',
     center: [-0.29, 0.3, -0.06],
@@ -285,7 +286,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'triceps_izq',
-    name: 'Tríceps izquierdo',
+    name: 'Left triceps',
     category: 'Extremidad superior',
     status: 'normal',
     center: [0.29, 0.3, -0.06],
@@ -295,7 +296,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'antebrazo_der',
-    name: 'Antebrazo derecho',
+    name: 'Right forearm',
     category: 'Extremidad superior',
     status: 'normal',
     center: [-0.365, 0.155, -0.005],
@@ -305,7 +306,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'antebrazo_izq',
-    name: 'Antebrazo izquierdo',
+    name: 'Left forearm',
     category: 'Extremidad superior',
     status: 'normal',
     center: [0.365, 0.155, -0.005],
@@ -315,7 +316,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'mano_der',
-    name: 'Mano derecha',
+    name: 'Right hand',
     category: 'Extremidad superior',
     status: 'normal',
     center: [-0.44, 0.015, 0.065],
@@ -325,7 +326,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'mano_izq',
-    name: 'Mano izquierda',
+    name: 'Left hand',
     category: 'Extremidad superior',
     status: 'normal',
     center: [0.44, 0.015, 0.065],
@@ -337,7 +338,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== CADERA Y PELVIS ====================
   {
     id: 'gluteo_der',
-    name: 'Glúteo derecho',
+    name: 'Right glute',
     category: 'Cadera y pelvis',
     status: 'normal',
     center: [-0.09, -0.04, -0.105],
@@ -347,7 +348,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'gluteo_izq',
-    name: 'Glúteo izquierdo',
+    name: 'Left glute',
     category: 'Cadera y pelvis',
     status: 'normal',
     center: [0.09, -0.04, -0.105],
@@ -357,7 +358,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'abductor_der',
-    name: 'Abductor / Cadera derecha',
+    name: 'Abductor / Right hip',
     category: 'Cadera y pelvis',
     status: 'normal',
     center: [-0.165, -0.08, -0.01],
@@ -367,7 +368,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'abductor_izq',
-    name: 'Abductor / Cadera izquierda',
+    name: 'Abductor / Left hip',
     category: 'Cadera y pelvis',
     status: 'normal',
     center: [0.165, -0.08, -0.01],
@@ -379,7 +380,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   // ==================== EXTREMIDAD INFERIOR ====================
   {
     id: 'muslo_der',
-    name: 'Muslo derecho (Cuádriceps)',
+    name: 'Right thigh (Quadriceps)',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [-0.11, -0.25, 0.045],
@@ -389,7 +390,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'muslo_izq',
-    name: 'Muslo izquierdo (Cuádriceps)',
+    name: 'Left thigh (Quadriceps)',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [0.11, -0.25, 0.045],
@@ -399,7 +400,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'isquio_der',
-    name: 'Isquiotibiales der. (Pierna trasera)',
+    name: 'Right hamstrings (Back of leg)',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [-0.115, -0.28, -0.065],
@@ -409,7 +410,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'isquio_izq',
-    name: 'Isquiotibiales izq. (Pierna trasera)',
+    name: 'Left hamstrings (Back of leg)',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [0.115, -0.28, -0.065],
@@ -419,7 +420,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'gemelo_der',
-    name: 'Gemelo derecho (Pantorrilla)',
+    name: 'Right calf (Gastrocnemius)',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [-0.155, -0.63, -0.06],
@@ -429,7 +430,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'gemelo_izq',
-    name: 'Gemelo izquierdo (Pantorrilla)',
+    name: 'Left calf (Gastrocnemius)',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [0.155, -0.63, -0.06],
@@ -439,7 +440,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'espinilla_der',
-    name: 'Espinilla / Tibial derecho',
+    name: 'Right shin / Tibialis',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [-0.155, -0.62, 0.01],
@@ -449,7 +450,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'espinilla_izq',
-    name: 'Espinilla / Tibial izquierdo',
+    name: 'Left shin / Tibialis',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [0.155, -0.62, 0.01],
@@ -459,7 +460,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'pie_der',
-    name: 'Pie derecho',
+    name: 'Right foot',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [-0.175, -0.9, 0.025],
@@ -469,7 +470,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
   },
   {
     id: 'pie_izq',
-    name: 'Pie izquierdo',
+    name: 'Left foot',
     category: 'Extremidad inferior',
     status: 'normal',
     center: [0.175, -0.9, 0.025],
@@ -481,123 +482,123 @@ export const INITIAL_MUSCLES: MuscleData[] = [
 
 const REGION_KNOWLEDGE_TEMPLATE: Record<BodyRegionCategory, MuscleMedicalKnowledge> = {
   'Cabeza y cuello': {
-    anatomicalSummary: 'Musculatura cervical, base craneal y región facial.',
-    biomechanicalRole: 'Sostiene la cabeza y absorbe carga del casco EVA.',
-    spaceflightImpact: 'Fluido cefálico en 0g y tensión cervical por casco.',
-    keyStructures: ['Esternocleidomastoideo', 'Suboccipitales', 'C1–C7'],
-    preventiveCountermeasure: 'Isométricos cervicales suaves e hidratación constante.',
-    yellowProtocol: 'Movilidad cervical suave y vigilar presión arterial.',
-    redProtocol: 'Descartar trauma o SANS; limitar actividad EVA.',
+    anatomicalSummary: 'Cervical musculature, skull base and facial region.',
+    biomechanicalRole: 'Supports the head and absorbs EVA helmet load.',
+    spaceflightImpact: 'Cephalad fluid shift in 0g and neck strain from the helmet.',
+    keyStructures: ['Sternocleidomastoid', 'Suboccipitals', 'C1–C7'],
+    preventiveCountermeasure: 'Gentle cervical isometrics and constant hydration.',
+    yellowProtocol: 'Gentle neck mobility and monitor blood pressure.',
+    redProtocol: 'Rule out trauma or SANS; limit EVA activity.',
     ragReferences: [
       {
         title: 'SANS & Fluid Shifts',
         source: 'NASA HRP',
-        focus: 'Edema y presión cefálica 0g',
+        focus: 'Edema and cephalad pressure in 0g',
       },
       {
         title: 'Cervical Spine Adaptation',
         source: 'Aerospace Med',
-        focus: 'Sobrecarga cervical',
+        focus: 'Cervical overload',
       },
     ],
   },
   'Tronco anterior': {
-    anatomicalSummary: 'Pared torácica anterior y faja abdominal estabilizadora.',
-    biomechanicalRole: 'Estabiliza el tórax y coordina empuje/tracción 0g.',
-    spaceflightImpact: 'Pérdida de tono postural y sobrecarga en traslación.',
-    keyStructures: ['Pectoral mayor', 'Recto abdominal', 'Oblicuos'],
-    preventiveCountermeasure: 'Activación progresiva de core sin hiperpresión.',
-    yellowProtocol: 'Reducir carga de tren superior 24–48 h.',
-    redProtocol: 'Descartar origen cardiopulmonar con ECG y SpO2.',
+    anatomicalSummary: 'Anterior chest wall and stabilizing abdominal girdle.',
+    biomechanicalRole: 'Stabilizes the thorax and coordinates push/pull in 0g.',
+    spaceflightImpact: 'Loss of postural tone and overload during translation.',
+    keyStructures: ['Pectoralis major', 'Rectus abdominis', 'Obliques'],
+    preventiveCountermeasure: 'Progressive core activation without hyperpressure.',
+    yellowProtocol: 'Reduce upper-body load for 24–48 h.',
+    redProtocol: 'Rule out cardiopulmonary origin with ECG and SpO2.',
     ragReferences: [
       {
         title: 'Core Stabilization in 0g',
         source: 'J. Appl. Physiol.',
-        focus: 'Atrofia abdominal en órbita',
+        focus: 'Abdominal atrophy in orbit',
       },
       {
         title: 'Thoracic Triage Protocol',
         source: 'NASA Medical',
-        focus: 'Dolor pectoral vs cardíaco',
+        focus: 'Chest pain vs cardiac pain',
       },
     ],
   },
   'Tronco posterior': {
-    anatomicalSummary: 'Cadena dorsal profunda, erectores espinales y zona lumbar.',
-    biomechanicalRole: 'Estabiliza la columna toracolumbar y transfiere fuerza.',
-    spaceflightImpact: 'Expansión discal en 0g (+2–5 cm) y lumbalgia frecuente.',
-    keyStructures: ['Dorsal ancho', 'Multífidos', 'Discos L1–S1'],
-    preventiveCountermeasure: 'Flexión lumbar suave y control de carga axial ARED.',
-    yellowProtocol: 'Descarga lumbar, calor moderado y pausar ARED.',
-    redProtocol: 'Sospecha radicular: suspender ARED/EVA y monitorear.',
+    anatomicalSummary: 'Deep posterior chain, spinal erectors and lumbar area.',
+    biomechanicalRole: 'Stabilizes the thoracolumbar spine and transfers force.',
+    spaceflightImpact: 'Disc expansion in 0g (+2–5 cm) and frequent low back pain.',
+    keyStructures: ['Latissimus dorsi', 'Multifidus', 'L1–S1 discs'],
+    preventiveCountermeasure: 'Gentle lumbar flexion and ARED axial load control.',
+    yellowProtocol: 'Lumbar offloading, moderate heat and pause ARED.',
+    redProtocol: 'Suspected radicular pain: suspend ARED/EVA and monitor.',
     ragReferences: [
       {
         title: 'Spaceflight Disc Swelling',
         source: 'NASA HRP',
-        focus: 'Elongación espinal y lumbalgia',
+        focus: 'Spinal elongation and low back pain',
       },
       {
         title: 'Lumbar Multifidus Study',
         source: 'Eur Spine J',
-        focus: 'Protección lumbar post-vuelo',
+        focus: 'Post-flight lumbar protection',
       },
     ],
   },
   'Extremidad superior': {
-    anatomicalSummary: 'Hombro, brazo, antebrazo y musculatura de agarre.',
-    biomechanicalRole: 'Motor principal de traslación y sujeción en microgravedad.',
-    spaceflightImpact: 'Fatiga de manguito rotador y trauma por guante EVA.',
-    keyStructures: ['Deltoides', 'Bíceps / Tríceps', 'Tendones del carpo'],
-    preventiveCountermeasure: 'Alternar agarre en pasamanos y estirar antebrazos.',
-    yellowProtocol: 'Reposo relativo y foto diaria si hay lesión cutánea.',
-    redProtocol: 'Inmovilización parcial; suspender tareas EVA de agarre.',
+    anatomicalSummary: 'Shoulder, arm, forearm and grip musculature.',
+    biomechanicalRole: 'Main driver of translation and holding in microgravity.',
+    spaceflightImpact: 'Rotator cuff fatigue and EVA glove trauma.',
+    keyStructures: ['Deltoid', 'Biceps / Triceps', 'Carpal tendons'],
+    preventiveCountermeasure: 'Alternate handrail grip and stretch forearms.',
+    yellowProtocol: 'Relative rest and a daily photo if there is a skin injury.',
+    redProtocol: 'Partial immobilization; suspend EVA grip tasks.',
     ragReferences: [
       {
         title: 'EVA Glove Trauma Surveillance',
         source: 'NASA EVA Lab',
-        focus: 'Fatiga de agarre y lesiones EVA',
+        focus: 'Grip fatigue and EVA injuries',
       },
       {
         title: 'Rotator Cuff in Microgravity',
         source: 'Aerospace Med',
-        focus: 'Sobrecarga manual 0g',
+        focus: 'Manual overload in 0g',
       },
     ],
   },
   'Cadera y pelvis': {
-    anatomicalSummary: 'Glúteos estabilizadores, abductores y articulación coxofemoral.',
-    biomechanicalRole: 'Estabilidad lateral pélvica y extensión de cadera.',
-    spaceflightImpact: 'Pérdida ósea en cuello femoral y atrofia sin ARED.',
-    keyStructures: ['Glúteo mayor/medio', 'Banda iliotibial', 'Cuello femoral'],
-    preventiveCountermeasure: 'Sentadilla asistida ARED y estiramiento lateral.',
-    yellowProtocol: 'Bajar resistencia 40% y vigilar dolor irradiado.',
-    redProtocol: 'Suspender carga axial ARED/T2 y evaluar tendón/ciático.',
+    anatomicalSummary: 'Stabilizing glutes, abductors and the hip joint.',
+    biomechanicalRole: 'Lateral pelvic stability and hip extension.',
+    spaceflightImpact: 'Bone loss at the femoral neck and atrophy without ARED.',
+    keyStructures: ['Gluteus maximus/medius', 'Iliotibial band', 'Femoral neck'],
+    preventiveCountermeasure: 'ARED-assisted squat and lateral stretching.',
+    yellowProtocol: 'Lower resistance by 40% and watch for radiating pain.',
+    redProtocol: 'Suspend ARED/T2 axial load and evaluate tendon/sciatic nerve.',
     ragReferences: [
       {
         title: 'Femoral Neck & Gluteus Countermeasures',
         source: 'NASA Muscle Lab',
-        focus: 'Carga pélvica en órbita',
+        focus: 'Pelvic load in orbit',
       },
     ],
   },
   'Extremidad inferior': {
-    anatomicalSummary: 'Cuádriceps, isquiotibiales, gemelos, sóleo y pie.',
-    biomechanicalRole: 'Soporte antigravitatorio, carrera T2 y retorno venoso.',
-    spaceflightImpact: 'Atrofia acelerada (sóleo/gemelos) y estasis venoso 0g.',
-    keyStructures: ['Cuádriceps', 'Gemelos y sóleo', 'Tendón de Aquiles'],
-    preventiveCountermeasure: 'Caminadora T2 con arnés y revisión cutánea diaria.',
-    yellowProtocol: 'Bajar ritmo en caminadora T2 y vigilar edema.',
-    redProtocol: 'Suspender T2; si hay hinchazón unilateral, descartar TVP.',
+    anatomicalSummary: 'Quadriceps, hamstrings, calves, soleus and foot.',
+    biomechanicalRole: 'Anti-gravity support, T2 running and venous return.',
+    spaceflightImpact: 'Accelerated atrophy (soleus/calves) and venous stasis in 0g.',
+    keyStructures: ['Quadriceps', 'Calves and soleus', 'Achilles tendon'],
+    preventiveCountermeasure: 'T2 treadmill with harness and daily skin check.',
+    yellowProtocol: 'Slow the T2 treadmill pace and monitor edema.',
+    redProtocol: 'Suspend T2; if there is unilateral swelling, rule out DVT.',
     ragReferences: [
       {
         title: 'Calf Atrophy in Orbit',
         source: 'NASA HRP',
-        focus: 'Desacondicionamiento de pantorrilla',
+        focus: 'Calf deconditioning',
       },
       {
         title: 'Spaceflight Venous Thrombosis',
         source: 'NEJM / NASA',
-        focus: 'Vigilancia vascular miembro inferior',
+        focus: 'Lower-limb vascular surveillance',
       },
     ],
   },
@@ -605,40 +606,40 @@ const REGION_KNOWLEDGE_TEMPLATE: Record<BodyRegionCategory, MuscleMedicalKnowled
 
 const SPECIFIC_MUSCLE_OVERRIDES: Record<string, Partial<MuscleMedicalKnowledge>> = {
   cara: {
-    anatomicalSummary: 'Región facial, senos paranasales y musculatura mímica.',
-    spaceflightImpact: 'Congestión por fluidos en 0g y roce de mascarilla.',
+    anatomicalSummary: 'Facial region, paranasal sinuses and facial-expression muscles.',
+    spaceflightImpact: 'Fluid congestion in 0g and mask chafing.',
   },
   cabeza: {
-    anatomicalSummary: 'Cráneo, cuero cabelludo y región temporo-occipital.',
-    spaceflightImpact: 'Golpes contra mamparos y cefalea por CO2 / fluidos.',
+    anatomicalSummary: 'Skull, scalp and temporo-occipital region.',
+    spaceflightImpact: 'Bumps against bulkheads and headaches from CO2 / fluids.',
   },
   cuello: {
-    anatomicalSummary: 'Columna cervical anterior/lateral y esternocleidomastoideo.',
-    spaceflightImpact: 'Sobrecarga por anillo del casco EVA y giros en 0g.',
+    anatomicalSummary: 'Anterior/lateral cervical spine and sternocleidomastoid.',
+    spaceflightImpact: 'Strain from the EVA helmet ring and turning in 0g.',
   },
   trapecio: {
-    anatomicalSummary: 'Trapecio superior/medio y zona suboccipital de nuca.',
-    spaceflightImpact: 'Tensión postural frente a consolas sin apoyo.',
+    anatomicalSummary: 'Upper/middle trapezius and suboccipital nape area.',
+    spaceflightImpact: 'Postural strain at consoles without support.',
   },
   lumbar: {
-    anatomicalSummary: 'Paravertebrales lumbares, multífidos y segmentos L1–L5.',
-    spaceflightImpact: 'Zona #1 de dolor en órbita por expansión discal 0g.',
+    anatomicalSummary: 'Lumbar paravertebrals, multifidus and L1–L5 segments.',
+    spaceflightImpact: '#1 pain zone in orbit due to 0g disc expansion.',
   },
   gemelo_der: {
-    anatomicalSummary: 'Gastrocnemio derecho, sóleo y tendón de Aquiles.',
-    spaceflightImpact: 'Alta atrofia 0g; foco clave de vigilancia vascular.',
+    anatomicalSummary: 'Right gastrocnemius, soleus and Achilles tendon.',
+    spaceflightImpact: 'High atrophy in 0g; key focus of vascular surveillance.',
   },
   gemelo_izq: {
-    anatomicalSummary: 'Gastrocnemio izquierdo, sóleo y tendón de Aquiles.',
-    spaceflightImpact: 'Alta atrofia 0g; foco clave de vigilancia vascular.',
+    anatomicalSummary: 'Left gastrocnemius, soleus and Achilles tendon.',
+    spaceflightImpact: 'High atrophy in 0g; key focus of vascular surveillance.',
   },
   mano_der: {
-    anatomicalSummary: 'Musculatura palmar, tendones flexores y piel de mano derecha.',
-    spaceflightImpact: 'Fatiga de agarre y rozaduras por guante presurizado.',
+    anatomicalSummary: 'Palmar musculature, flexor tendons and skin of the right hand.',
+    spaceflightImpact: 'Grip fatigue and chafing from the pressurized glove.',
   },
   mano_izq: {
-    anatomicalSummary: 'Musculatura palmar, tendones flexores y piel de mano izquierda.',
-    spaceflightImpact: 'Fatiga de agarre y rozaduras por guante presurizado.',
+    anatomicalSummary: 'Palmar musculature, flexor tendons and skin of the left hand.',
+    spaceflightImpact: 'Grip fatigue and chafing from the pressurized glove.',
   },
 };
 
@@ -668,68 +669,68 @@ export function evaluateMuscleWithAiRag(
     recommendedActions.push(knowledge.preventiveCountermeasure);
   } else {
     if (riskTier === 'red') {
-      differentialWarnings.push(`Dolor grave (${intensity}/10): restringir carga.`);
+      differentialWarnings.push(`Severe pain (${intensity}/10): restrict load.`);
       recommendedActions.push(knowledge.redProtocol);
     } else if (riskTier === 'orange') {
-      differentialWarnings.push(`Dolor moderado (${intensity}/10): posible sobrecarga.`);
+      differentialWarnings.push(`Moderate pain (${intensity}/10): possible overload.`);
       recommendedActions.push(knowledge.yellowProtocol);
     } else {
-      differentialWarnings.push(`Molestia leve (${intensity}/10): fase temprana.`);
+      differentialWarnings.push(`Mild discomfort (${intensity}/10): early stage.`);
       recommendedActions.push(knowledge.yellowProtocol);
     }
 
     if (obs.swelling) {
-      differentialWarnings.push('Edema reportado: vigilar evolución.');
+      differentialWarnings.push('Edema reported: monitor progress.');
       if (muscle.id.startsWith('gemelo') || muscle.id.startsWith('muslo')) {
-        differentialWarnings.push('Alerta vascular: descartar estasis o TVP.');
+        differentialWarnings.push('Vascular alert: rule out stasis or DVT.');
       }
-      recommendedActions.push('Capturar foto diaria para medir evolución.');
+      recommendedActions.push('Capture a daily photo to measure progress.');
     }
 
     if (obs.functionalLimitation) {
-      differentialWarnings.push('Limitación funcional: pausar ARED / T2.');
+      differentialWarnings.push('Functional limitation: pause ARED / T2.');
     }
   }
 
   if (vitals.heartRate !== null) {
     if (vitals.heartRate >= 105) {
-      telemetryCorrelations.push(`Pulso elevado (${vitals.heartRate} Lpm).`);
+      telemetryCorrelations.push(`Elevated pulse (${vitals.heartRate} BPM).`);
     } else {
-      telemetryCorrelations.push(`Pulso basal (${vitals.heartRate} Lpm).`);
+      telemetryCorrelations.push(`Baseline pulse (${vitals.heartRate} BPM).`);
     }
   }
 
   if (vitals.stress !== null) {
     if (vitals.stress >= 70) {
-      telemetryCorrelations.push(`Estrés alto (${vitals.stress}/100).`);
-      recommendedActions.push('Aplicar respiración guiada 10 min.');
+      telemetryCorrelations.push(`High stress (${vitals.stress}/100).`);
+      recommendedActions.push('Apply guided breathing for 10 min.');
     } else {
-      telemetryCorrelations.push(`Estrés en ${vitals.stress}/100.`);
+      telemetryCorrelations.push(`Stress at ${vitals.stress}/100.`);
     }
   }
 
   if (vitals.spo2 !== null && vitals.spo2 < 94) {
-    telemetryCorrelations.push(`SpO2 límite (${vitals.spo2}%).`);
+    telemetryCorrelations.push(`Borderline SpO2 (${vitals.spo2}%).`);
   }
 
   if (vitals.sleepHours !== null && vitals.sleepHours < 6.5) {
-    telemetryCorrelations.push(`Sueño bajo (${vitals.sleepHours.toFixed(1)} h).`);
+    telemetryCorrelations.push(`Low sleep (${vitals.sleepHours.toFixed(1)} h).`);
   }
 
   if (latestCheck) {
     if (latestCheck.temperatureC !== null && latestCheck.temperatureC >= 37.5) {
-      telemetryCorrelations.push(`Temp. ${latestCheck.temperatureC}°C en check-in.`);
+      telemetryCorrelations.push(`Temp. ${latestCheck.temperatureC}°C at check-in.`);
     }
-    if (latestCheck.symptoms.length > 0 && !latestCheck.symptoms.includes('Ninguno')) {
-      telemetryCorrelations.push(`Síntomas: ${latestCheck.symptoms.join(', ')}.`);
+    if (latestCheck.symptoms.length > 0 && !latestCheck.symptoms.every(isNoSymptom)) {
+      telemetryCorrelations.push(`Symptoms: ${latestCheck.symptoms.map(displaySymptom).join(', ')}.`);
     }
   }
 
-  let clinicalSummary = `${muscle.name}: estado nominal sin alerta activa.`;
+  let clinicalSummary = `${muscle.name}: nominal status, no active alerts.`;
   if (obs && intensity > 0) {
-    clinicalSummary = `${muscle.name} · Riesgo ${getPainSeverityLabel(intensity)} (${intensity}/10)${
-      obs.swelling ? ' · Con hinchazón' : ''
-    }${obs.functionalLimitation ? ' · Limitación' : ''}.`;
+    clinicalSummary = `${muscle.name} · Risk: ${getPainSeverityLabel(intensity)} (${intensity}/10)${
+      obs.swelling ? ' · With swelling' : ''
+    }${obs.functionalLimitation ? ' · Limitation' : ''}.`;
   }
 
   return {
@@ -760,9 +761,9 @@ export function generateGlobalAiRagInsights(
         id: 'hr-tachy',
         severity: 'critical',
         category: 'Cardiovascular',
-        title: `Taquicardia (${vitals.heartRate} Lpm)`,
-        reasoning: 'Frecuencia >120 Lpm en reposo.',
-        suggestedAction: 'Hidratación y nueva toma en 10 min.',
+        title: `Tachycardia (${vitals.heartRate} BPM)`,
+        reasoning: 'Rate >120 BPM at rest.',
+        suggestedAction: 'Hydrate and re-measure in 10 min.',
         evidenceSources: ['NASA HRP Cardiovascular'],
       });
     } else if (vitals.heartRate > 0 && vitals.heartRate <= 45) {
@@ -770,9 +771,9 @@ export function generateGlobalAiRagInsights(
         id: 'hr-brady',
         severity: 'critical',
         category: 'Cardiovascular',
-        title: `Bradicardia (${vitals.heartRate} Lpm)`,
-        reasoning: 'Lectura <45 Lpm; verificar sensor.',
-        suggestedAction: 'Confirmar ajuste y descartar mareo.',
+        title: `Bradycardia (${vitals.heartRate} BPM)`,
+        reasoning: 'Reading <45 BPM; check the sensor.',
+        suggestedAction: 'Confirm fit and rule out dizziness.',
         evidenceSources: ['NASA Autonomic Guidelines'],
       });
     }
@@ -782,10 +783,10 @@ export function generateGlobalAiRagInsights(
     insights.push({
       id: 'spo2-low',
       severity: vitals.spo2 < 90 ? 'critical' : 'warning',
-      category: 'Oxigenación',
-      title: `SpO2 baja (${vitals.spo2}%)`,
-      reasoning: 'Debajo de banda nominal 95–100%.',
-      suggestedAction: 'Revisar cabina O2/CO2 y reposo.',
+      category: 'Oxygenation',
+      title: `Low SpO2 (${vitals.spo2}%)`,
+      reasoning: 'Below the nominal 95–100% band.',
+      suggestedAction: 'Check cabin O2/CO2 and rest.',
       evidenceSources: ['ISS Respiratory Standard'],
     });
   }
@@ -794,10 +795,10 @@ export function generateGlobalAiRagInsights(
     insights.push({
       id: 'stress-high',
       severity: vitals.stress >= 85 ? 'critical' : 'warning',
-      category: 'Conductual',
-      title: `Estrés elevado (${vitals.stress}/100)`,
-      reasoning: 'Tensión simpática elevada sostenida.',
-      suggestedAction: 'Respiración guiada 10 min.',
+      category: 'Behavioral',
+      title: `Elevated stress (${vitals.stress}/100)`,
+      reasoning: 'Sustained elevated sympathetic tension.',
+      suggestedAction: 'Guided breathing for 10 min.',
       evidenceSources: ['NASA BHP Evidence'],
     });
   }
@@ -806,10 +807,10 @@ export function generateGlobalAiRagInsights(
     insights.push({
       id: 'sleep-deficit',
       severity: vitals.sleepHours < 5.5 ? 'critical' : 'warning',
-      category: 'Sueño',
-      title: `Déficit de sueño (${vitals.sleepHours.toFixed(1)} h)`,
-      reasoning: 'Menor a 7 h recomendadas en 0g.',
-      suggestedAction: 'Bloque de descanso antes de ARED.',
+      category: 'Sleep',
+      title: `Sleep deficit (${vitals.sleepHours.toFixed(1)} h)`,
+      reasoning: 'Below the 7 h recommended in 0g.',
+      suggestedAction: 'Rest block before ARED.',
       evidenceSources: ['NASA Circadian Guidelines'],
     });
   }
@@ -823,15 +824,15 @@ export function generateGlobalAiRagInsights(
     insights.push({
       id: `cond-${cond.muscleId}`,
       severity,
-      category: cond.bodyRegion,
+      category: getRegionCategoryLabel(cond.bodyRegion),
       title: `${cond.muscleName} (${cond.painIntensity}/10)`,
       reasoning: isLowerLimbSwelling
-        ? 'Dolor e inflamación distal: vigilar estasis venoso.'
+        ? 'Distal pain and inflammation: monitor venous stasis.'
         : cond.description || cond.conditionName,
       suggestedAction:
         tier === 'red'
-          ? 'Rojo: suspender carga y foto clínica.'
-          : 'Amarillo/Naranja: reducir carga y vigilar.',
+          ? 'Red: suspend load and take a clinical photo.'
+          : 'Yellow/Orange: reduce load and monitor.',
       evidenceSources: ['NASA Musculoskeletal Protocol'],
       relatedMuscleId: cond.muscleId,
     });
@@ -842,8 +843,8 @@ export function generateGlobalAiRagInsights(
       id: `hc-${latestCheck.dateIso}`,
       severity: latestCheck.overallStatus === 'critical' ? 'critical' : 'warning',
       category: `Check-in ${latestCheck.dateIso}`,
-      title: `Check-in diario en ${latestCheck.overallStatus.toUpperCase()}`,
-      reasoning: `Síntomas: ${latestCheck.symptoms.join(', ') || 'ninguno'}.`,
+      title: `Daily check-in ${latestCheck.overallStatus.toUpperCase()}`,
+      reasoning: `Symptoms: ${latestCheck.symptoms.map(displaySymptom).join(', ') || 'none'}.`,
       suggestedAction: latestCheck.recommendation,
       evidenceSources: ['Flight Surgeon Check-In'],
     });
@@ -853,10 +854,10 @@ export function generateGlobalAiRagInsights(
     insights.push({
       id: 'rag-baseline',
       severity: 'info',
-      category: 'Estado Basal',
-      title: 'Sin anomalías activas',
-      reasoning: 'Indicadores dentro de rango nominal.',
-      suggestedAction: 'Toca cualquier músculo 3D para inspeccionar.',
+      category: 'Baseline',
+      title: 'No active anomalies',
+      reasoning: 'Indicators within nominal range.',
+      suggestedAction: 'Tap any 3D muscle to inspect it.',
       evidenceSources: ['NASA HRP Baseline'],
     });
   }

@@ -1,5 +1,5 @@
 import { allCatalogActions, buildSystemPrompt, SCREENS } from "./voice-catalog";
-import { INTENT_TYPES, sanitizeIntent } from "./voice-intent";
+import { INTENT_TYPES, sanitizeIntent, TABS } from "./voice-intent";
 
 describe("voice catalog", () => {
   it("every example intent passes sanitizeIntent with the same type", () => {
@@ -25,18 +25,28 @@ describe("voice catalog", () => {
 });
 
 describe("buildSystemPrompt", () => {
-  it("lists every intent type and the language line", () => {
-    const p = buildSystemPrompt("en");
+  it("lists every intent type and requires English messages", () => {
+    const p = buildSystemPrompt();
     for (const t of INTENT_TYPES) expect(p).toContain(t);
-    expect(p).toContain("siempre en inglés");
-    expect(buildSystemPrompt()).toContain("siempre en español");
+    expect(p).toContain("The user may speak Spanish or English; understand both");
+    expect(p).toContain('the `message` field must ALWAYS be in English');
+    expect(p).not.toContain("siempre en español");
     expect(p).not.toContain("El usuario está en");
   });
 
-  it("includes the context screen title and tab", () => {
-    const p = buildSystemPrompt("es", { screen: "/explore", tab: "records" });
-    expect(p).toContain("El usuario está en Vista Corporal (Registros)");
-    expect(p).toContain("prefiere acciones de esta pantalla");
-    expect(buildSystemPrompt("es", { screen: "/missions" })).toContain("El usuario está en Misiones y Viaje.");
+  it("includes the context screen title and tab in English", () => {
+    const p = buildSystemPrompt({ screen: "/explore", tab: "records" });
+    expect(p).toContain("The user is on Body View (Records)");
+    expect(p).toContain("prefer actions from this screen");
+    expect(buildSystemPrompt({ screen: "/missions" })).toContain("The user is on Missions & Journey.");
+  });
+
+  it("uses English screen titles and tabs", () => {
+    expect(SCREENS.map((s) => s.title)).toEqual(["Vital Monitoring", "Body View", "Missions & Journey"]);
+    expect(Object.values(TABS)).toEqual(["3D View", "Questionnaire", "Records"]);
+  });
+
+  it("has no Spanish instructions in the prompt", () => {
+    expect(buildSystemPrompt()).not.toMatch(/Eres el|Responde SOLO|Nunca inventes/);
   });
 });

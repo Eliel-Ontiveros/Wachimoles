@@ -33,9 +33,9 @@ interface MetricDescriptor {
 const METRICS: MetricDescriptor[] = [
   {
     key: 'heart_rate',
-    label: 'Frecuencia Cardíaca',
-    shortLabel: 'Pulso',
-    unit: 'Lpm',
+    label: 'Heart Rate',
+    shortLabel: 'Pulse',
+    unit: 'BPM',
     color: '#ef4444',
     nominalMin: 60,
     nominalMax: 100,
@@ -43,8 +43,8 @@ const METRICS: MetricDescriptor[] = [
   },
   {
     key: 'spo2',
-    label: 'Oxígeno SpO2',
-    shortLabel: 'Oxígeno',
+    label: 'Oxygen SpO2',
+    shortLabel: 'Oxygen',
     unit: '%',
     color: '#0284c7',
     nominalMin: 95,
@@ -53,8 +53,8 @@ const METRICS: MetricDescriptor[] = [
   },
   {
     key: 'stress',
-    label: 'Nivel de Estrés',
-    shortLabel: 'Estrés',
+    label: 'Stress Level',
+    shortLabel: 'Stress',
     unit: '/100',
     color: '#f59e0b',
     nominalMin: 0,
@@ -63,8 +63,8 @@ const METRICS: MetricDescriptor[] = [
   },
   {
     key: 'sleep',
-    label: 'Sueño',
-    shortLabel: 'Sueño',
+    label: 'Sleep',
+    shortLabel: 'Sleep',
     unit: 'h',
     color: '#7c3aed',
     nominalMin: 7,
@@ -73,9 +73,9 @@ const METRICS: MetricDescriptor[] = [
   },
   {
     key: 'steps',
-    label: 'Actividad Física',
-    shortLabel: 'Pasos',
-    unit: 'pasos',
+    label: 'Physical Activity',
+    shortLabel: 'Steps',
+    unit: 'steps',
     color: '#06b6d4',
     decimals: 0,
   },
@@ -112,7 +112,7 @@ function renderMetricIcon(metric: SampleMetric, size = 14) {
 
 function formatMetricNumber(value: number, decimals: number): string {
   if (decimals > 0) return value.toFixed(decimals);
-  return Math.round(value).toLocaleString('es-MX');
+  return Math.round(value).toLocaleString('en-US');
 }
 
 function formatDateTimeShort(iso: string): string {
@@ -383,38 +383,38 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
   }[] = [
     {
       key: 'heart_rate',
-      label: 'Pulso',
+      label: 'Pulse',
       tone: 'tone-rose',
       valueText: vitals.heartRate !== null ? `${vitals.heartRate}` : '--',
-      unit: 'Lpm',
+      unit: 'BPM',
     },
     {
       key: 'spo2',
-      label: 'Oxígeno',
+      label: 'Oxygen',
       tone: 'tone-sky',
       valueText: vitals.spo2 !== null ? `${vitals.spo2}` : '--',
       unit: '%',
     },
     {
       key: 'stress',
-      label: 'Estrés',
+      label: 'Stress',
       tone: 'tone-amber',
       valueText: vitals.stress !== null ? `${vitals.stress}` : '--',
       unit: '/100',
     },
     {
       key: 'sleep',
-      label: 'Sueño',
+      label: 'Sleep',
       tone: 'tone-sky',
       valueText: vitals.sleepHours !== null ? vitals.sleepHours.toFixed(1) : '--',
       unit: 'h',
     },
     {
       key: 'steps',
-      label: 'Pasos',
+      label: 'Steps',
       tone: 'tone-sky',
-      valueText: vitals.steps !== null ? vitals.steps.toLocaleString('es-MX') : '--',
-      unit: 'pasos',
+      valueText: vitals.steps !== null ? vitals.steps.toLocaleString('en-US') : '--',
+      unit: 'steps',
     },
   ];
 
@@ -438,16 +438,16 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
 
   return (
     <>
-      {/* Accesos al historial con el lenguaje visual de las tarjetas de signos */}
-      <section className="history-summary-card" aria-label="Bitácora de vuelo biométrica">
+      {/* History shortcuts using the visual language of the vitals cards */}
+      <section className="history-summary-card" aria-label="Biometric flight log">
         <div className="history-card-head">
           <div className="history-head-title">
             <span className="sym-icon-box tone-sky" aria-hidden="true">
               <OrbitIcon size={14} />
             </span>
             <div className="history-head-copy">
-              <h2>Bitácora de Vuelo</h2>
-              <span>{allSamples.length} lecturas en órbita</span>
+              <h2>Flight Log</h2>
+              <span>{allSamples.length} readings in orbit</span>
             </div>
           </div>
 
@@ -456,7 +456,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
             className="history-open-btn"
             onClick={() => openHistoryModal(selectedMetric)}
           >
-            <span>Explorar</span>
+            <span>Explore</span>
             <ChevronRightIcon size={14} />
           </button>
         </div>
@@ -468,7 +468,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
               type="button"
               className="history-metric-row"
               onClick={() => openHistoryModal(qm.key)}
-              aria-label={`Ver historial de ${qm.label}: ${qm.valueText} ${qm.unit}`}
+              aria-label={`View ${qm.label} history: ${qm.valueText} ${qm.unit}`}
             >
               <span className={`sym-icon-box ${qm.tone}`} aria-hidden="true">
                 {renderMetricIcon(qm.key, 14)}
@@ -484,7 +484,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
         </div>
       </section>
 
-      {/* Dialog modal nativo con closedby="any" + contención de scroll */}
+      {/* Native modal dialog with closedby="any" + scroll containment */}
       <dialog
         ref={dialogRef}
         className="history-native-dialog"
@@ -543,12 +543,12 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
 
             <div className="history-banner-overlay">
               <div className="history-banner-title">
-                <span className="history-banner-kicker">BITÁCORA DE VUELO</span>
+                <span className="history-banner-kicker">FLIGHT LOG</span>
                 <h3 id="history-dialog-title">{activeMeta.label}</h3>
                 <span>
                   {stats
-                    ? `${stats.count} registros recientes · última muestra ${formatDateTimeShort(stats.latestTime)}`
-                    : 'Sin lecturas sincronizadas para esta señal'}
+                    ? `${stats.count} recent records · latest sample ${formatDateTimeShort(stats.latestTime)}`
+                    : 'No synced readings for this signal'}
                 </span>
               </div>
 
@@ -556,7 +556,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                 type="button"
                 className="modal-close-cosmic"
                 onClick={closeHistoryModal}
-                aria-label="Cerrar bitácora"
+                aria-label="Close flight log"
               >
                 <XIcon size={17} />
               </button>
@@ -565,7 +565,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
 
           <div className="history-modal-body">
             {/* Selector limpio de métrica */}
-            <div className="metric-tabs-strip" role="tablist" aria-label="Seleccionar señal vital">
+            <div className="metric-tabs-strip" role="tablist" aria-label="Select vital signal">
               {METRICS.map((m) => (
                 <button
                   key={m.key}
@@ -598,19 +598,19 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                 {/* 3 métricas clave simples */}
                 <div className="stats-trio-grid">
               <div className="stat-trio-box">
-                <span>Última lectura</span>
+                <span>Latest reading</span>
                 <strong style={{ color: activeMeta.color }}>
                   {stats ? `${formatMetricNumber(stats.latest, activeMeta.decimals)} ${activeMeta.unit}` : '--'}
                 </strong>
               </div>
               <div className="stat-trio-box">
-                <span>Promedio</span>
+                <span>Average</span>
                 <strong className="accent">
                   {stats ? `${formatMetricNumber(stats.avg, activeMeta.decimals)} ${activeMeta.unit}` : '--'}
                 </strong>
               </div>
               <div className="stat-trio-box">
-                <span>Mín – Máx</span>
+                <span>Min – Max</span>
                 <strong className="range">
                   {stats
                     ? `${formatMetricNumber(stats.min, activeMeta.decimals)} – ${formatMetricNumber(
@@ -625,7 +625,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
             {/* Curva suave simplificada */}
             <div className="linechart-panel">
               <div className="linechart-header">
-                <strong>Evolución reciente</strong>
+                <strong>Recent trend</strong>
                 {activeHoverPoint && (
                   <span className="linechart-point-pill" style={{ borderColor: activeMeta.color }}>
                     <strong>
@@ -642,7 +642,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                     viewBox={`0 0 ${chartGeometry.width} ${chartGeometry.height}`}
                     className="linechart-svg"
                     role="img"
-                    aria-label={`Gráfica de ${activeMeta.label}`}
+                    aria-label={`${activeMeta.label} chart`}
                   >
                     <defs>
                       <linearGradient id="history-area-fill" x1="0" y1="0" x2="0" y2="1">
@@ -750,7 +750,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
               ) : (
                 <div className="linechart-empty-compact">
                   <ActivityIcon size={16} />
-                  <span>Sin lecturas de {activeMeta.shortLabel.toLowerCase()} registradas en servidor</span>
+                  <span>No {activeMeta.shortLabel.toLowerCase()} readings recorded on the server</span>
                 </div>
               )}
             </div>
@@ -760,7 +760,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
               <div className="daily-summary-stack">
                 <div className="daily-stack-heading">
                   <span>Resumen por jornada</span>
-                  <small>Últimos {Math.min(5, dailySummaries.length)} días</small>
+                  <small>Last {Math.min(5, dailySummaries.length)} days</small>
                 </div>
 
                 {dailySummaries.slice(0, 5).map((day) => {
@@ -775,7 +775,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                           <span>{day.count} lecturas</span>
                         </div>
                         <span className="dcs-avg-pill" style={{ color: activeMeta.color }}>
-                          Prom {formatMetricNumber(day.avg, activeMeta.decimals)} {activeMeta.unit}
+                          Avg {formatMetricNumber(day.avg, activeMeta.decimals)} {activeMeta.unit}
                         </span>
                       </div>
 
@@ -788,11 +788,11 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                         <div className="dcs-range-wrap">
                           <div className="dcs-range-labels">
                             <span>
-                              Mín <strong>{formatMetricNumber(day.min, activeMeta.decimals)}</strong>{' '}
+                              Min <strong>{formatMetricNumber(day.min, activeMeta.decimals)}</strong>{' '}
                               <small>({day.minTime})</small>
                             </span>
                             <span>
-                              Máx <strong>{formatMetricNumber(day.max, activeMeta.decimals)}</strong>{' '}
+                              Max <strong>{formatMetricNumber(day.max, activeMeta.decimals)}</strong>{' '}
                               <small>({day.maxTime})</small>
                             </span>
                           </div>
@@ -804,7 +804,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                             <span
                               className="dcs-range-marker"
                               style={{ left: `${avgPct}%`, borderColor: activeMeta.color }}
-                              title={`Promedio ${formatMetricNumber(day.avg, activeMeta.decimals)} ${activeMeta.unit}`}
+                              title={`Average ${formatMetricNumber(day.avg, activeMeta.decimals)} ${activeMeta.unit}`}
                             />
                           </div>
                         </div>
