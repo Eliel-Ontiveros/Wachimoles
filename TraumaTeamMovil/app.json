@@ -26,6 +26,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Wachimoles necesita acceso a tus fotos para adjuntarlas a un padecimiento.",
+          "cameraPermission": "Wachimoles necesita acceso a la cámara para tomar fotos del padecimiento.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",

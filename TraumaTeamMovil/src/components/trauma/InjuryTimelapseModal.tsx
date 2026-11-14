@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -29,9 +30,12 @@ export function InjuryTimelapseModal({
   muscle: MuscleData | null;
   onClose: () => void;
 }) {
-  const { injuryPhotos, addInjuryPhoto } = useMission();
+  const { injuryPhotos, addInjuryPhoto, refreshInjuryPhotos } = useMission();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [photoLoadError, setPhotoLoadError] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
   const photos = muscle ? injuryPhotos[muscle.id] ?? [] : [];
@@ -39,6 +43,31 @@ export function InjuryTimelapseModal({
     selectedIndex !== null && selectedIndex < photos.length
       ? selectedIndex
       : Math.max(0, photos.length - 1);
+
+  useEffect(() => {
+    if (!visible || !muscle) return;
+    let isMounted = true;
+    void Promise.resolve().then(async () => {
+      if (!isMounted) return;
+      setIsLoadingPhotos(true);
+      setPhotoLoadError(null);
+      try {
+        await refreshInjuryPhotos(muscle.id, muscle.name);
+      } catch (error: unknown) {
+        console.error('[InjuryTimelapseModal] Error al cargar fotos de lesión:', error);
+        if (isMounted) {
+          setPhotoLoadError(
+            error instanceof Error ? error.message : 'No se pudieron cargar las imágenes.'
+          );
+        }
+      } finally {
+        if (isMounted) setIsLoadingPhotos(false);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [visible, muscle, refreshInjuryPhotos]);
 
   useEffect(() => {
     if (!isPlaying || photos.length < 2) return;
@@ -58,15 +87,29 @@ export function InjuryTimelapseModal({
 
   const currentPhoto = photos[activeIndex] ?? photos[photos.length - 1];
 
-  const handleSaveUri = async (uri: string) => {
-    await addInjuryPhoto(muscle.id, muscle.name, {
-      uri,
-      painIntensity: muscle.observation?.painIntensity,
-      note: note.trim() || 'Registro fotográfico diario',
-    });
-    setNote('');
-    setIsPlaying(false);
-    setSelectedIndex(photos.length);
+  const handleSaveImage = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (isUploading) return;
+    setIsUploading(true);
+    try {
+      await addInjuryPhoto(muscle.id, muscle.name, {
+        uri: asset.uri,
+        fileName: asset.fileName ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+        painIntensity: muscle.observation?.painIntensity,
+        note: note.trim() || 'Registro fotográfico diario',
+      });
+      setNote('');
+      setIsPlaying(false);
+      setSelectedIndex(photos.length);
+    } catch (error: unknown) {
+      console.error('[InjuryTimelapseModal] Error al subir la imagen:', error);
+      Alert.alert(
+        'No se pudo subir la imagen',
+        error instanceof Error ? error.message : 'Ocurrió un error al subir la imagen.'
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleTakePhoto = async () => {
@@ -84,7 +127,7 @@ export function InjuryTimelapseModal({
         allowsEditing: true,
       });
       if (!res.canceled && res.assets[0]?.uri) {
-        await handleSaveUri(res.assets[0].uri);
+        await handleSaveImage(res.assets[0]);
       }
     } catch {
       // Fallback en navegadores/simuladores sin cámara disponible
@@ -100,7 +143,7 @@ export function InjuryTimelapseModal({
         allowsEditing: true,
       });
       if (!res.canceled && res.assets[0]?.uri) {
-        await handleSaveUri(res.assets[0].uri);
+        await handleSaveImage(res.assets[0]);
       }
     } catch {
       Alert.alert('Error', 'No se pudo abrir la galería de imágenes.');
@@ -205,12 +248,21 @@ export function InjuryTimelapseModal({
                 </View>
               ) : (
                 <View className="items-center rounded-2xl border border-dashed border-slate-300 bg-[#f8fafc] p-6">
-                  <Camera size={26} color="#94a3b8" />
+                  {isLoadingPhotos ? (
+                    <ActivityIndicator color="#0284c7" />
+                  ) : (
+                    <Camera size={26} color="#94a3b8" />
+                  )}
                   <Text className="mt-2 font-mono text-xs font-bold text-slate-600">
-                    Sin fotos registradas aún
+                    {isLoadingPhotos
+                      ? 'Cargando imágenes...'
+                      : photoLoadError
+                        ? 'No se pudieron cargar las imágenes'
+                        : 'Sin fotos registradas aún'}
                   </Text>
                   <Text className="mt-0.5 text-center font-mono text-[10px] text-slate-400">
-                    Toma una foto diaria de esta zona para armar tu timelapse de recuperación.
+                    {photoLoadError ??
+                      'Toma una foto diaria de esta zona para armar tu timelapse de recuperación.'}
                   </Text>
                 </View>
               )}
@@ -266,15 +318,21 @@ export function InjuryTimelapseModal({
                 <View className="flex-row gap-2.5">
                   <Pressable
                     onPress={handleTakePhoto}
+                    disabled={isLoadingPhotos || isUploading}
                     className="flex-1 flex-row items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-3 active:opacity-75">
-                    <Camera size={16} color="#0f172a" />
+                    {isUploading ? (
+                      <ActivityIndicator size="small" color="#0f172a" />
+                    ) : (
+                      <Camera size={16} color="#0f172a" />
+                    )}
                     <Text className="ml-2 font-mono text-xs font-bold text-trauma-ink">
-                      Tomar foto
+                      {isUploading ? 'Subiendo...' : 'Tomar foto'}
                     </Text>
                   </Pressable>
 
                   <Pressable
                     onPress={handlePickFromGallery}
+                    disabled={isLoadingPhotos || isUploading}
                     className="flex-1 flex-row items-center justify-center rounded-xl border border-trauma-line bg-white py-3 active:opacity-75">
                     <Images size={16} color="#334155" />
                     <Text className="ml-2 font-mono text-xs font-bold text-slate-700">

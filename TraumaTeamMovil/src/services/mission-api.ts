@@ -8,9 +8,9 @@ import {
   DailyMission,
   EnvironmentConfig,
   EnvironmentType,
-  InjuryPhoto,
   SpaceLocation,
 } from '../types/mission';
+import { Platform } from 'react-native';
 
 // Servicio preparado para conectar misiones, entorno y fotos de lesiones con el backend
 
@@ -41,6 +41,18 @@ export interface BodyConditionRecord {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+}
+
+export interface BodyConditionImageRecord {
+  path: string;
+  signedUrl: string;
+  expiresAt: string;
+}
+
+export interface BodyConditionImageUpload {
+  uri: string;
+  fileName?: string;
+  mimeType?: string;
 }
 
 type DailyHealthCheckRecord = Omit<DailyHealthCheck, 'notes'> & {
@@ -656,23 +668,161 @@ export async function syncEnvironmentToBackend(environment: EnvironmentType): Pr
 }
 
 // Endpoint listo para subir foto diaria de lesión/corte al backend
-export async function uploadInjuryPhotoToBackend(
-  photo: Omit<InjuryPhoto, 'id'>
-): Promise<{ synced: boolean }> {
-  const baseUrl = API_CONFIG.localUrls[0];
-  try {
-    const res = await fetch(`${baseUrl}/observations/photos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: API_CONFIG.userId,
-        ...photo,
-      }),
-    });
-    return { synced: res.ok };
-  } catch {
-    return { synced: false };
+function isBodyConditionImageRecord(value: unknown): value is BodyConditionImageRecord {
+  return (
+    isRecord(value) &&
+    typeof value.path === 'string' &&
+    typeof value.signedUrl === 'string' &&
+    typeof value.expiresAt === 'string'
+  );
+}
+
+function getImageFileName(fileName: string | undefined, mimeType: string): string {
+  if (fileName) return fileName;
+  if (mimeType === 'image/png') return 'body-condition.png';
+  if (mimeType === 'image/webp') return 'body-condition.webp';
+  return 'body-condition.jpg';
+}
+
+export async function uploadBodyConditionImageToBackend(
+  muscleId: string,
+  image: BodyConditionImageUpload
+): Promise<BodyConditionImageRecord> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (
+    authHeadersList.length === 0 ||
+    (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
+  ) {
+    throw new Error(
+      'Configura EXPO_PUBLIC_API_BASE_URL y la autorización existente para conectar con el backend.'
+    );
   }
+
+  const mimeType = image.mimeType || 'image/jpeg';
+  const fileName = getImageFileName(image.fileName, mimeType);
+  const formData = new FormData();
+
+  if (Platform.OS === 'web') {
+    const imageResponse = await fetch(image.uri);
+    if (!imageResponse.ok) {
+      throw new Error('No se pudo leer la imagen seleccionada.');
+    }
+    formData.append('image', await imageResponse.blob(), fileName);
+  } else {
+    let attached = false;
+
+    // 1. Intentar convertir la URI local a Blob (funciona en Expo SDK 58 con su interceptor de file://)
+    try {
+      const imageResponse = await fetch(image.uri);
+      if (imageResponse.ok) {
+        const rawBlob = await imageResponse.blob();
+        const typedBlob =
+          rawBlob.type === mimeType ? rawBlob : rawBlob.slice(0, rawBlob.size, mimeType);
+        formData.append('image', typedBlob, fileName);
+        attached = true;
+      }
+    } catch {
+      // Continuar con los siguientes métodos si fetch falla
+    }
+
+    // 2. Intentar con File de expo-file-system (soporta .bytes() requerido por Expo Winter fetch)
+    if (!attached) {
+      try {
+        const { File: ExpoFile } = await import('expo-file-system');
+        if (ExpoFile) {
+          const filePart = new ExpoFile(image.uri);
+          formData.append('image', filePart as unknown as Blob, fileName);
+          attached = true;
+        }
+      } catch {
+        // Ignorar si expo-file-system no está cargado
+      }
+    }
+
+    // 3. Fallback para React Native legacy fetch (ej. EXPO_PUBLIC_USE_RN_FETCH=true)
+    if (!attached) {
+      const nativeFormData = formData as FormData & {
+        append(
+          name: string,
+          value: { uri: string; name: string; type: string }
+        ): void;
+      };
+      nativeFormData.append('image', { uri: image.uri, name: fileName, type: mimeType });
+    }
+  }
+
+  const path = `/dashboard/body-conditions/${encodeURIComponent(muscleId)}/images`;
+  let response: Response | null = null;
+  for (const headers of authHeadersList) {
+    response = await fetchBackendWithFallback(
+      path,
+      {
+        method: 'POST',
+        headers: { ...headers, Accept: 'application/json' },
+        body: formData,
+      },
+      30_000
+    );
+    if (response.status !== 401) break;
+  }
+
+  if (!response || !response.ok) {
+    const status = response?.status ?? 0;
+    if (status === 413) {
+      throw new Error('La imagen supera el límite de 10 MB.');
+    }
+    if (status === 415) {
+      throw new Error('Formato no compatible. Usa una imagen JPEG, PNG o WebP.');
+    }
+    if (status === 401) {
+      throw new Error('El backend rechazó la autorización al subir la imagen (401).');
+    }
+    throw new Error(`No se pudo subir la imagen (${status}).`);
+  }
+
+  const result: unknown = await response.json();
+  if (!isBodyConditionImageRecord(result)) {
+    throw new Error('El backend devolvió una respuesta de imagen inválida.');
+  }
+  return result;
+}
+
+export async function getBodyConditionImagesFromBackend(
+  muscleId: string
+): Promise<BodyConditionImageRecord[]> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (
+    authHeadersList.length === 0 ||
+    (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')
+  ) {
+    throw new Error(
+      'Configura EXPO_PUBLIC_API_BASE_URL y la autorización existente para conectar con el backend.'
+    );
+  }
+
+  const path = `/dashboard/body-conditions/${encodeURIComponent(muscleId)}/images`;
+  let response: Response | null = null;
+  for (const headers of authHeadersList) {
+    response = await fetchBackendWithFallback(path, {
+      method: 'GET',
+      headers: { ...headers, Accept: 'application/json' },
+    });
+    if (response.status !== 401) break;
+  }
+
+  if (!response || !response.ok) {
+    const status = response?.status ?? 0;
+    if (status === 401) {
+      throw new Error('El backend rechazó la autorización al cargar las imágenes (401).');
+    }
+    throw new Error(`No se pudieron cargar las imágenes (${status}).`);
+  }
+
+  const result: unknown = await response.json();
+  if (!Array.isArray(result) || !result.every(isBodyConditionImageRecord)) {
+    throw new Error('El backend devolvió una lista de imágenes inválida.');
+  }
+  return result;
 }
 
 // Endpoint listo para guardar observación anatómica en el backend

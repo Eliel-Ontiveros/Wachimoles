@@ -8,10 +8,11 @@ import {
   getMissionsForEnvironment,
   getRouteTotalDays,
   getTodayIsoDate,
+  getBodyConditionImagesFromBackend,
   getDailyHealthChecksFromBackend,
   syncEnvironmentToBackend,
   syncHealthCheckToBackend,
-  uploadInjuryPhotoToBackend,
+  uploadBodyConditionImageToBackend,
 } from '../../services/mission-api';
 import {
   CriticalAlert,
@@ -368,15 +369,22 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     async (
       muscleId: string,
       muscleName: string,
-      photo: { uri: string; painIntensity?: number; note?: string }
+      photo: {
+        uri: string;
+        fileName?: string;
+        mimeType?: string;
+        painIntensity?: number;
+        note?: string;
+      }
     ): Promise<InjuryPhoto> => {
       const existing = injuryPhotos[muscleId] ?? [];
       const nextDay = existing.length + 1;
+      const uploadedImage = await uploadBodyConditionImageToBackend(muscleId, photo);
       const entry: InjuryPhoto = {
-        id: `photo-${muscleId}-${Date.now()}`,
+        id: uploadedImage.path,
         muscleId,
         muscleName,
-        uri: photo.uri,
+        uri: uploadedImage.signedUrl,
         dayNumber: nextDay,
         capturedAt: formatNowLabel(),
         painIntensity: photo.painIntensity,
@@ -386,18 +394,29 @@ export function MissionProvider({ children }: { children: ReactNode }) {
         ...prev,
         [muscleId]: [...(prev[muscleId] ?? []), entry],
       }));
-      void uploadInjuryPhotoToBackend({
-        muscleId,
-        muscleName,
-        uri: photo.uri,
-        dayNumber: nextDay,
-        capturedAt: entry.capturedAt,
-        painIntensity: photo.painIntensity,
-        note: photo.note,
-      });
       return entry;
     },
     [injuryPhotos]
+  );
+
+  const refreshInjuryPhotos = useCallback(
+    async (muscleId: string, muscleName: string): Promise<InjuryPhoto[]> => {
+      const images = await getBodyConditionImagesFromBackend(muscleId);
+      const photos = images
+        .slice()
+        .reverse()
+        .map((image, index) => ({
+          id: image.path,
+          muscleId,
+          muscleName,
+          uri: image.signedUrl,
+          dayNumber: index + 1,
+          capturedAt: 'Imagen guardada en Supabase',
+        }));
+      setInjuryPhotos((prev) => ({ ...prev, [muscleId]: photos }));
+      return photos;
+    },
+    []
   );
 
   const unreadAlertCount = useMemo(
@@ -443,6 +462,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       acknowledgeAllAlerts,
       injuryPhotos,
       addInjuryPhoto,
+      refreshInjuryPhotos,
       healthChecks,
       submitHealthCheck,
     }),
@@ -479,6 +499,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       acknowledgeAllAlerts,
       injuryPhotos,
       addInjuryPhoto,
+      refreshInjuryPhotos,
       healthChecks,
       submitHealthCheck,
     ]

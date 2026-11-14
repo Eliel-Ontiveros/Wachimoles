@@ -96,7 +96,8 @@ export function isNetworkFetchError(error: unknown): boolean {
 
 export async function fetchBackendWithFallback(
   pathWithQuery: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  timeoutMs = API_CONFIG.timeoutMs
 ): Promise<Response> {
   const normalizedPath = pathWithQuery.startsWith('/')
     ? pathWithQuery
@@ -130,8 +131,8 @@ export async function fetchBackendWithFallback(
     }
 
     const controller = new AbortController();
-    const timeoutMs = isProxy ? Math.min(API_CONFIG.timeoutMs, 3000) : API_CONFIG.timeoutMs;
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const requestTimeoutMs = isProxy ? Math.min(timeoutMs, 3000) : timeoutMs;
+    const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
 
     const externalSignal = init.signal;
     const onExternalAbort = () => controller.abort();
