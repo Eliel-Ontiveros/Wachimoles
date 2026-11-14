@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import a2Ship from '../assets/a2.jpg';
+import shipSprite from '../assets/Naveee (1).svg';
 import { groupSamplesByDay } from '../services/backend-api';
 import type { DashboardSample, SampleMetric, VitalSignsData } from '../types/dashboard';
 import {
@@ -511,18 +511,17 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
               <circle cx="270" cy="68" r="11" fill="url(#history-planet-earth)" opacity="0.92" />
               <circle cx="520" cy="56" r="9" fill="url(#history-planet-moon)" opacity="0.92" />
 
-              {/* Nave espacial a2.jpg flotando en el centro de la órbita */}
+              {/* Nave espacial Naveee (1).svg flotando en el centro de la órbita */}
               <g className="history-ship-float">
-                <circle cx="395" cy="36" r="22" fill="rgba(88, 199, 243, 0.22)" />
-                <circle cx="395" cy="36" r="18.6" fill="#ffffff" stroke="#58c7f3" strokeWidth="1.8" />
+                <circle cx="395" cy="36" r="22" fill="rgba(115, 203, 244, 0.2)" />
+                <circle cx="395" cy="36" r="18.6" fill="#060b19" stroke="#73cbf4" strokeWidth="1.8" />
                 <image
-                  href={a2Ship}
-                  x="377"
-                  y="18"
-                  width="36"
-                  height="36"
-                  preserveAspectRatio="xMidYMid slice"
-                  clipPath="url(#history-ship-clip)"
+                  href={shipSprite}
+                  x="381"
+                  y="26.5"
+                  width="28"
+                  height="19"
+                  preserveAspectRatio="xMidYMid meet"
                 />
               </g>
             </svg>

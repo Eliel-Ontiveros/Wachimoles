@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import a2Ship from '../assets/a2.jpg';
+import shipSprite from '../assets/Naveee (1).svg';
 import type { AstronautProfile, VitalSignsData } from '../types/dashboard';
 import { ActivityIcon, HeartIcon, OrbitIcon } from './Icons';
 
@@ -85,6 +85,9 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
               <span>{LOCATION_LABELS[astronaut.environment] ?? astronaut.environment} · {astronaut.gravityLabel}</span>
             </div>
           </div>
+          <span className="mission-dest-pill">
+            RUMBO · {(LOCATION_LABELS[astronaut.destination] ?? astronaut.destination).toUpperCase()}
+          </span>
         </div>
 
         <svg viewBox="0 0 340 88" className="mission-route-svg" aria-hidden="true">
@@ -137,18 +140,17 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
             SALIDA · {(LOCATION_LABELS[astronaut.origin] ?? astronaut.origin).toUpperCase()}
           </text>
 
-          {/* Nave espacial en ruta (a2.jpg) con flotación suave */}
+          {/* Nave espacial en ruta (Naveee (1).svg) con flotación suave */}
           <g className="mission-ship-marker">
-            <circle cx="170" cy="25" r="18" fill="rgba(88, 199, 243, 0.24)" />
-            <circle cx="170" cy="25" r="15" fill="#ffffff" stroke="#58c7f3" strokeWidth="1.8" />
+            <circle cx="170" cy="25" r="18" fill="rgba(115, 203, 244, 0.22)" />
+            <circle cx="170" cy="25" r="15" fill="#060b19" stroke="#73cbf4" strokeWidth="1.8" />
             <image
-              href={a2Ship}
-              x="155.5"
-              y="10.5"
-              width="29"
-              height="29"
-              preserveAspectRatio="xMidYMid slice"
-              clipPath="url(#mission-ship-clip)"
+              href={shipSprite}
+              x="158.5"
+              y="17.5"
+              width="23"
+              height="15"
+              preserveAspectRatio="xMidYMid meet"
             />
           </g>
 

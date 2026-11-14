@@ -2,13 +2,11 @@ import React, { useMemo } from 'react';
 import type {
   DailyHealthCheck,
   HealthStatusLevel,
-  MuscleData,
   VitalSignsData,
 } from '../types/dashboard';
 import {
   ActivityIcon,
   DropletsIcon,
-  LayersIcon,
   SmileIcon,
   ThermometerIcon,
   ZapIcon,
@@ -16,7 +14,6 @@ import {
 
 interface SymptomPulseCardsProps {
   latestCheck: DailyHealthCheck | null;
-  muscles: MuscleData[];
   vitals: VitalSignsData;
 }
 
@@ -171,7 +168,6 @@ function computeBilateralPointerPct(
 }
 
 function MiniWaveStrip({
-  accent,
   active,
   mode,
   status,
@@ -180,7 +176,6 @@ function MiniWaveStrip({
   ranges,
   bilateralRanges,
 }: {
-  accent: string;
   active: boolean;
   mode: GaugeMode;
   status: HealthStatusLevel | null;
@@ -200,27 +195,6 @@ function MiniWaveStrip({
 
   return (
     <div className="sym-visual-footer">
-      <div className="sym-spark-box">
-        <svg
-          viewBox="0 0 240 22"
-          preserveAspectRatio="none"
-          className={`sym-spark-svg ${active ? 'animated' : ''}`}
-          aria-hidden="true"
-        >
-          <path
-            d={
-              active
-                ? 'M0 13 L18 13 L24 8 L30 13 L46 13 L52 4 L58 18 L64 13 L84 13 L90 9 L96 13 L120 13 L138 13 L144 8 L150 13 L166 13 L172 4 L178 18 L184 13 L204 13 L210 9 L216 13 L240 13'
-                : 'M0 11 L240 11'
-            }
-            fill="none"
-            stroke={active ? accent : '#cbd5e1'}
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
       <div
         className="sym-index-gauge"
         aria-label={titleText ? `Índices clínicos: ${titleText}` : undefined}
@@ -366,7 +340,6 @@ const MOOD_TAG: Record<number, { label: string; status: HealthStatusLevel; pct: 
 
 export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
   latestCheck,
-  muscles,
   vitals,
 }) => {
   const evals = useMemo(() => {
@@ -410,14 +383,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
     };
   }, [latestCheck, vitals.spo2, vitals.stress]);
 
-  const activeLesions = useMemo(
-    () => muscles.filter((m) => m.status !== 'normal' && m.observation),
-    [muscles]
-  );
-
-  const swellingCount = activeLesions.filter((m) => m.observation?.swelling).length;
-  const limitationCount = activeLesions.filter((m) => m.observation?.functionalLimitation).length;
-
   const reportedSymptoms = useMemo(() => {
     if (!latestCheck || latestCheck.symptoms.length === 0) return [];
     return latestCheck.symptoms.filter((s) => s.toLowerCase() !== 'ninguno');
@@ -441,7 +406,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span>% SpO2</span>
           </div>
           <MiniWaveStrip
-            accent={evals.sSpo2 ? STATUS_META[evals.sSpo2].color : '#0284c7'}
             active={evals.spo2Val !== null && evals.spo2Val > 0}
             mode="high-good"
             status={evals.sSpo2}
@@ -474,7 +438,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span>/100</span>
           </div>
           <MiniWaveStrip
-            accent={evals.sStress ? STATUS_META[evals.sStress].color : '#d97706'}
             active={evals.stressVal !== null}
             mode="low-good"
             status={evals.sStress}
@@ -507,7 +470,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span>mg/dL</span>
           </div>
           <MiniWaveStrip
-            accent={evals.sGlucose ? STATUS_META[evals.sGlucose].color : '#0284c7'}
             active={evals.glucoseVal !== null}
             mode="bilateral"
             status={evals.sGlucose}
@@ -554,7 +516,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span>mmHg</span>
           </div>
           <MiniWaveStrip
-            accent={evals.sBp ? STATUS_META[evals.sBp].color : '#ef4444'}
             active={evals.sBp !== null}
             mode="bilateral"
             status={evals.sBp}
@@ -603,7 +564,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span>°C</span>
           </div>
           <MiniWaveStrip
-            accent={evals.sTemp ? STATUS_META[evals.sTemp].color : '#d97706'}
             active={evals.tempVal !== null}
             mode="bilateral"
             status={evals.sTemp}
@@ -645,7 +605,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <strong>{evals.moodInfo ? evals.moodInfo.label : '--'}</strong>
           </div>
           <MiniWaveStrip
-            accent={evals.sMood ? STATUS_META[evals.sMood].color : '#059669'}
             active={Boolean(evals.moodInfo)}
             mode="high-good"
             status={evals.sMood}
@@ -665,33 +624,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             ranges={{ green: '4–5/5', yellow: '2–3/5', red: '1/5' }}
           />
         </article>
-      </div>
-
-      {/* Signos musculares reportados + síntomas del check-in */}
-      <div className="symptom-flags-row">
-        <div className={`sym-flag-card ${activeLesions.length > 0 ? 'warn' : ''}`}>
-          <div className="sym-flag-top">
-            <ZapIcon size={13} />
-            <span>Zonas 3D</span>
-          </div>
-          <strong>{activeLesions.length}</strong>
-        </div>
-
-        <div className={`sym-flag-card ${swellingCount > 0 ? 'warn' : ''}`}>
-          <div className="sym-flag-top">
-            <LayersIcon size={13} />
-            <span>Edema</span>
-          </div>
-          <strong>{swellingCount}</strong>
-        </div>
-
-        <div className={`sym-flag-card ${limitationCount > 0 ? 'warn' : ''}`}>
-          <div className="sym-flag-top">
-            <ActivityIcon size={13} />
-            <span>Limitación</span>
-          </div>
-          <strong>{limitationCount}</strong>
-        </div>
       </div>
 
       {reportedSymptoms.length > 0 && (

@@ -244,12 +244,9 @@ export function App() {
     setIntroFinished(true);
   }, []);
 
-  if (!introFinished) {
-    return <StartupSplashAnimation onComplete={handleIntroComplete} />;
-  }
-
   return (
     <div className={`app-root theme-${themeMode}`}>
+      {!introFinished && <StartupSplashAnimation onComplete={handleIntroComplete} />}
       <AstronautProfileBar
         astronauts={astronauts}
         selectedAstronautId={selectedAstronautId}
@@ -307,7 +304,6 @@ export function App() {
             <RealtimeEcgMonitor vitals={vitals} astronaut={selectedAstronaut} />
             <SymptomPulseCards
               latestCheck={latestHealthCheck}
-              muscles={muscles}
               vitals={vitals}
             />
             <HealthChartsPanel vitals={vitals} allSamples={samples} />

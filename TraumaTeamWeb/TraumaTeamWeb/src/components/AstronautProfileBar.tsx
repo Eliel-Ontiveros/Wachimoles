@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import a2Logo from '../assets/a2.jpg';
+import brandLogo from '../assets/Recurso 6.svg';
 import type {
   AstronautProfile,
   ConnectionEndpointStatus,
 } from '../types/dashboard';
 import {
+  AlertTriangleIcon,
+  CheckIcon,
   MoonIcon,
+  OrbitIcon,
   RefreshCwIcon,
+  ShieldAlertIcon,
   SunIcon,
 } from './Icons';
 
@@ -23,11 +27,31 @@ interface AstronautProfileBarProps {
   onManualRefresh: () => void;
 }
 
+const RISK_META: Record<
+  AstronautProfileBarProps['globalRiskLevel'],
+  { label: string; renderIcon: () => React.ReactNode }
+> = {
+  normal: {
+    label: 'Nominal',
+    renderIcon: () => <CheckIcon size={11} strokeWidth={2.5} />,
+  },
+  warning: {
+    label: 'Vigilar',
+    renderIcon: () => <AlertTriangleIcon size={11} strokeWidth={2.4} />,
+  },
+  critical: {
+    label: 'Crítico',
+    renderIcon: () => <ShieldAlertIcon size={11} strokeWidth={2.4} />,
+  },
+};
+
 export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
   astronauts,
   selectedAstronautId,
   onSelectAstronaut,
   connectionStatus,
+  globalRiskLevel,
+  activeLesionsCount,
   isSyncing,
   themeMode,
   onToggleTheme,
@@ -55,24 +79,38 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
     })
     : '--:--';
 
+  const riskMeta = RISK_META[globalRiskLevel];
+
   return (
     <header className="topbar-shell">
       <div className="topbar-brand">
         <div className="brand-pulse-box">
-          <img src={a2Logo} alt="Logo TraumaTeam" className="brand-logo-img" />
+          <img src={brandLogo} alt="Logo TraumaTeam" className="brand-logo-img" />
         </div>
         <div className="brand-text-group">
           <div className="brand-title-row">
             <h1 className="brand-wordmark">
               <span className="brand-heavy">Trauma</span>Team
             </h1>
+            <span className={`global-status-chip status-${globalRiskLevel}`}>
+              {riskMeta.renderIcon()}
+              <span>
+                {riskMeta.label}
+                {activeLesionsCount > 0
+                  ? ` · ${activeLesionsCount} zona${activeLesionsCount === 1 ? '' : 's'}`
+                  : ''}
+              </span>
+            </span>
           </div>
+          <span className="brand-subtitle">GROUND CONTROL · TELEMETRÍA BIOMÉDICA</span>
         </div>
       </div>
 
       <div className="topbar-profiles" aria-label="Perfil de astronauta activo">
         {astronauts.map((astro) => {
           const isSelected = astro.id === selectedAstronautId;
+          const envBadge =
+            astro.environment === 'nave' ? '0g · Órbita' : astro.gravityLabel;
           return (
             <button
               key={astro.id}
@@ -95,6 +133,10 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
                 </div>
                 <span className="astro-role">{astro.role}</span>
               </div>
+              <span className="astro-env-pill">
+                <OrbitIcon size={11} />
+                <span>{envBadge}</span>
+              </span>
             </button>
           );
         })}

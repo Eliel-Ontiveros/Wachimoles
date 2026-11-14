@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Image, Platform, Pressable, Text, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Flag } from 'lucide-react-native';
 import { ENVIRONMENTS, SPACE_LOCATIONS } from '../../services/mission-api';
@@ -392,11 +393,13 @@ export function SpaceJourneyTimeline({
                   height: SHIP_SIZE,
                   transform: [{ translateY: floatAnim }],
                 }}>
-                <View className="h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-sky-400 bg-slate-900 shadow-sm">
+                <View
+                  style={{ backgroundColor: '#060b19', borderColor: '#38bdf8', borderWidth: 1.8 }}
+                  className="h-full w-full items-center justify-center overflow-hidden rounded-full shadow-sm">
                   <Image
-                    source={require('@/assets/images/a2.jpg')}
-                    style={{ width: 24, height: 24 }}
-                    resizeMode="contain"
+                    source={require('@/assets/images/Naveee (1).svg')}
+                    style={{ width: 22, height: 15 }}
+                    contentFit="contain"
                   />
                 </View>
               </Animated.View>

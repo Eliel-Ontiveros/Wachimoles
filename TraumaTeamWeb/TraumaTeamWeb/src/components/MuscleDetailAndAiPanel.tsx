@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import a2Logo from '../assets/a2.jpg';
+import brandLogo from '../assets/Recurso 6.svg';
 import {
   getMuscleKnowledge,
   getPainColorHex,
@@ -99,7 +99,7 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
               />
             </svg>
             <div className="muscle-empty-emblem">
-              <img src={a2Logo} alt="TraumaTeam" className="muscle-empty-emblem-img" />
+              <img src={brandLogo} alt="TraumaTeam" className="muscle-empty-emblem-img" />
               <span className="muscle-empty-emblem-ring" aria-hidden="true" />
             </div>
             <div className="muscle-empty-cosmic-copy">

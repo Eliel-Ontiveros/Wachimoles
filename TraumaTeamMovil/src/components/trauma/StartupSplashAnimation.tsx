@@ -1,10 +1,137 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native';
-import type { AnimationItem } from 'lottie-web';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  Platform,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import Svg, { Polygon } from 'react-native-svg';
+import type { AnimationItem, LottiePlayer } from 'lottie-web';
 
 interface StartupSplashAnimationProps {
   onComplete: () => void;
 }
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+const DISSOLVE_DURATION_MS = 960;
+
+interface SplashTile {
+  key: string;
+  cx: number;
+  cy: number;
+  d: number;
+}
+
+interface HexGrid {
+  boxW: number;
+  boxH: number;
+  tilePoints: string;
+  tiles: SplashTile[];
+}
+
+function hexPoints(radius: number, cx: number, cy: number): string {
+  return Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 180) * (60 * i - 90);
+    return `${(cx + radius * Math.cos(a)).toFixed(2)},${(cy + radius * Math.sin(a)).toFixed(2)}`;
+  }).join(' ');
+}
+
+function buildHexGrid(w: number, h: number): HexGrid {
+  const safeW = Math.max(320, w);
+  const safeH = Math.max(320, h);
+  const ox = safeW / 2;
+  const oy = safeH / 2;
+  const radius = Math.max(40, Math.min(70, Math.round(Math.hypot(safeW, safeH) / 26)));
+  const hexW = Math.sqrt(3) * radius;
+  const rowStep = 1.5 * radius;
+  const boxW = hexW + 4;
+  const boxH = 2 * radius + 4;
+  const tilePoints = hexPoints(radius + 2.2, boxW / 2, boxH / 2);
+
+  const rows = Math.ceil(safeH / rowStep) + 1;
+  const cols = Math.ceil(safeW / hexW) + 1;
+  const maxD = Math.max(1, Math.hypot(Math.max(ox, safeW - ox), Math.max(oy, safeH - oy)));
+
+  const tiles: SplashTile[] = [];
+  for (let r = -1; r <= rows; r++) {
+    const offset = Math.abs(r) % 2 === 1 ? hexW / 2 : 0;
+    for (let c = -1; c <= cols; c++) {
+      const cx = c * hexW + offset;
+      const cy = r * rowStep;
+      if (cx - hexW / 2 > safeW || cx + hexW / 2 < 0 || cy - radius > safeH || cy + radius < 0) {
+        continue;
+      }
+      tiles.push({
+        key: `${r}-${c}`,
+        cx,
+        cy,
+        d: Math.min(1, Math.hypot(cx - ox, cy - oy) / maxD),
+      });
+    }
+  }
+
+  return { boxW, boxH, tilePoints, tiles };
+}
+
+const SplashHexTile = memo(function SplashHexTile({
+  tile,
+  boxW,
+  boxH,
+  tilePoints,
+  dissolveProgress,
+}: {
+  tile: SplashTile;
+  boxW: number;
+  boxH: number;
+  tilePoints: string;
+  dissolveProgress: Animated.Value;
+}) {
+  const start = tile.d * 0.48;
+  const end = Math.min(1, start + 0.52);
+  const mid = start + (end - start) * 0.45;
+
+  const scale = dissolveProgress.interpolate({
+    inputRange: [start, mid, end],
+    outputRange: [1, 0.72, 0],
+    extrapolate: 'clamp',
+  });
+  const rotate = dissolveProgress.interpolate({
+    inputRange: [start, mid, end],
+    outputRange: ['0deg', '-18deg', '-60deg'],
+    extrapolate: 'clamp',
+  });
+  const opacity = dissolveProgress.interpolate({
+    inputRange: [start, Math.min(end, start + 0.08), end],
+    outputRange: [1, 0.96, 0],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: tile.cx - boxW / 2,
+        top: tile.cy - boxH / 2,
+        width: boxW,
+        height: boxH,
+        opacity,
+        transform: [{ scale }, { rotate }],
+      }}>
+      <Svg width={boxW} height={boxH}>
+        <Polygon
+          points={tilePoints}
+          fill="#f8fafc"
+          stroke="#e2e8f0"
+          strokeWidth={1.5}
+        />
+      </Svg>
+    </Animated.View>
+  );
+});
 
 let NativeWebView: any = null;
 if (Platform.OS !== 'web') {
@@ -94,7 +221,7 @@ function buildSplashHtml(animationJson: string, reduceMotion: boolean): string {
       } else {
         anim.addEventListener('complete', function () {
           holdFinalFrame();
-          setTimeout(notifyComplete, 200);
+          notifyComplete();
         });
       }
     })();
@@ -104,10 +231,17 @@ function buildSplashHtml(animationJson: string, reduceMotion: boolean): string {
 }
 
 export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationProps) {
+  const { width, height } = useWindowDimensions();
   const webContainerRef = useRef<HTMLDivElement | null>(null);
   const onCompleteRef = useRef(onComplete);
+  const startExitRef = useRef<(reduceMotion: boolean) => void>(() => {});
   const hasCompletedRef = useRef(false);
+  const [isDissolving, setIsDissolving] = useState(false);
+  const [dissolveProgress] = useState(() => new Animated.Value(0));
   const [nativeHtml, setNativeHtml] = useState<string | null>(null);
+  const [reduceMotionPref, setReduceMotionPref] = useState(false);
+
+  const hexGrid = useMemo(() => buildHexGrid(width, height), [width, height]);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -115,7 +249,9 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
 
   useEffect(() => {
     let cancelled = false;
+    let dissolvingStarted = false;
     let anim: AnimationItem | null = null;
+    let holdTimer: ReturnType<typeof setTimeout> | null = null;
     let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
     const triggerComplete = () => {
@@ -126,6 +262,35 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
 
     const safetyTimer = setTimeout(triggerComplete, 6500);
 
+    const beginHexDissolve = (reduceMotion: boolean) => {
+      if (cancelled || hasCompletedRef.current || dissolvingStarted) return;
+      dissolvingStarted = true;
+      clearTimeout(safetyTimer);
+
+      if (reduceMotion) {
+        finishTimer = setTimeout(triggerComplete, 350);
+        return;
+      }
+
+      holdTimer = setTimeout(() => {
+        if (cancelled || hasCompletedRef.current) return;
+        setIsDissolving(true);
+        finishTimer = setTimeout(triggerComplete, DISSOLVE_DURATION_MS + 60);
+        Animated.timing(dissolveProgress, {
+          toValue: 1,
+          duration: DISSOLVE_DURATION_MS,
+          easing: Easing.linear,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }).start(({ finished }) => {
+          if (finished) {
+            triggerComplete();
+          }
+        });
+      }, 150);
+    };
+
+    startExitRef.current = beginHexDissolve;
+
     const runSplash = async () => {
       try {
         const nativeReduced = await AccessibilityInfo.isReduceMotionEnabled().catch(
@@ -135,29 +300,29 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
           typeof window !== 'undefined' &&
           Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
         const prefersReduced = nativeReduced || webReduced;
+        if (!cancelled) {
+          setReduceMotionPref(prefersReduced);
+        }
+
+        const jsonModule = await import('../../../assets/images/logo_nave_orbita_v5.json');
+        if (cancelled) return;
+        const rawData = jsonModule.default ?? jsonModule;
 
         if (Platform.OS === 'web') {
-          const loadJsonFromPublic = async (): Promise<unknown> => {
-            try {
-              const res = await fetch('/animations/logo_nave_orbita_v3.json');
-              if (res.ok) {
-                return await res.json();
-              }
-            } catch {
-              // Fallback a carga diferida desde assets locales si /animations aún no está servido
-            }
-            const localJson = await import('../../../assets/images/logo_nave_orbita_v3.json');
-            return localJson.default ?? localJson;
-          };
-
-          const [lottieModule, animationData] = await Promise.all([
-            import('lottie-web'),
-            loadJsonFromPublic(),
-          ]);
-
+          const lottieModule = await import('lottie-web');
           if (cancelled || !webContainerRef.current) return;
 
-          const lottie = lottieModule.default ?? lottieModule;
+          const candidate = (lottieModule.default ?? lottieModule) as LottiePlayer & {
+            default?: LottiePlayer;
+          };
+          const lottie: LottiePlayer | undefined =
+            typeof candidate.loadAnimation === 'function' ? candidate : candidate.default;
+          if (!lottie || typeof lottie.loadAnimation !== 'function') {
+            throw new Error('Lottie player unavailable');
+          }
+
+          const animationData = JSON.parse(JSON.stringify(rawData)) as Record<string, unknown>;
+          webContainerRef.current.innerHTML = '';
           anim = lottie.loadAnimation({
             container: webContainerRef.current,
             renderer: 'svg',
@@ -179,7 +344,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
             const onReady = () => {
               if (cancelled) return;
               holdFinalFrame();
-              finishTimer = setTimeout(triggerComplete, 350);
+              beginHexDissolve(true);
             };
             if (anim.isLoaded && anim.totalFrames > 0) {
               onReady();
@@ -190,20 +355,17 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
             anim.addEventListener('complete', () => {
               if (cancelled) return;
               holdFinalFrame();
-              finishTimer = setTimeout(triggerComplete, 200);
+              beginHexDissolve(false);
             });
           }
           return;
         }
 
-        const jsonModule = await import('../../../assets/images/logo_nave_orbita_v3.json');
-        if (cancelled) return;
-        const animationData = jsonModule.default ?? jsonModule;
         if (!NativeWebView) {
-          finishTimer = setTimeout(triggerComplete, 350);
+          beginHexDissolve(true);
           return;
         }
-        setNativeHtml(buildSplashHtml(JSON.stringify(animationData), prefersReduced));
+        setNativeHtml(buildSplashHtml(JSON.stringify(rawData), prefersReduced));
       } catch {
         triggerComplete();
       }
@@ -214,28 +376,76 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
     return () => {
       cancelled = true;
       clearTimeout(safetyTimer);
+      if (holdTimer !== null) {
+        clearTimeout(holdTimer);
+      }
       if (finishTimer !== null) {
         clearTimeout(finishTimer);
       }
       anim?.destroy();
     };
-  }, []);
+  }, [dissolveProgress]);
 
   const handleNativeMessage = (event: { nativeEvent?: { data?: string } }) => {
     try {
       const payload = JSON.parse(event?.nativeEvent?.data ?? '{}');
-      if (payload?.type === 'SPLASH_COMPLETE' && !hasCompletedRef.current) {
-        hasCompletedRef.current = true;
-        onCompleteRef.current();
+      if (payload?.type === 'SPLASH_COMPLETE') {
+        startExitRef.current(reduceMotionPref);
       }
     } catch {
       // Ignorar mensajes externos
     }
   };
 
+  const solidBgOpacity = dissolveProgress.interpolate({
+    inputRange: [0, 0.19],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const stageOpacity = dissolveProgress.interpolate({
+    inputRange: [0, 0.36],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const stageScale = dissolveProgress.interpolate({
+    inputRange: [0, 0.4],
+    outputRange: [1, 0.92],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <View style={styles.overlay} accessibilityLabel="Cargando aplicación TraumaTeam">
-      <View style={styles.stageContainer}>
+    <View
+      style={styles.overlay}
+      pointerEvents={isDissolving ? 'none' : 'auto'}
+      accessibilityLabel="Cargando aplicación TraumaTeam">
+      {/* Malla de hexágonos que se disuelve radialmente para revelar la app */}
+      <View style={styles.hexLayer} pointerEvents="none">
+        {hexGrid.tiles.map((tile) => (
+          <SplashHexTile
+            key={tile.key}
+            tile={tile}
+            boxW={hexGrid.boxW}
+            boxH={hexGrid.boxH}
+            tilePoints={hexGrid.tilePoints}
+            dissolveProgress={dissolveProgress}
+          />
+        ))}
+      </View>
+
+      {/* Fondo sólido continuo durante Lottie que cede suavemente al mosaico hexagonal */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.solidBg, { opacity: solidBgOpacity }]}
+      />
+
+      {/* Escenario de animación Lottie */}
+      <Animated.View
+        style={[
+          styles.stageContainer,
+          { opacity: stageOpacity, transform: [{ scale: stageScale }] },
+        ]}>
         {Platform.OS === 'web' ? (
           <div
             ref={webContainerRef}
@@ -258,7 +468,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
             javaScriptEnabled={true}
           />
         ) : null}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -271,12 +481,31 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     zIndex: 9999,
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    overflow: 'hidden',
+  },
+  hexLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 1,
+  },
+  solidBg: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 2,
+    backgroundColor: '#f8fafc',
   },
   stageContainer: {
+    zIndex: 3,
     width: '100%',
     maxWidth: 400,
     aspectRatio: 1596 / 1110,

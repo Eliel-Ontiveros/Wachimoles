@@ -753,6 +753,273 @@ function VitalHistoryModal({
   );
 }
 
+function formatSleepDuration(hours: number): string {
+  const totalMinutes = Math.max(0, Math.round(hours * 60));
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+function getSleepShortDayLabel(day: DailySummary): string {
+  if (day.dateLabel.startsWith('Hoy')) return 'Hoy';
+  if (day.dateLabel.startsWith('Ayer')) return 'Ayer';
+  const [, m, d] = day.dateKey.split('-');
+  return m && d ? `${Number(d)}/${Number(m)}` : day.dateLabel;
+}
+
+function getSleepMeta(hours: number | null) {
+  if (hours === null) {
+    return {
+      label: 'Sin toma',
+      color: '#64748b',
+      bg: '#f8fafc',
+      border: '#e2e8f0',
+      summary: 'Esperando lectura del reloj',
+      pointerPct: 0,
+    };
+  }
+
+  let pointerPct: number;
+  if (hours < 5.5) {
+    const ratio = Math.max(0, Math.min(1, (hours - 2) / 3.5));
+    pointerPct = 4 + ratio * 28;
+    return {
+      label: 'Déficit',
+      color: '#dc2626',
+      bg: '#fef2f2',
+      border: '#fecaca',
+      summary: `Faltan ${(7 - hours).toFixed(1)} h para la meta`,
+      pointerPct,
+    };
+  }
+
+  if (hours < 7) {
+    const ratio = (hours - 5.5) / 1.5;
+    pointerPct = 38 + ratio * 20;
+    return {
+      label: 'Vigilar',
+      color: '#d97706',
+      bg: '#fffbeb',
+      border: '#fde68a',
+      summary: `Faltan ${(7 - hours).toFixed(1)} h para la meta`,
+      pointerPct,
+    };
+  }
+
+  const ratio = Math.max(0, Math.min(1, (hours - 7) / 3));
+  pointerPct = 64 + ratio * 31;
+  return {
+    label: 'Óptimo',
+    color: '#059669',
+    bg: '#ecfdf5',
+    border: '#a7f3d0',
+    summary: hours > 9 ? 'Descanso extendido (>9 h)' : 'Dentro de meta (7–9 h)',
+    pointerPct,
+  };
+}
+
+function SleepSummaryCard({
+  sleepHours,
+  sleepHistory,
+  onPress,
+}: {
+  sleepHours: number | null;
+  sleepHistory: DashboardSample[];
+  onPress: () => void;
+}) {
+  const meta = getSleepMeta(sleepHours);
+
+  const recentInfo = useMemo(() => {
+    const days = groupSamplesByDay(sleepHistory);
+    if (days.length === 0) return { days: [] as DailySummary[], avg: null as number | null };
+    const latestFive = days.slice(0, 5).reverse();
+    const sum = latestFive.reduce((acc, d) => acc + d.max, 0);
+    const avg = Math.round((sum / latestFive.length) * 10) / 10;
+    return { days: latestFive, avg };
+  }, [sleepHistory]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel="Ver historial de sueño"
+      className="mb-4 rounded-2xl border border-violet-200/80 bg-white p-4 shadow-md active:opacity-90">
+      {/* Cabecera de sueño con estado clínico */}
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1 flex-row items-center pr-2">
+          <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl border border-violet-100 bg-violet-50">
+            <Moon size={19} color="#7c3aed" />
+          </View>
+          <View className="flex-1">
+            <Text className="font-mono text-xs font-bold text-trauma-ink">
+              Descanso y Sueño
+            </Text>
+            <Text className="mt-0.5 font-mono text-[9px] text-slate-500">
+              Ciclo circadiano · Meta 7–9 h
+            </Text>
+          </View>
+        </View>
+
+        <View
+          style={{
+            backgroundColor: meta.bg,
+            borderColor: meta.border,
+            borderWidth: 1,
+          }}
+          className="flex-row items-center rounded-full px-2.5 py-1">
+          <View
+            style={{ backgroundColor: meta.color }}
+            className="mr-1.5 h-1.5 w-1.5 rounded-full"
+          />
+          <Text style={{ color: meta.color }} className="font-mono text-[9.5px] font-bold">
+            {meta.label}
+          </Text>
+        </View>
+      </View>
+
+      {/* Lectura principal y promedio reciente */}
+      <View className="mt-3 flex-row items-end justify-between">
+        <View>
+          <View className="flex-row items-baseline">
+            <Text className="font-mono text-3xl font-extrabold text-trauma-ink">
+              {sleepHours !== null ? sleepHours.toFixed(1) : '--'}
+            </Text>
+            <Text className="ml-1 font-mono text-xs font-bold text-violet-700">h</Text>
+            {sleepHours !== null && (
+              <View className="ml-2 rounded-md bg-violet-50 px-1.5 py-0.5">
+                <Text className="font-mono text-[9.5px] font-bold text-violet-700">
+                  {formatSleepDuration(sleepHours)}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text className="mt-0.5 font-mono text-[9.5px] text-slate-500">{meta.summary}</Text>
+        </View>
+
+        {recentInfo.avg !== null && (
+          <View className="items-end rounded-xl border border-violet-100 bg-violet-50/70 px-2.5 py-1.5">
+            <Text className="font-mono text-[8.5px] font-bold uppercase text-violet-600">
+              Prom. {recentInfo.days.length}d
+            </Text>
+            <Text className="font-mono text-xs font-extrabold text-violet-800">
+              {recentInfo.avg.toFixed(1)} h
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Escala clínica de sueño (Déficit / Vigilar / Óptimo) */}
+      <View className="mt-3">
+        <View className="relative h-2 flex-row items-center gap-1">
+          <View
+            style={{
+              flex: 35,
+              height: 6,
+              borderRadius: 999,
+              backgroundColor: '#ef4444',
+              opacity: sleepHours !== null && sleepHours < 5.5 ? 1 : 0.24,
+            }}
+          />
+          <View
+            style={{
+              flex: 25,
+              height: 6,
+              borderRadius: 999,
+              backgroundColor: '#f59e0b',
+              opacity: sleepHours !== null && sleepHours >= 5.5 && sleepHours < 7 ? 1 : 0.24,
+            }}
+          />
+          <View
+            style={{
+              flex: 40,
+              height: 6,
+              borderRadius: 999,
+              backgroundColor: '#10b981',
+              opacity: sleepHours !== null && sleepHours >= 7 ? 1 : 0.24,
+            }}
+          />
+          {sleepHours !== null && (
+            <View
+              style={{
+                position: 'absolute',
+                left: `${Math.max(4, Math.min(96, meta.pointerPct))}%`,
+                top: -2,
+                marginLeft: -6,
+                width: 12,
+                height: 12,
+                borderRadius: 999,
+                backgroundColor: meta.color,
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                shadowColor: '#0f172a',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.25,
+                shadowRadius: 2,
+                elevation: 3,
+              }}
+            />
+          )}
+        </View>
+        <View className="mt-1.5 flex-row justify-between">
+          <Text className="font-mono text-[8.5px] font-semibold text-rose-600">&lt;5.5 h</Text>
+          <Text className="font-mono text-[8.5px] font-semibold text-amber-600">5.5–6.9 h</Text>
+          <Text className="font-mono text-[8.5px] font-semibold text-emerald-700">
+            ≥7 h · Óptimo
+          </Text>
+        </View>
+      </View>
+
+      {/* Mini comparativa de últimas noches */}
+      {recentInfo.days.length > 0 && (
+        <View className="mt-3 rounded-xl border border-slate-100 bg-slate-50/80 px-2.5 py-2">
+          <View className="mb-1.5 flex-row items-center justify-between">
+            <Text className="font-mono text-[8.5px] font-bold uppercase tracking-wider text-slate-400">
+              Últimas noches
+            </Text>
+            <Text className="font-mono text-[8.5px] font-semibold text-violet-600">
+              {recentInfo.days.length} {recentInfo.days.length === 1 ? 'registro' : 'registros'}
+            </Text>
+          </View>
+          <View className="flex-row items-end justify-between gap-2">
+            {recentInfo.days.map((day) => {
+              const barPct = Math.max(18, Math.min(100, Math.round((day.max / 10) * 100)));
+              const barColor =
+                day.max < 5.5 ? '#ef4444' : day.max < 7 ? '#f59e0b' : '#7c3aed';
+              return (
+                <View key={day.dateKey} className="flex-1 items-center">
+                  <Text className="mb-1 font-mono text-[8.5px] font-bold text-slate-600">
+                    {day.max.toFixed(1)}h
+                  </Text>
+                  <View className="h-9 w-full max-w-[22px] justify-end overflow-hidden rounded-md bg-slate-200/70">
+                    <View
+                      style={{
+                        height: `${barPct}%`,
+                        backgroundColor: barColor,
+                        borderTopLeftRadius: 4,
+                        borderTopRightRadius: 4,
+                      }}
+                    />
+                  </View>
+                  <Text className="mt-1 font-mono text-[8px] text-slate-400">
+                    {getSleepShortDayLabel(day)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Acción al historial */}
+      <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2">
+        <Text className="font-mono text-[9px] font-bold text-violet-700">
+          Toca para ver historial de sueño por día
+        </Text>
+        <ChevronRight size={12} color="#7c3aed" />
+      </View>
+    </Pressable>
+  );
+}
+
 function MetricCard({
   label,
   value,
@@ -966,27 +1233,11 @@ export function VitalMonitorView() {
         />
       </View>
 
-      <Pressable
+      <SleepSummaryCard
+        sleepHours={vitals.sleepHours}
+        sleepHistory={vitals.sleepHistory}
         onPress={() => handleOpenMetricHistory('sleep')}
-        accessibilityLabel="Ver historial de sueño"
-        className="mb-4 flex-row items-center justify-between rounded-2xl border border-violet-100 bg-white p-4 shadow-md active:opacity-85">
-        <View className="flex-row items-center">
-          <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
-            <Moon size={20} color="#7c3aed" />
-          </View>
-          <View>
-            <Text className="font-mono text-xs font-bold text-trauma-ink">
-              Sueño registrado
-            </Text>
-            <Text className="mt-1 font-mono text-[9px] text-slate-500">
-              Total diario leído del reloj · Ver historial
-            </Text>
-          </View>
-        </View>
-        <Text className="font-mono text-2xl font-extrabold text-violet-700">
-          {vitals.sleepHours !== null ? `${vitals.sleepHours.toFixed(1)} h` : '-- h'}
-        </Text>
-      </Pressable>
+      />
 
       {/* Resumen de trayectoria y misiones diarias */}
       <Pressable
