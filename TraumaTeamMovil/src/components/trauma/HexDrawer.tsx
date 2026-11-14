@@ -13,7 +13,7 @@ import {
 import Svg, { Polygon } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, usePathname, type Href } from 'expo-router';
-import { Activity, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
+import { Activity, BookOpen, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
 
 import { useDrawer } from './drawer-context';
 
@@ -129,6 +129,13 @@ const NAV_ITEMS: {
       subtitle: 'Rachas, rutinas y navecita',
       href: '/missions',
       Icon: Rocket,
+    },
+    {
+      path: '/assistant',
+      label: 'Space Health Assistant',
+      subtitle: 'Research with cited sources',
+      href: '/assistant',
+      Icon: BookOpen,
     },
   ];
 
