@@ -17,33 +17,6 @@ interface SymptomPulseCardsProps {
   vitals: VitalSignsData;
 }
 
-const STATUS_META: Record<
-  HealthStatusLevel,
-  { label: string; color: string; dotColor: string; bg: string; border: string }
-> = {
-  normal: {
-    label: 'Óptimo',
-    color: '#0369a1',
-    dotColor: '#93DEFF',
-    bg: 'rgba(147, 222, 255, 0.28)',
-    border: '#93DEFF',
-  },
-  warning: {
-    label: 'Vigilar',
-    color: '#d97706',
-    dotColor: '#d97706',
-    bg: 'rgba(245, 158, 11, 0.14)',
-    border: 'rgba(245, 158, 11, 0.45)',
-  },
-  critical: {
-    label: 'Atención',
-    color: '#dc2626',
-    dotColor: '#dc2626',
-    bg: 'rgba(239, 68, 68, 0.14)',
-    border: 'rgba(239, 68, 68, 0.45)',
-  },
-};
-
 function evalSpo2(v: number | null): HealthStatusLevel | null {
   if (v === null || v <= 0) return null;
   if (v < 90) return 'critical';
@@ -56,27 +29,6 @@ function evalStress(v: number | null): HealthStatusLevel | null {
   if (v >= 85) return 'critical';
   if (v >= 68) return 'warning';
   return 'normal';
-}
-
-function StatusBadge({ status }: { status: HealthStatusLevel | null }) {
-  if (!status) {
-    return <span className="sym-pill neutral">Sin toma</span>;
-  }
-  const meta = STATUS_META[status];
-  return (
-    <span
-      className="sym-pill"
-      style={{ color: meta.color, backgroundColor: meta.bg, borderColor: meta.border }}
-    >
-      <i
-        style={{
-          backgroundColor: meta.dotColor,
-          boxShadow: status === 'normal' ? '0 0 0 1px rgba(3, 105, 161, 0.3)' : undefined,
-        }}
-      />
-      {meta.label}
-    </span>
-  );
 }
 
 type GaugeMode = 'low-good' | 'high-good' | 'bilateral';
@@ -407,7 +359,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
               <DropletsIcon size={14} />
             </span>
             <span className="sym-title">Oxígeno</span>
-            <StatusBadge status={evals.sSpo2} />
           </div>
           <div className="sym-val-row">
             <strong>{evals.spo2Val !== null ? `${evals.spo2Val}` : '--'}</strong>
@@ -439,7 +390,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
               <ZapIcon size={14} />
             </span>
             <span className="sym-title">Estrés</span>
-            <StatusBadge status={evals.sStress} />
           </div>
           <div className="sym-val-row">
             <strong>{evals.stressVal !== null ? `${evals.stressVal}` : '--'}</strong>
@@ -471,7 +421,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
               <DropletsIcon size={14} />
             </span>
             <span className="sym-title">Glucosa</span>
-            <StatusBadge status={evals.sGlucose} />
           </div>
           <div className="sym-val-row">
             <strong>{evals.glucoseVal ?? '--'}</strong>
@@ -513,7 +462,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
               <ActivityIcon size={14} />
             </span>
             <span className="sym-title">Presión Art.</span>
-            <StatusBadge status={evals.sBp} />
           </div>
           <div className="sym-val-row">
             <strong>
@@ -565,7 +513,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
               <ThermometerIcon size={14} />
             </span>
             <span className="sym-title">Temperatura</span>
-            <StatusBadge status={evals.sTemp} />
           </div>
           <div className="sym-val-row">
             <strong>{evals.tempVal !== null ? evals.tempVal.toFixed(1) : '--'}</strong>
@@ -607,7 +554,6 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
               <SmileIcon size={14} />
             </span>
             <span className="sym-title">Ánimo</span>
-            <StatusBadge status={evals.sMood} />
           </div>
           <div className="sym-val-row mood-size">
             <strong>{evals.moodInfo ? evals.moodInfo.label : '--'}</strong>
