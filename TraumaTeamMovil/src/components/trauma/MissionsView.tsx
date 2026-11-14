@@ -1,9 +1,14 @@
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, Text, View } from 'react-native';
 import { Check, CheckCircle2, Circle, Dumbbell, Flame, Footprints, Sparkles } from 'lucide-react-native';
 import { EnvironmentSelector } from './EnvironmentSelector';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
+import { useI18n } from '@/i18n/I18nProvider';
+import { useVoice } from '@/voice/voice-context';
 import { DailyMission } from '../../types/mission';
+import { StreakCheckinHost } from '../streak/StreakCheckinHost';
+import { playStreakCheckin } from '../streak/streak-checkin';
 
 const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -25,10 +30,71 @@ export function MissionsView() {
     toggleMission,
   } = useMission();
 
+  const { t } = useI18n();
+  const { missionsIntent, consumeMissionsIntent, announce } = useVoice();
+  const [pulse] = useState(() => new Animated.Value(0));
+  const handledNonce = useRef(0);
+  const checkInTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef({ checkedInToday, streakDays, doDailyCheckIn });
+  useEffect(() => {
+    latest.current = { checkedInToday, streakDays, doDailyCheckIn };
+  });
+
+  // Animación de racha: se dispara solo cuando el check-in del día pasa de
+  // pendiente a hecho (botón, voz o misión), nunca al cargar la pantalla.
+  const prevCheckedIn = useRef(checkedInToday);
+  useEffect(() => {
+    if (!prevCheckedIn.current && checkedInToday) {
+      playStreakCheckin({ streak: streakDays, todayIndex: new Date().getDay() });
+    }
+    prevCheckedIn.current = checkedInToday;
+  }, [checkedInToday, streakDays]);
+
+  // Check-in por voz: resalta el botón ~1 s, hace el check-in y anuncia la racha (S7).
+  useEffect(() => {
+    if (!missionsIntent || missionsIntent.nonce === handledNonce.current)
+      return;
+    handledNonce.current = missionsIntent.nonce;
+    consumeMissionsIntent(missionsIntent.nonce);
+    Animated.sequence([
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulse, {
+        toValue: 0.35,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start(() => pulse.setValue(0));
+    checkInTimer.current = setTimeout(() => {
+      const cur = latest.current;
+      if (cur.checkedInToday) {
+        announce(t("action.checkinAlready", { days: cur.streakDays }));
+      } else {
+        cur.doDailyCheckIn();
+        announce(t("action.checkinDone", { days: cur.streakDays + 1 }));
+      }
+    }, 1000);
+  }, [missionsIntent, consumeMissionsIntent, announce, pulse, t]);
+  useEffect(
+    () => () => {
+      if (checkInTimer.current) clearTimeout(checkInTimer.current);
+    },
+    [],
+  );
+
   const completedCount = missions.filter((m) => m.completed).length;
 
   return (
     <View className="px-5 pb-10 pt-5">
+      <StreakCheckinHost />
       {/* Selector de entorno */}
       <View className="mb-4">
         <EnvironmentSelector />
@@ -51,6 +117,22 @@ export function MissionsView() {
             </View>
           </View>
 
+          <View>
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: -5,
+              left: -5,
+              right: -5,
+              bottom: -5,
+              borderRadius: 16,
+              borderWidth: 2,
+              borderColor: '#f59e0b',
+              opacity: pulse,
+              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.06] }) }],
+            }}
+          />
           <Pressable
             onPress={doDailyCheckIn}
             disabled={checkedInToday}
@@ -67,6 +149,7 @@ export function MissionsView() {
               {checkedInToday ? 'Completado' : 'Check-in hoy'}
             </Text>
           </Pressable>
+          </View>
         </View>
 
         {/* Indicador semanal */}

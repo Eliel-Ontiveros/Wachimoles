@@ -23,7 +23,11 @@ async function bootstrap(): Promise<void> {
         return;
       }
 
-      callback(new Error("Origin is not allowed by CORS."));
+      callback(
+        new Error(
+          `Origin is not allowed by CORS: ${origin}. Add it to CORS_ORIGINS.`
+        )
+      );
     }
   });
   app.useGlobalPipes(

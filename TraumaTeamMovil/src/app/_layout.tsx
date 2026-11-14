@@ -9,6 +9,9 @@ import { CriticalAlertToaster } from '@/components/trauma/CriticalAlertToaster';
 import { DrawerProvider } from '@/components/trauma/DrawerProvider';
 import { MissionOnboardingModal } from '@/components/trauma/MissionOnboardingModal';
 import { MissionProvider } from '@/components/trauma/MissionProvider';
+import { I18nProvider } from '@/i18n/I18nProvider';
+import { VoiceFab } from '@/voice/VoiceButton';
+import { VoiceProvider } from '@/voice/VoiceProvider';
 import { StartupSplashAnimation } from '@/components/trauma/StartupSplashAnimation';
 
 LogBox.ignoreLogs(['ImageBackground is deprecated', 'useNativeDriver']);
@@ -35,18 +38,23 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <MissionProvider>
-      <DrawerProvider>
-        <Stack screenOptions={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
-        {splashDone ? (
-          <>
-            <MissionOnboardingModal />
-            <CriticalAlertToaster />
-          </>
-        ) : (
-          <StartupSplashAnimation onComplete={() => setSplashDone(true)} />
-        )}
-      </DrawerProvider>
-    </MissionProvider>
+    <I18nProvider>
+      <MissionProvider>
+        <DrawerProvider>
+          <VoiceProvider>
+            <Stack screenOptions={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
+            {splashDone ? (
+              <>
+                <MissionOnboardingModal />
+                <CriticalAlertToaster />
+                <VoiceFab />
+              </>
+            ) : (
+              <StartupSplashAnimation onComplete={() => setSplashDone(true)} />
+            )}
+          </VoiceProvider>
+        </DrawerProvider>
+      </MissionProvider>
+    </I18nProvider>
   );
 }

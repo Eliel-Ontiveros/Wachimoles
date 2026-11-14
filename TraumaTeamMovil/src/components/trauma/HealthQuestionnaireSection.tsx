@@ -15,6 +15,8 @@ import {
 import { getTodayIsoDate } from '../../services/mission-api';
 import { DailyHealthCheck, HealthStatusLevel } from '../../types/mission';
 import { useMission } from './mission-context';
+import { DictationButton } from '@/voice/VoiceButton';
+import { useVoice } from '@/voice/voice-context';
 
 const HERO_STARS = [
   { x: 0.08, y: 0.2, r: 1.1, o: 0.65 },
@@ -182,6 +184,25 @@ export function HealthQuestionnaireSection() {
     setSymptoms(todayCheck.symptoms.length > 0 ? todayCheck.symptoms : ['Ninguno']);
     setNotes(todayCheck.notes ?? '');
   }, [todayCheck]);
+
+  // Dictado por voz: rellena los campos (durante el render) y se consume una sola vez; no guarda.
+  const { healthIntent, consumeHealthIntent } = useVoice();
+  const [handledVoiceNonce, setHandledVoiceNonce] = useState(0);
+  if (healthIntent && healthIntent.nonce !== handledVoiceNonce) {
+    setHandledVoiceNonce(healthIntent.nonce);
+    const f = healthIntent.fields;
+    if (f.bloodSugarMgDl !== undefined) setGlucoseText(String(f.bloodSugarMgDl));
+    if (f.systolicBp !== undefined) setSysText(String(f.systolicBp));
+    if (f.diastolicBp !== undefined) setDiaText(String(f.diastolicBp));
+    if (f.temperatureC !== undefined) setTempText(String(f.temperatureC));
+    if (f.sleepHours !== undefined) setSleepText(String(f.sleepHours));
+    if (f.mood !== undefined) setMood(f.mood);
+    if (f.symptoms !== undefined && f.symptoms.length > 0) setSymptoms(f.symptoms);
+    if (f.notes !== undefined) setNotes(f.notes);
+  }
+  useEffect(() => {
+    if (healthIntent) consumeHealthIntent(healthIntent.nonce);
+  }, [healthIntent, consumeHealthIntent]);
 
   const glucose = parseNum(glucoseText);
   const sys = parseNum(sysText);
@@ -719,6 +740,12 @@ export function HealthQuestionnaireSection() {
             placeholder="Nota clínica adicional (opcional)..."
             placeholderTextColor="#94a3b8"
             className="font-mono text-[11px] text-slate-700"
+          />
+        </View>
+        <View className="mt-2">
+          <DictationButton
+            label="Dictar nota"
+            onText={(t) => setNotes((prev) => (prev ? `${prev} ${t}` : t))}
           />
         </View>
       </View>

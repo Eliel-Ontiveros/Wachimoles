@@ -39,6 +39,8 @@ import {
 import { InjuryTimelapseModal } from './InjuryTimelapseModal';
 import { HealthQuestionnaireSection } from './HealthQuestionnaireSection';
 import { useMission } from './mission-context';
+import type { ObservationPrefill } from '@/voice/parser';
+import { reportBodyTab, useVoice } from '@/voice/voice-context';
 import {
   getBodyConditionsFromBackend,
   syncObservationToBackend,
@@ -377,7 +379,14 @@ function ProblemDetailModal({
 
 export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   const { injuryPhotos } = useMission();
-  const [tab, setTab] = useState<'body' | 'health' | 'records'>('body');
+  const { bodyIntent, consumeBodyIntent } = useVoice();
+  const [tab, setTabState] = useState<'body' | 'health' | 'records'>('body');
+  // La voz necesita saber en qué pestaña está el usuario (S5): se reporta en cada cambio.
+  const setTab = (next: 'body' | 'health' | 'records') => {
+    reportBodyTab(next);
+    setTabState(next);
+  };
+  useEffect(() => () => reportBodyTab('body'), []);
   const [muscles, setMuscles] = useState<MuscleData[]>(INITIAL_MUSCLES);
   const [selectedName, setSelectedName] = useState<string>('Cuello');
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
@@ -436,6 +445,33 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
       isMounted = false;
     };
   }, []);
+
+  // Comandos de voz: se aplican durante el render (sin setState en efectos) y se consumen una sola vez.
+  const [handledVoiceNonce, setHandledVoiceNonce] = useState(0);
+  const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>(undefined);
+  if (bodyIntent && bodyIntent.nonce !== handledVoiceNonce) {
+    setHandledVoiceNonce(bodyIntent.nonce);
+    if (bodyIntent.tab) setTab(bodyIntent.tab);
+    const target = bodyIntent.muscleId ? muscles.find((m) => m.id === bodyIntent.muscleId) : undefined;
+    if (target) {
+      setSelectedName(target.name);
+      const hasProblem = target.status !== 'normal' && Boolean(target.observation);
+      if (bodyIntent.action === 'register') {
+        // Si ya hay un problema guardado, el mismo formulario funciona como edición.
+        setObservationPrefill(bodyIntent.prefill);
+        setObservationModalOpen(true);
+      } else if (bodyIntent.action === 'detail' && hasProblem) {
+        setDetailMuscle(target);
+        setDetailModalOpen(true);
+      } else if (bodyIntent.action === 'photos') {
+        setTimelapseMuscle(target);
+        setTimelapseOpen(true);
+      }
+    }
+  }
+  useEffect(() => {
+    if (bodyIntent) consumeBodyIntent(bodyIntent.nonce);
+  }, [bodyIntent, consumeBodyIntent]);
 
   const selectedMuscle =
     muscles.find((m) => m.name.toLowerCase() === selectedName.toLowerCase()) || muscles[0];
@@ -761,7 +797,11 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
         visible={observationModalOpen}
         muscle={selectedMuscle}
         snapshotUri={zoneSnapshots[selectedMuscle.id]}
-        onClose={() => setObservationModalOpen(false)}
+        prefill={observationPrefill}
+        onClose={() => {
+          setObservationModalOpen(false);
+          setObservationPrefill(undefined);
+        }}
         onSave={handleSaveObservation}
       />
     </View>

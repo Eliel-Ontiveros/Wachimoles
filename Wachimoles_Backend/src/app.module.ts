@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthController } from "./health.controller";
+import { VoiceModule } from "./voice/voice.module";
 import { validateEnvironment } from "./validate-environment";
 import { RagModule } from "./rag/rag.module";
 
@@ -12,6 +13,7 @@ import { RagModule } from "./rag/rag.module";
       validate: validateEnvironment
     }),
     DashboardModule,
+    VoiceModule,
     RagModule
   ],
   controllers: [HealthController]

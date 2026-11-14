@@ -23,12 +23,20 @@ import {
   getPainColorHex,
 } from './BodyModelViewer';
 import { useMission } from './mission-context';
+import { DictationButton } from '@/voice/VoiceButton';
 
 // Modal para registrar o editar observación clínica de una zona
 interface RegisterObservationModalProps {
   visible: boolean;
   muscle: MuscleData;
   snapshotUri?: string;
+  /** Valores sugeridos (p. ej. por voz) que se aplican al abrir; el usuario revisa y guarda. */
+  prefill?: {
+    painIntensity?: number;
+    swelling?: boolean;
+    functionalLimitation?: boolean;
+    notes?: string;
+  };
   onClose: () => void;
   onSave: (muscleId: string, observation: MuscleObservation | null) => void;
 }
@@ -179,6 +187,7 @@ export function RegisterObservationModal({
   visible,
   muscle,
   snapshotUri,
+  prefill,
   onClose,
   onSave,
 }: RegisterObservationModalProps) {
@@ -210,11 +219,17 @@ export function RegisterObservationModal({
         setFunctionalLimitation(false);
         setNotes('');
       }
+      if (prefill) {
+        if (prefill.painIntensity !== undefined) setPainIntensity(prefill.painIntensity);
+        if (prefill.swelling !== undefined) setSwelling(prefill.swelling);
+        if (prefill.functionalLimitation !== undefined) setFunctionalLimitation(prefill.functionalLimitation);
+        if (prefill.notes !== undefined) setNotes(prefill.notes);
+      }
     });
     return () => {
       isMounted = false;
     };
-  }, [visible, muscle]);
+  }, [visible, muscle, prefill]);
 
   const updatePainFromTouch = (locationX: number) => {
     if (sliderWidth <= 0) return;
@@ -558,6 +573,12 @@ export function RegisterObservationModal({
                   placeholderTextColor="#94a3b8"
                   className="min-h-[76px] text-xs leading-5 text-slate-700"
                   textAlignVertical="top"
+                />
+              </View>
+              <View className="mt-2">
+                <DictationButton
+                  label="Dictar observación"
+                  onText={(t) => setNotes((prev) => (prev ? `${prev} ${t}` : t).slice(0, 300))}
                 />
               </View>
               <Text className="mt-1.5 text-right text-[11px] text-slate-400">

@@ -30,6 +30,7 @@ import { DashboardSample } from '../../types/vital-signs';
 import { EnvironmentSelector } from './EnvironmentSelector';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
+import { useVoice } from '@/voice/voice-context';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -1128,6 +1129,15 @@ export function VitalMonitorView() {
       }
     }
   };
+
+  // Comando de voz: abre el historial de la métrica pedida (se consume una sola vez)
+  const { vitalsIntent, consumeVitalsIntent } = useVoice();
+  useEffect(() => {
+    if (!vitalsIntent) return;
+    consumeVitalsIntent(vitalsIntent.nonce);
+    void handleOpenMetricHistory(vitalsIntent.metric);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vitalsIntent, consumeVitalsIntent]);
 
   return (
     <View className="px-5 pb-10 pt-6">

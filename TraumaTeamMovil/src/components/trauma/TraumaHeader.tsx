@@ -1,8 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Bell, CheckCheck, Menu, X } from 'lucide-react-native';
+
+import { useVoice } from '@/voice/voice-context';
 
 import { useDrawer } from './drawer-context';
 import { useMission } from './mission-context';
@@ -11,6 +13,15 @@ export function TraumaHeader() {
   const { open } = useDrawer();
   const { alerts, unreadAlertCount, acknowledgeAllAlerts } = useMission();
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const { alertsIntent, consumeAlertsIntent } = useVoice();
+  const [handledVoiceNonce, setHandledVoiceNonce] = useState(0);
+  if (alertsIntent && alertsIntent.nonce !== handledVoiceNonce) {
+    setHandledVoiceNonce(alertsIntent.nonce);
+    setAlertsOpen(true);
+  }
+  useEffect(() => {
+    if (alertsIntent) consumeAlertsIntent(alertsIntent.nonce);
+  }, [alertsIntent, consumeAlertsIntent]);
 
   return (
     <>

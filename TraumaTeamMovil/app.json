@@ -40,6 +40,14 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "TraumaTeam usa el micrófono para que controles la app con tu voz.",
+          "speechRecognitionPermission": "TraumaTeam usa el reconocimiento de voz para entender tus comandos.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
       ]
     ],
     "experiments": {
