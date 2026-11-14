@@ -7,6 +7,8 @@ import { useMission } from './mission-context';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useVoice } from '@/voice/voice-context';
 import { DailyMission } from '../../types/mission';
+import { StreakCheckinHost } from '../streak/StreakCheckinHost';
+import { playStreakCheckin } from '../streak/streak-checkin';
 
 const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -37,6 +39,16 @@ export function MissionsView() {
   useEffect(() => {
     latest.current = { checkedInToday, streakDays, doDailyCheckIn };
   });
+
+  // Animación de racha: se dispara solo cuando el check-in del día pasa de
+  // pendiente a hecho (botón, voz o misión), nunca al cargar la pantalla.
+  const prevCheckedIn = useRef(checkedInToday);
+  useEffect(() => {
+    if (!prevCheckedIn.current && checkedInToday) {
+      playStreakCheckin({ streak: streakDays, todayIndex: new Date().getDay() });
+    }
+    prevCheckedIn.current = checkedInToday;
+  }, [checkedInToday, streakDays]);
 
   // Check-in por voz: resalta el botón ~1 s, hace el check-in y anuncia la racha (S7).
   useEffect(() => {
@@ -82,6 +94,7 @@ export function MissionsView() {
 
   return (
     <View className="px-5 pb-10 pt-5">
+      <StreakCheckinHost />
       {/* Selector de entorno */}
       <View className="mb-4">
         <EnvironmentSelector />
