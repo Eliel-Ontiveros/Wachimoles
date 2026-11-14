@@ -77,7 +77,6 @@ h3 {
 }
 
 .app-root.theme-dark .sym-reported-chip,
-.app-root.theme-dark .viewer3d-alert-pill.has-alerts,
 .app-root.theme-dark .srb-flag-chip.active,
 .app-root.theme-dark .record-mini-flag {
   color: #fcd34d;
@@ -188,12 +187,11 @@ h3 {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
   border-radius: 0;
-  padding: 8px clamp(14px, 2.2vw, 32px);
+  padding: 12px clamp(16px, 2.2vw, 32px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 2px 14px rgba(15, 23, 42, 0.06);
+  gap: 32px;
 }
 
 .topbar-brand,
@@ -206,50 +204,20 @@ h3 {
   justify-self: start;
   display: flex;
   align-items: center;
-  gap: 11px;
-}
-
-.brand-pulse-box {
-  inline-size: 42px;
-  block-size: 42px;
-  border-radius: 12px;
-  background: radial-gradient(circle at 30% 25%, #10203d 0%, #060b19 100%);
-  color: #73cbf4;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  padding: 5px;
-  border: 1.5px solid rgba(115, 203, 244, 0.5);
-  box-shadow:
-    0 2px 10px rgba(2, 6, 23, 0.24),
-    inset 0 1px 0 rgba(151, 214, 247, 0.2);
-  flex-shrink: 0;
+  gap: 12px;
 }
 
 .brand-logo-img {
-  inline-size: 100%;
-  block-size: 100%;
+  inline-size: 64px;
+  block-size: 48px;
   object-fit: contain;
   display: block;
-  filter: drop-shadow(0 0 6px rgba(115, 203, 244, 0.35));
-}
-
-.brand-text-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.brand-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  flex-shrink: 0;
 }
 
 .brand-wordmark {
   margin: 0;
-  font-size: 1.16rem;
+  font-size: 1.5rem;
   font-weight: 500;
   letter-spacing: -0.025em;
   line-height: 1.1;
@@ -258,15 +226,6 @@ h3 {
 
 .brand-heavy {
   font-weight: 800;
-}
-
-.brand-subtitle {
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-  color: var(--text-muted);
-  line-height: 1.2;
 }
 
 .control-pill {
@@ -312,31 +271,36 @@ h3 {
 
 .topbar-profiles {
   position: relative;
-  justify-self: center;
+  justify-self: start;
+  max-inline-size: 100%;
+  padding-inline-start: 24px;
+  border-inline-start: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
 }
 
 .astronaut-card-btn {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 5px 12px 5px 6px;
-  border-radius: 999px;
-  border: 1.5px solid var(--border-color);
-  background: var(--bg-elevated);
+  min-block-size: 44px;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  gap: 16px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-main);
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .astronaut-card-btn:hover:not(:disabled),
 .astronaut-card-btn.is-open {
-  border-color: #93deff;
-  background: rgba(147, 222, 255, 0.2);
-  box-shadow: 0 4px 14px -6px rgba(2, 132, 199, 0.28);
+  border-color: var(--border-color);
+  background: var(--bg-elevated);
 }
 
 .astro-avatar {
@@ -361,26 +325,30 @@ h3 {
 }
 
 .astro-info {
+  min-inline-size: 0;
   display: flex;
   flex-direction: column;
   text-align: left;
-  line-height: 1.18;
+  gap: 4px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .astro-compact-name {
-  font-size: 0.81rem;
-  font-weight: 800;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: var(--text-main);
 }
 
 .astro-compact-meta {
   font-family: var(--font-mono);
-  font-size: 0.63rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 500;
   color: var(--text-muted);
 }
 
 .astro-trigger-chevron {
+  flex-shrink: 0;
   color: var(--text-muted);
   margin-inline-start: 2px;
   transition: transform 0.18s ease, color 0.15s ease;
@@ -394,8 +362,7 @@ h3 {
 .astro-dropdown-panel {
   position: absolute;
   top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  inset-inline-start: 24px;
   z-index: 60;
   inline-size: min(296px, calc(100vw - 24px));
   background: var(--bg-surface);
@@ -458,12 +425,15 @@ h3 {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-main);
+  overflow-wrap: anywhere;
 }
 
 .astro-dropdown-copy span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
   font-family: var(--font-mono);
   font-size: 0.63rem;
   color: var(--text-muted);
@@ -536,37 +506,37 @@ h3 {
   gap: 10px;
 }
 
-@media (max-width: 860px) {
+.topbar-connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
   .topbar-shell {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    row-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 16px;
+  }
+
+  .topbar-brand {
+    inline-size: 100%;
+    grid-column: 1 / -1;
+    padding-block-end: 12px;
+    border-block-end: 1px solid var(--border-color);
   }
 
   .topbar-profiles {
-    order: 3;
-    flex: 1 1 100%;
-    justify-content: center;
+    padding-inline-start: 0;
+    border-inline-start: 0;
   }
-}
 
-.sync-pill-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
-.sync-pill-wrap.is-standalone {
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--text-main);
+  .astro-dropdown-panel {
+    inset-inline-start: 0;
+  }
 }
 
 .sync-dot {
@@ -577,8 +547,7 @@ h3 {
 }
 
 .sync-dot.online {
-  background: #10b981;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+  background: #059669;
 }
 
 .sync-dot.offline {
@@ -1960,6 +1929,7 @@ dialog.history-native-dialog::backdrop {
 }
 
 .viewer3d-dropdown-bar {
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1968,7 +1938,6 @@ dialog.history-native-dialog::backdrop {
 }
 
 .viewer3d-select-field {
-  position: relative;
   flex: 1 1 auto;
   min-inline-size: 0;
   display: flex;
@@ -1984,7 +1953,7 @@ dialog.history-native-dialog::backdrop {
   color: var(--text-muted);
 }
 
-/* Custom listbox dropdown con iconos de severidad/dolor por músculo */
+/* Muscle listbox with anatomical previews grouped in two columns. */
 .muscle-picker-trigger {
   inline-size: 100%;
   display: flex;
@@ -2040,17 +2009,18 @@ dialog.history-native-dialog::backdrop {
 }
 
 .muscle-picker-menu {
+  container-type: inline-size;
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   right: 0;
   z-index: 45;
-  max-block-size: min(360px, 56dvh);
+  max-block-size: min(520px, 65dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
   color: var(--text-main);
   border: 1.5px solid var(--border-color);
   border-radius: 15px;
@@ -2064,7 +2034,7 @@ dialog.history-native-dialog::backdrop {
 .muscle-picker-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   padding-top: 4px;
   border-top: 1px solid var(--border-color);
 }
@@ -2096,6 +2066,75 @@ dialog.history-native-dialog::backdrop {
 
 .muscle-picker-option:hover {
   background: var(--accent-soft);
+}
+
+.muscle-picker-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.muscle-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.muscle-picker-tile {
+  --muscle-preview-size: clamp(52px, 16cqi, 72px);
+  position: relative;
+  min-inline-size: 0;
+  display: grid;
+  grid-template-columns: var(--muscle-preview-size) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  text-align: left;
+}
+
+.muscle-option-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  inline-size: var(--muscle-preview-size);
+  block-size: var(--muscle-preview-size);
+  color: var(--text-muted);
+}
+
+.muscle-option-preview img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: 7px;
+  object-fit: contain;
+}
+
+.muscle-picker-tile .muscle-option-copy {
+  align-items: flex-start;
+  gap: 4px;
+  padding-inline-end: 10px;
+}
+
+.muscle-picker-tile .muscle-option-copy strong,
+.muscle-picker-tile .muscle-option-copy small {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
+.muscle-picker-tile .muscle-option-copy strong {
+  font-size: 0.75rem;
+}
+
+.muscle-picker-tile .muscle-option-pain-pill {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
+.muscle-picker-tile .muscle-option-check {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
 }
 
 .muscle-picker-option.is-affected-row {
@@ -2189,23 +2228,6 @@ dialog.history-native-dialog::backdrop {
 .muscle-option-check {
   color: var(--accent-text);
   flex-shrink: 0;
-}
-
-.viewer3d-alert-pill {
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 8px 11px;
-  border-radius: 12px;
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
-  white-space: nowrap;
-}
-
-.viewer3d-alert-pill.has-alerts {
-  background: rgba(245, 158, 11, 0.16);
-  color: #b45309;
-  border-color: rgba(245, 158, 11, 0.45);
 }
 
 .viewer3d-canvas-frame {
@@ -3152,15 +3174,13 @@ dialog.history-native-dialog::backdrop {
   gap: 12px;
   padding: 15px 14px;
   border-radius: 15px;
-  background: radial-gradient(
-      115% 135% at 15% 20%,
-      rgba(56, 189, 248, 0.2) 0%,
-      rgba(6, 11, 25, 0) 60%
-    ),
-    linear-gradient(135deg, #060b19 0%, #0b162d 55%, #112240 100%);
-  border: 1.5px solid rgba(56, 189, 248, 0.34);
-  color: #f8fafc;
-  box-shadow: 0 12px 26px -18px rgba(6, 11, 25, 0.72);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.muscle-empty-cosmic .muscle-hero-stars {
+  opacity: 0.24;
 }
 
 .muscle-empty-emblem {
@@ -3172,9 +3192,8 @@ dialog.history-native-dialog::backdrop {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  background: radial-gradient(circle at 30% 25%, #10203d 0%, #060b19 100%);
-  border: 1.5px solid rgba(115, 203, 244, 0.55);
-  box-shadow: 0 0 18px rgba(115, 203, 244, 0.25);
+  background: #f0f9ff;
+  border: 1px solid #cbd5e1;
 }
 
 .muscle-empty-emblem-img {
@@ -3184,14 +3203,13 @@ dialog.history-native-dialog::backdrop {
   object-fit: contain;
   padding: 4px;
   display: block;
-  filter: drop-shadow(0 0 6px rgba(115, 203, 244, 0.35));
 }
 
 .muscle-empty-emblem-ring {
   position: absolute;
   inset: -4px;
   border-radius: 999px;
-  border: 1px dashed rgba(151, 214, 247, 0.5);
+  border: 1px dashed #cbd5e1;
   pointer-events: none;
   animation: emblemOrbit 14s linear infinite;
 }
@@ -3210,13 +3228,13 @@ dialog.history-native-dialog::backdrop {
   font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.09em;
-  color: #73cbf4;
+  color: #0369a1;
 }
 
 .muscle-empty-cosmic-copy strong {
   font-size: 0.92rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   line-height: 1.15;
 }
 
@@ -3225,7 +3243,7 @@ dialog.history-native-dialog::backdrop {
   font-size: 0.71rem;
   line-height: 1.42;
   text-wrap: pretty;
-  color: #cbd5e1;
+  color: #475569;
 }
 
 .muscle-empty-actions {

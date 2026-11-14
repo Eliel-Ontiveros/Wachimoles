@@ -860,7 +860,6 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
               <span className="muscle-empty-emblem-ring" aria-hidden="true" />
             </div>
             <div className="muscle-empty-cosmic-copy">
-              <span className="muscle-empty-eyebrow">ESCÁNER ANATÓMICO · EN ESPERA</span>
               <strong>Selecciona una región 3D</strong>
               <p>
                 Toca un punto anatómico en el modelo 3D, usa el selector superior o elige un

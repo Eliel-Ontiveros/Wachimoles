@@ -77,17 +77,10 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
   return (
     <header className="topbar-shell">
       <div className="topbar-brand">
-        <div className="brand-pulse-box">
-          <img src={brandLogo} alt="Logo TraumaTeam" className="brand-logo-img" />
-        </div>
-        <div className="brand-text-group">
-          <div className="brand-title-row">
-            <h1 className="brand-wordmark">
-              <span className="brand-heavy">Trauma</span>Team
-            </h1>
-          </div>
-          <span className="brand-subtitle">GROUND CONTROL · TELEMETRÍA BIOMÉDICA</span>
-        </div>
+        <img src={brandLogo} alt="Logo TraumaTeam" className="brand-logo-img" />
+        <h1 className="brand-wordmark">
+          <span className="brand-heavy">Trauma</span>Team
+        </h1>
       </div>
 
       <div
@@ -104,7 +97,6 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
             aria-controls={panelId}
             onClick={() => setDropdownOpen((open) => !open)}
           >
-            <div className="astro-avatar">{getInitials(activeAstronaut.shortName)}</div>
             <div className="astro-info">
               <strong className="astro-compact-name">{activeAstronaut.name}</strong>
               <span className="astro-compact-meta">
@@ -180,8 +172,8 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
       </div>
 
       <div className="topbar-right">
-        <div className="sync-pill-wrap is-standalone" role="status" aria-live="polite">
-          <span className={`sync-dot ${connectionStatus.healthOk ? 'online' : 'offline'}`} />
+        <div className="topbar-connection" role="status" aria-live="polite">
+          <span aria-hidden="true" className={`sync-dot ${connectionStatus.healthOk ? 'online' : 'offline'}`} />
           <span className="sync-text">
             {connectionStatus.healthOk ? 'En línea' : 'Sin enlace'}
           </span>
