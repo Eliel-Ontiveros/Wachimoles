@@ -8,11 +8,15 @@ export type LlmInterpretation =
 
 const LLM_TIMEOUT_MS = 18000;
 
+/** Turno de la conversación de aclaración con el LLM (máx. 6, contenido ≤ 300). */
+export type VoiceTurn = { role: 'user' | 'assistant'; content: string };
+export const MAX_HISTORY_TURNS = 6;
+
 /**
  * Respaldo con LLM (DeepSeek vía backend) para frases que el intérprete local
  * no reconoce. Si no está disponible devuelve el motivo, para mostrarlo en la UI.
  */
-export async function interpretWithLlm(text: string, locale: Locale): Promise<LlmInterpretation> {
+export async function interpretWithLlm(text: string, locale: Locale, history: VoiceTurn[] = []): Promise<LlmInterpretation> {
   if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) return { ok: false, reason: 'not-configured' };
 
   const controller = new AbortController();
@@ -24,7 +28,13 @@ export async function interpretWithLlm(text: string, locale: Locale): Promise<Ll
         Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text: text.slice(0, 300), locale }),
+      body: JSON.stringify({
+        text: text.slice(0, 300),
+        locale,
+        ...(history.length
+          ? { history: history.slice(-MAX_HISTORY_TURNS).map((h) => ({ role: h.role, content: h.content.slice(0, 300) })) }
+          : {}),
+      }),
       signal: controller.signal,
     });
     if (response.status === 503) return { ok: false, reason: 'disabled' };

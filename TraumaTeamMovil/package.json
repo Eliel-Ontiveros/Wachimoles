@@ -50,7 +50,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test:voice": "node --test scripts/voice-parser.test.mjs scripts/i18n.test.mjs"
+    "test:voice": "node --test scripts/voice-parser.test.mjs scripts/voice-dialog.test.mjs scripts/i18n.test.mjs"
   },
   "private": true
 }

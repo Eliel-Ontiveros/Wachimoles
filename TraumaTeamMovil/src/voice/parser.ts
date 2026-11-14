@@ -70,7 +70,7 @@ export type VoiceIntent =
 export type ParseResult =
   | { ok: true; intent: VoiceIntent; confidence: number }
   | { ok: false; reason: 'empty' | 'unknown' }
-  | { ok: false; reason: 'ambiguous'; zone: string };
+  | { ok: false; reason: 'ambiguous'; zone: string; pending?: VoiceIntent };
 
 export function normalize(input: string): string {
   return input
@@ -152,7 +152,7 @@ function parseZone(text: string): ParseResult | null {
   const right = hasAny(text, RIGHT);
   const left = hasAny(text, LEFT);
   if (right === left) {
-    return { ok: false, reason: 'ambiguous', zone: z.name };
+    return { ok: false, reason: 'ambiguous', zone: z.name, pending: { type: 'body-zone', muscleId: z.base, muscleName: z.name } };
   }
   const side = right ? 'der' : 'izq';
   const sideName = right ? 'derecho' : 'izquierdo';
@@ -161,6 +161,11 @@ function parseZone(text: string): ParseResult | null {
     intent: { type: 'body-zone', muscleId: `${z.base}_${side}`, muscleName: `${z.name} ${sideName}` },
     confidence: 0.9,
   };
+}
+
+/** ¿El id es de una zona con lado (derecho/izquierdo) pero no lo trae (`deltoides`)? */
+export function zoneNeedsSide(muscleId: string): boolean {
+  return ZONES.some((z) => z.sided && z.base === muscleId);
 }
 
 /** Nombre legible de una zona a partir de su id (`deltoides_izq` → "Deltoides izquierdo"). */
@@ -173,6 +178,18 @@ export function zoneNameFor(muscleId: string): string {
 
 // ---------------------------------------------------------------- comandos
 const GO = ['ir', 've', 'vamos', 'llevame', 'abre', 'abrir', 'muestrame', 'mostrar', 'muestra', 'quiero ver', 'go', 'open', 'show', 'take me', 'ver'];
+
+function observationPrefill(text: string, lite: string): ObservationPrefill {
+  const reg: ObservationPrefill = {};
+  const pm = /(?:dolor|pain|intensidad|intensity|nivel|level)\s*(?:de|of)?\s*(\d{1,2})\b/.exec(lite) ?? /\b(\d{1,2})\s*(?:de|\/|out of)\s*10\b/.exec(lite);
+  if (pm) reg.painIntensity = Math.min(10, Math.max(1, Number(pm[1])));
+  else if (hasAny(text, ['leve', 'suave', 'mild', 'slight'])) reg.painIntensity = 3;
+  else if (hasAny(text, ['moderado', 'moderada', 'moderate'])) reg.painIntensity = 5;
+  else if (hasAny(text, ['fuerte', 'intenso', 'intensa', 'severo', 'severa', 'strong', 'severe', 'intense'])) reg.painIntensity = 8;
+  if (hasAny(text, ['hinchado', 'hinchada', 'hinchazon', 'inflamado', 'inflamada', 'swollen', 'swelling'])) reg.swelling = true;
+  if (hasAny(text, ['limitacion', 'limitado', 'limitada', 'no puedo mover', 'cannot move', 'limited'])) reg.functionalLimitation = true;
+  return reg;
+}
 
 export function parseCommand(raw: string): ParseResult {
   const text = normalize(raw);
@@ -289,18 +306,19 @@ export function parseCommand(raw: string): ParseResult {
   const photoWord = hasAny(text, ['foto', 'fotos', 'fotografia', 'fotografias', 'photo', 'photos', 'timelapse']);
   if ((registerVerb && painWord) || detailWord || photoWord) {
     const z = parseZone(text);
-    if (z && !z.ok) return z;
+    if (z && !z.ok && z.reason === 'ambiguous') {
+      const base = z.pending && 'muscleId' in z.pending ? z.pending.muscleId : undefined;
+      const muscleName = z.zone;
+      if (!base) return z;
+      if (registerVerb && painWord) {
+        return { ...z, pending: { type: 'register-observation', muscleId: base, muscleName, ...observationPrefill(text, lite) } };
+      }
+      return { ...z, pending: { type: detailWord ? 'zone-detail' : 'zone-photos', muscleId: base, muscleName } };
+    }
     if (z && z.ok && z.intent.type === 'body-zone') {
       const { muscleId, muscleName } = z.intent;
       if (registerVerb && painWord) {
-        const reg: Extract<VoiceIntent, { type: 'register-observation' }> = { type: 'register-observation', muscleId, muscleName };
-        const pm = /(?:dolor|pain|intensidad|intensity|nivel|level)\s*(?:de|of)?\s*(\d{1,2})\b/.exec(lite) ?? /\b(\d{1,2})\s*(?:de|\/|out of)\s*10\b/.exec(lite);
-        if (pm) reg.painIntensity = Math.min(10, Math.max(1, Number(pm[1])));
-        else if (hasAny(text, ['leve', 'suave', 'mild', 'slight'])) reg.painIntensity = 3;
-        else if (hasAny(text, ['moderado', 'moderada', 'moderate'])) reg.painIntensity = 5;
-        else if (hasAny(text, ['fuerte', 'intenso', 'intensa', 'severo', 'severa', 'strong', 'severe', 'intense'])) reg.painIntensity = 8;
-        if (hasAny(text, ['hinchado', 'hinchada', 'hinchazon', 'inflamado', 'inflamada', 'swollen', 'swelling'])) reg.swelling = true;
-        if (hasAny(text, ['limitacion', 'limitado', 'limitada', 'no puedo mover', 'cannot move', 'limited'])) reg.functionalLimitation = true;
+        const reg: Extract<VoiceIntent, { type: 'register-observation' }> = { type: 'register-observation', muscleId, muscleName, ...observationPrefill(text, lite) };
         return ok(reg, 0.85);
       }
       if (detailWord) return ok({ type: 'zone-detail', muscleId, muscleName }, 0.85);
@@ -325,8 +343,11 @@ export function parseCommand(raw: string): ParseResult {
 
   if (has(text, 'cinta') || has(text, 'treadmill')) return ok({ type: 'toggle-treadmill' });
 
-  // Chequeo diario / cuestionario de salud
-  if (hasAny(text, ['chequeo', 'check in', 'checkin', 'cuestionario', 'questionnaire', 'como me siento', 'registrar mi dia', 'daily check'])) {
+  // Cuestionario de salud (se rellena por diálogo) vs. check-in de la racha (S7)
+  if (hasAny(text, ['cuestionario', 'questionnaire', 'como me siento', 'llenar'])) {
+    return ok({ type: 'fill-health-check' });
+  }
+  if (hasAny(text, ['chequeo', 'check in', 'checkin', 'registrar mi dia', 'daily check'])) {
     return ok({ type: 'start-checkin' });
   }
 

@@ -36,7 +36,9 @@ export function VoiceFab() {
       ? v.mode === 'dictation'
         ? t('voice.dictating')
         : t('voice.listening')
-      : t('voice.tapToTalk');
+      : v.question
+        ? t('dialog.asking')
+        : t('voice.tapToTalk');
 
   const fb = v.feedback;
   const pill =
@@ -47,7 +49,7 @@ export function VoiceFab() {
         : { bg: 'rgba(88,213,247,0.14)', border: 'rgba(125,211,252,0.4)', text: '#bae6fd' };
 
   const examples = t('examples').split('|').slice(0, 4);
-  const idle = !v.listening && !v.thinking && v.transcript === '' && !fb;
+  const idle = !v.listening && !v.thinking && v.transcript === '' && !fb && !v.question;
 
   if (!v.panelOpen) {
     return (
@@ -108,10 +110,21 @@ export function VoiceFab() {
           paddingBottom: insets.bottom + 20,
         }}>
         <View accessibilityLiveRegion="polite" style={{ alignItems: 'center', marginBottom: 12 }} pointerEvents="none">
+          {v.question && (
+            <Text
+              numberOfLines={6}
+              style={{ color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 10 }}>
+              {v.question}
+            </Text>
+          )}
           {v.transcript !== '' && (
             <Text
               numberOfLines={4}
-              style={{ color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 10 }}>
+              style={
+                v.question
+                  ? { color: '#7dd3fc', fontSize: 17, fontWeight: '600', textAlign: 'center', marginBottom: 10 }
+                  : { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 10 }
+              }>
               {v.transcript}
             </Text>
           )}
@@ -159,9 +172,9 @@ export function VoiceFab() {
             ],
           }}>
           <Pressable
-            onPress={v.listening ? v.stop : v.startCommand}
+            onPress={v.question ? v.cancelDialog : v.listening ? v.stop : v.startCommand}
             accessibilityRole="button"
-            accessibilityLabel={v.listening ? t('voice.stopListening') : t('voice.talk')}>
+            accessibilityLabel={v.question ? t('voice.close') : v.listening ? t('voice.stopListening') : t('voice.talk')}>
             <VoiceOrb size={ORB_BIG} listening={v.listening} thinking={v.thinking} level={v.level} />
           </Pressable>
         </Animated.View>

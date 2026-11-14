@@ -8,8 +8,9 @@ import { useDrawer } from '@/components/trauma/drawer-context';
 import { useMission } from '@/components/trauma/mission-context';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
-import { interpretWithLlm } from '@/services/voice-api';
+import { interpretWithLlm, MAX_HISTORY_TURNS, type VoiceTurn } from '@/services/voice-api';
 
+import { answer as dialogAnswer, needsDialog, startDialog, type DialogState, type Question } from './dialog';
 import { haptic } from './haptics';
 import { parseCommand, zoneNameFor, type ParseResult, type VoiceIntent } from './parser';
 import {
@@ -17,12 +18,15 @@ import {
   type AlertsIntent,
   type BodyIntent,
   type HealthIntent,
+  type MissionsIntent,
   type VitalsIntent,
   type VoiceFeedback,
 } from './voice-context';
 import { WarpTransition, type WarpTrip } from './WarpTransition';
 
 const LISTEN_TIMEOUT_MS = 12000;
+/** Si TTS no avisa de que terminó, se abre el micrófono igualmente pasado este tiempo. */
+const speechFallbackMs = (text: string) => Math.max(2500, text.length * 95);
 
 const ERROR_KEYS: Record<string, MessageKey> = {
   'not-allowed': 'error.notAllowed',
@@ -49,7 +53,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const { t, locale, speech } = useI18n();
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [mode, setMode] = useState<'command' | 'dictation' | null>(null);
+  const [mode, setMode] = useState<'command' | 'dictation' | 'answer' | null>(null);
+  const [question, setQuestion] = useState<string | null>(null);
   const [transcript, setTranscript] = useState('');
   const [feedback, setFeedback] = useState<VoiceFeedback | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -57,11 +62,21 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [healthIntent, setHealthIntent] = useState<HealthIntent | null>(null);
   const [vitalsIntent, setVitalsIntent] = useState<VitalsIntent | null>(null);
   const [alertsIntent, setAlertsIntent] = useState<AlertsIntent | null>(null);
+  const [missionsIntent, setMissionsIntent] = useState<MissionsIntent | null>(null);
   const [trip, setTrip] = useState<WarpTrip | null>(null);
   const [voiceId, setVoiceId] = useState<string | undefined>(undefined);
   const [level] = useState(() => new Animated.Value(0));
 
-  const modeRef = useRef<'command' | 'dictation' | null>(null);
+  const modeRef = useRef<'command' | 'dictation' | 'answer' | null>(null);
+  /** Diálogo de huecos en curso (S3-S6). */
+  const dialogRef = useRef<DialogState | null>(null);
+  /** Conversación de aclaración con el LLM (S8): turnos recientes. */
+  const llmHistory = useRef<VoiceTurn[]>([]);
+  const llmOpen = useRef(false);
+  const speakToken = useRef(0);
+  const speakTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const answerError = useRef(false);
+  const beginRef = useRef<(m: 'command' | 'dictation' | 'answer') => Promise<void>>(async () => {});
   const dictationCb = useRef<((t: string) => void) | null>(null);
   const finalText = useRef('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,6 +121,31 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         Speech.speak(text, { language: speech.lang, voice: voiceId, rate: 1.0, pitch: 1.0 });
       } catch {
         // La confirmación hablada es opcional: el feedback visual siempre se muestra.
+      }
+    },
+    [speech.lang, voiceId]
+  );
+
+  /** Dice el texto y llama a `then` cuando termina (onDone, o por tiempo si TTS no avisa). */
+  const speakThen = useCallback(
+    (text: string, then: () => void) => {
+      speakToken.current += 1;
+      const token = speakToken.current;
+      if (speakTimer.current) clearTimeout(speakTimer.current);
+      let fired = false;
+      const fire = () => {
+        if (fired || speakToken.current !== token) return;
+        fired = true;
+        if (speakTimer.current) clearTimeout(speakTimer.current);
+        speakTimer.current = null;
+        then();
+      };
+      speakTimer.current = setTimeout(fire, speechFallbackMs(text));
+      try {
+        Speech.stop();
+        Speech.speak(text, { language: speech.lang, voice: voiceId, rate: 1.0, pitch: 1.0, onDone: fire, onError: fire });
+      } catch {
+        fire();
       }
     },
     [speech.lang, voiceId]
@@ -156,6 +196,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     nonce.current += 1;
     setVitalsIntent({ nonce: nonce.current, metric });
   }, []);
+  const pushMissionsIntent = useCallback((action: MissionsIntent['action']) => {
+    nonce.current += 1;
+    setMissionsIntent({ nonce: nonce.current, action });
+  }, []);
   const pushAlertsIntent = useCallback(() => {
     nonce.current += 1;
     setAlertsIntent({ nonce: nonce.current });
@@ -173,9 +217,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         }
         case 'start-checkin':
           report({ kind: 'success', text: t('action.checkin') }, true);
-          warpTo(t('tab.health'), () => {
-            pushBodyIntent({ tab: 'health' });
-            router.navigate('/explore');
+          warpTo(t('route./missions'), () => {
+            pushMissionsIntent('checkin');
+            router.navigate('/missions');
           });
           return;
         case 'body-tab': {
@@ -314,7 +358,73 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           return;
       }
     },
-    [drawer, pushAlertsIntent, pushBodyIntent, pushHealthIntent, pushVitalsIntent, report, t, warpTo]
+    [drawer, pushAlertsIntent, pushBodyIntent, pushHealthIntent, pushMissionsIntent, pushVitalsIntent, report, t, warpTo]
+  );
+
+  /** Termina el diálogo/aclaración: olvida el estado y la pregunta mostrada. */
+  const endConversation = useCallback(() => {
+    dialogRef.current = null;
+    llmHistory.current = [];
+    llmOpen.current = false;
+    answerError.current = false;
+    setQuestion(null);
+  }, []);
+
+  /** Dice la pregunta y, al terminar de hablar, abre el micrófono en modo respuesta. */
+  const ask = useCallback(
+    (q: Question) => {
+      const hint = q.hintKey ? `${t(q.hintKey)} ` : '';
+      const text = `${hint}${t(q.key, q.params)}`;
+      setQuestion(text);
+      setTranscript('');
+      setFeedback(null);
+      speakThen(text, () => {
+        if (dialogRef.current || llmOpen.current) void beginRef.current('answer');
+      });
+    },
+    [speakThen, t]
+  );
+
+  /** Ejecuta una intención; si le faltan datos abre un diálogo para completarlos. */
+  const run = useCallback(
+    (intent: VoiceIntent) => {
+      if (needsDialog(intent)) {
+        const start = startDialog(intent);
+        if (start.state) {
+          llmHistory.current = [];
+          llmOpen.current = false;
+          dialogRef.current = start.state;
+          setPanelOpen(true);
+          ask(start.question);
+          return;
+        }
+      }
+      endConversation();
+      execute(intent);
+    },
+    [ask, endConversation, execute]
+  );
+
+  const handleAnswer = useCallback(
+    (text: string) => {
+      const state = dialogRef.current;
+      if (!state) return;
+      const res = dialogAnswer(state, text);
+      if (res.cancelled) {
+        endConversation();
+        report({ kind: 'info', text: t('dialog.cancelled') }, true);
+      } else if (res.failed) {
+        endConversation();
+        report({ kind: 'error', text: t('dialog.failed') }, true);
+      } else if (res.done) {
+        endConversation();
+        execute(res.done);
+      } else if (res.question) {
+        dialogRef.current = res.state;
+        ask(res.question);
+      }
+    },
+    [ask, endConversation, execute, report, t]
   );
 
   const failureText = useCallback(
@@ -325,11 +435,62 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     [t]
   );
 
+  /** Pregunta al LLM (con el historial de la aclaración en curso, S8). */
+  const askLlm = useCallback(
+    (text: string, fallback: string) => {
+      setThinking(true);
+      report({ kind: 'info', text: t('voice.thinking') });
+      const history = llmHistory.current;
+      void interpretWithLlm(text, locale, history).then((llm) => {
+        setThinking(false);
+        if (llm.ok && llm.intent) {
+          run(llm.intent);
+        } else if (llm.ok) {
+          const message = llm.message ?? fallback;
+          const turns: VoiceTurn[] = [...history, { role: 'user', content: text }, { role: 'assistant', content: message }];
+          llmHistory.current = turns.slice(-MAX_HISTORY_TURNS);
+          if (llm.message && turns.length < MAX_HISTORY_TURNS + 2) {
+            // Aclaración: el LLM pregunta algo, se habla y se vuelve a escuchar.
+            llmOpen.current = true;
+            ask({ key: 'dialog.llmMessage', params: { message } });
+          } else {
+            endConversation();
+            report({ kind: 'error', text: message }, true);
+          }
+        } else {
+          endConversation();
+          report({
+            kind: 'error',
+            text: `${t(LLM_KEYS[llm.reason])}${'status' in llm && llm.status ? ` (HTTP ${llm.status})` : ''}`,
+          });
+        }
+      });
+    },
+    [ask, endConversation, locale, report, run, t]
+  );
+
   const runText = useCallback(
     (text: string) => {
+      if (dialogRef.current) {
+        handleAnswer(text);
+        return;
+      }
+      if (llmOpen.current) {
+        if (/^\s*(cancela|cancelar|cancel|olv[ií]dalo|d[eé]jalo|stop|basta)\b/i.test(text)) {
+          endConversation();
+          report({ kind: 'info', text: t('dialog.cancelled') }, true);
+          return;
+        }
+        askLlm(text, t('parse.unknown'));
+        return;
+      }
       const result = parseCommand(text);
       if (result.ok) {
-        execute(result.intent);
+        run(result.intent);
+        return;
+      }
+      if (result.reason === 'ambiguous' && result.pending) {
+        run(result.pending);
         return;
       }
       if (result.reason !== 'unknown') {
@@ -337,20 +498,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         return;
       }
       // El intérprete local no lo entendió: se consulta al LLM (DeepSeek vía backend).
-      setThinking(true);
-      report({ kind: 'info', text: t('voice.thinking') });
-      void interpretWithLlm(text, locale).then((llm) => {
-        setThinking(false);
-        if (llm.ok && llm.intent) execute(llm.intent);
-        else if (llm.ok) report({ kind: 'error', text: llm.message ?? failureText(result) }, true);
-        else
-          report({
-            kind: 'error',
-            text: `${t(LLM_KEYS[llm.reason])}${'status' in llm && llm.status ? ` (HTTP ${llm.status})` : ''}`,
-          });
-      });
+      askLlm(text, failureText(result));
     },
-    [execute, failureText, locale, report, t]
+    [askLlm, endConversation, failureText, handleAnswer, report, run, t]
   );
 
   const clearTimer = () => {
@@ -379,6 +529,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setListening(false);
     level.setValue(0);
     const silent = e.error === 'aborted' || e.error === 'no-speech';
+    // Un fallo real del micrófono durante una respuesta termina la conversación.
+    if (!silent && modeRef.current === 'answer') answerError.current = true;
     if (!silent) console.warn('[voice] recognition error', e.error, e.message);
     const key = ERROR_KEYS[e.error];
     report({
@@ -396,6 +548,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     const current = modeRef.current;
     modeRef.current = null;
     setMode(null);
+    if (current === 'answer') {
+      if (answerError.current) {
+        endConversation();
+        return;
+      }
+      // Silencio = respuesta vacía: el diálogo la trata como no entendida (repite o se rinde).
+      if (dialogRef.current) handleAnswer(text);
+      else if (llmOpen.current) {
+        if (text) askLlm(text, t('parse.unknown'));
+        else endConversation();
+      }
+      return;
+    }
     if (!text) return;
     if (current === 'dictation') {
       dictationCb.current?.(text);
@@ -408,7 +573,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   });
 
   const begin = useCallback(
-    async (next: 'command' | 'dictation') => {
+    async (next: 'command' | 'dictation' | 'answer') => {
       if (!supported) {
         report({ kind: 'error', text: t('error.unsupported') });
         return;
@@ -422,10 +587,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       }
       Speech.stop();
       haptic.listen();
+      answerError.current = false;
       finalText.current = '';
       modeRef.current = next;
       setMode(next);
       setTranscript('');
+      if (next !== 'answer') setQuestion(null);
       setFeedback(null);
       setListening(true);
       ExpoSpeechRecognitionModule.start({
@@ -440,11 +607,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     },
     [supported, report, t, speech.lang]
   );
+  useEffect(() => {
+    beginRef.current = begin;
+  }, [begin]);
 
   const startCommand = useCallback(() => {
+    endConversation();
     setPanelOpen(true);
     void begin('command');
-  }, [begin]);
+  }, [begin, endConversation]);
 
   const startDictation = useCallback(
     (onText: (text: string) => void) => {
@@ -496,10 +667,33 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   );
 
   const openPanel = useCallback(() => setPanelOpen(true), []);
+  /** Cancela diálogo/aclaración: calla la voz, cierra el micrófono y olvida la conversación. */
+  const cancelDialog = useCallback(() => {
+    speakToken.current += 1;
+    endConversation();
+    try {
+      Speech.stop();
+      ExpoSpeechRecognitionModule.abort();
+    } catch {
+      // nada que cancelar
+    }
+    clearTimer();
+    modeRef.current = null;
+    setMode(null);
+    setListening(false);
+    level.setValue(0);
+  }, [endConversation, level]);
+
   const closePanel = useCallback(() => {
-    stop();
+    cancelDialog();
     setPanelOpen(false);
-  }, [stop]);
+  }, [cancelDialog]);
+
+  const announce = useCallback((text: string) => report({ kind: 'success', text }, true), [report]);
+  const consumeMissionsIntent = useCallback(
+    (n: number) => setMissionsIntent((cur) => (cur && cur.nonce === n ? null : cur)),
+    []
+  );
 
   const value = useMemo(
     () => ({
@@ -508,6 +702,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       thinking,
       level,
       mode,
+      question,
       transcript,
       feedback,
       panelOpen,
@@ -516,6 +711,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       startCommand,
       startDictation,
       stop,
+      cancelDialog,
+      announce,
       runText,
       bodyIntent,
       consumeBodyIntent,
@@ -525,8 +722,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       consumeVitalsIntent,
       alertsIntent,
       consumeAlertsIntent,
+      missionsIntent,
+      consumeMissionsIntent,
     }),
-    [supported, listening, thinking, level, mode, transcript, feedback, panelOpen, openPanel, closePanel, startCommand, startDictation, stop, runText, bodyIntent, consumeBodyIntent, healthIntent, consumeHealthIntent, vitalsIntent, consumeVitalsIntent, alertsIntent, consumeAlertsIntent]
+    [supported, listening, thinking, level, mode, transcript, feedback, panelOpen, openPanel, closePanel, startCommand, startDictation, stop, runText, bodyIntent, consumeBodyIntent, healthIntent, consumeHealthIntent, vitalsIntent, consumeVitalsIntent, alertsIntent, consumeAlertsIntent, question, cancelDialog, announce, missionsIntent, consumeMissionsIntent]
   );
 
   return (

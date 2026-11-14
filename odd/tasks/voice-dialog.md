@@ -12,8 +12,8 @@ Branch feat/voice-commands. Builds on odd/tasks/voice-all-actions.md (intents, p
 - S8 LLM clarifications are conversational: when DeepSeek answers {type:"unknown", message}, the app speaks the message, listens again, and sends the conversation (last turns) so the model can complete the action. Backend `POST /voice/interpret` accepts optional `history` [{role:'user'|'assistant', content ≤300}] max 6 items, validated.
 
 ## Tasks
-- T1 S8 backend history in DTO/service/prompt — worker
-- T2 S1-S8 app dialog engine (pure, tested), provider loop (TTS → auto listen), UI question text, missions check-in channel, client history — worker
+- T1 S8 backend history in DTO/service/prompt — worker — done b3e05d2
+- T2 S1-S8 app dialog engine (pure, tested), provider loop (TTS → auto listen), UI question text, missions check-in channel, client history — worker — done
 
 ## Log
 - L1 Screenshot of the observation form + S1/S2 request.

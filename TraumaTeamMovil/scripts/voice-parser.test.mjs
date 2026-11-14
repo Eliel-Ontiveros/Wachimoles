@@ -18,6 +18,11 @@ test('navigation (es/en)', () => {
 test('daily check-in', () => {
   assert.equal(intent('iniciar chequeo diario').type, 'start-checkin');
   assert.equal(intent('start daily check-in').type, 'start-checkin');
+  assert.equal(intent('registrar mi chequeo diario').type, 'start-checkin');
+  assert.equal(intent('hacer check-in').type, 'start-checkin');
+  assert.equal(intent('check in').type, 'start-checkin');
+  assert.equal(intent('cuestionario de salud').type, 'fill-health-check');
+  assert.equal(intent('llenar cuestionario').type, 'fill-health-check');
 });
 
 test('body zones with side', () => {
@@ -75,7 +80,9 @@ test('S1: register an observation by voice', () => {
   assert.deepEqual([k.type, k.muscleId, k.painIntensity, k.swelling], ['register-observation', 'biceps_der', 6, true]);
   assert.equal(intent('register a strong pain in the left calf').painIntensity, 8);
   assert.equal(intent('registrar molestia leve en el cuello').painIntensity, 3);
-  assert.equal(parseCommand('registrar una molestia en el hombro').reason, 'ambiguous');
+  const amb = parseCommand('registrar una molestia en el hombro');
+  assert.equal(amb.reason, 'ambiguous');
+  assert.deepEqual(amb.pending, { type: 'register-observation', muscleId: 'deltoides', muscleName: 'Deltoides' });
 });
 
 test('zone detail and photos', () => {
@@ -127,7 +134,7 @@ test('fill health check', () => {
   assert.equal(intent('me siento cansado').mood, 3);
   const sym = intent('tengo mareo y fatiga');
   assert.deepEqual(sym.symptoms, ['Mareo 0g', 'Fatiga']);
-  assert.equal(intent('como me siento').type, 'start-checkin');
+  assert.equal(intent('como me siento').type, 'fill-health-check');
 });
 
 test('dismiss alert vs open alerts', () => {

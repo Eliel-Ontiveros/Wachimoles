@@ -18,6 +18,8 @@ export type BodyIntent = {
 export type HealthIntent = { nonce: number; fields: HealthPrefill };
 export type VitalsIntent = { nonce: number; metric: VitalMetric };
 export type AlertsIntent = { nonce: number };
+/** Acción pedida a la pantalla de misiones (check-in a través de la racha). */
+export type MissionsIntent = { nonce: number; action: 'checkin' };
 
 export type VoiceCtx = {
   /** El dispositivo/navegador puede reconocer voz. */
@@ -27,7 +29,9 @@ export type VoiceCtx = {
   thinking: boolean;
   /** Nivel de voz 0..1 para animar la esfera. */
   level: Animated.Value;
-  mode: 'command' | 'dictation' | null;
+  mode: 'command' | 'dictation' | 'answer' | null;
+  /** Pregunta abierta (diálogo o aclaración del LLM) que se muestra sobre la esfera. */
+  question: string | null;
   /** Texto parcial/final en vivo mientras se escucha. */
   transcript: string;
   feedback: VoiceFeedback | null;
@@ -38,6 +42,10 @@ export type VoiceCtx = {
   /** Dicta texto libre; el resultado se entrega a `onText` para que el usuario lo revise. */
   startDictation: (onText: (text: string) => void) => void;
   stop: () => void;
+  /** Termina la conversación en curso (diálogo / aclaración del LLM) y la escucha. */
+  cancelDialog: () => void;
+  /** Muestra y dice un mensaje de éxito (p. ej. el resultado del check-in). */
+  announce: (text: string) => void;
   /** Ejecuta texto como si se hubiera dicho (teclado de respaldo/pruebas). */
   runText: (text: string) => void;
   bodyIntent: BodyIntent | null;
@@ -51,6 +59,9 @@ export type VoiceCtx = {
   /** Abre la campana de alertas. */
   alertsIntent: AlertsIntent | null;
   consumeAlertsIntent: (nonce: number) => void;
+  /** Check-in diario pedido por voz: la pantalla de misiones lo ejecuta y resalta. */
+  missionsIntent: MissionsIntent | null;
+  consumeMissionsIntent: (nonce: number) => void;
 };
 
 export const VoiceContext = createContext<VoiceCtx | null>(null);
