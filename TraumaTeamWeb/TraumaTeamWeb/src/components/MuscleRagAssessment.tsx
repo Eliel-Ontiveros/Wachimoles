@@ -105,8 +105,6 @@ export function MuscleRagAssessment({ muscle, initialEnvironment }: Props) {
                 <option value="mars">Mars</option>
               </select>
             </label>
-            <p className="rag-report-date">Report time: {muscle.observation?.recordedAtIso || 'Unknown'}. This may not reflect your current symptoms.</p>
-            <p className="rag-privacy">The report and retrieved passages are sent to the configured AI provider when synthesis is enabled.</p>
             <button type="button" className={`rag-assess-button${answer ? ' is-secondary' : ''}`} disabled={loading} onClick={() => void assess()}>
               {loading ? 'Reviewing documents…' : error ? 'Retry assessment' : answer ? 'Review documents again' : 'Review symptoms against documents'}
             </button>

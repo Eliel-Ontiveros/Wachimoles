@@ -15,6 +15,7 @@ interface BodyModelViewerWebProps {
   selectedMuscleId: string | null;
   onSelectMuscle: (muscleId: string | null) => void;
   onZoneSnapshot?: (zoneId: string, dataUrl: string) => void;
+  onZoneThumbnail?: (zoneId: string, dataUrl: string) => void;
   isLocked?: boolean;
 }
 
@@ -1031,6 +1032,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
   selectedMuscleId,
   onSelectMuscle,
   onZoneSnapshot,
+  onZoneThumbnail,
   isLocked = false,
 }) => {
   const selectId = useId();
@@ -1041,6 +1043,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const onSelectRef = useRef(onSelectMuscle);
   const onZoneSnapshotRef = useRef(onZoneSnapshot);
+  const onZoneThumbnailRef = useRef(onZoneThumbnail);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [zoneThumbnails, setZoneThumbnails] = useState<Record<string, string>>({});
 
@@ -1051,6 +1054,10 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
   useEffect(() => {
     onZoneSnapshotRef.current = onZoneSnapshot;
   }, [onZoneSnapshot]);
+
+  useEffect(() => {
+    onZoneThumbnailRef.current = onZoneThumbnail;
+  }, [onZoneThumbnail]);
 
   const [srcDoc] = useState(() => buildViewerHtml(muscles, selectedMuscleId));
   const [viewerReady, setViewerReady] = useState(false);
@@ -1081,6 +1088,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
           data.dataUrl.startsWith('data:image/png;base64,')
         ) {
           setZoneThumbnails((previous) => ({ ...previous, [data.zoneId]: data.dataUrl }));
+          onZoneThumbnailRef.current?.(data.zoneId, data.dataUrl);
         }
       } catch {
         // Ignorar mensajes externos
@@ -1130,12 +1138,12 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
   );
 
   useEffect(() => {
-    if (!dropdownOpen || !viewerReady) return;
+    if (!viewerReady || (!dropdownOpen && !onZoneThumbnail)) return;
     iframeRef.current?.contentWindow?.postMessage(JSON.stringify({
       type: 'REQUEST_ZONE_THUMBNAILS',
       ids: [...affectedMuscles, ...muscles].map((muscle) => muscle.id),
     }), '*');
-  }, [dropdownOpen, viewerReady, affectedMuscles, muscles]);
+  }, [dropdownOpen, viewerReady, affectedMuscles, muscles, onZoneThumbnail]);
 
   useEffect(() => {
     if (!dropdownOpen) return;
