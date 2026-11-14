@@ -12,6 +12,6 @@ export class VoiceController {
   @HttpCode(200)
   @Header("Cache-Control", "no-store")
   interpret(@Body() body: InterpretVoiceDto): Promise<InterpretResult> {
-    return this.voice.interpret(body.text.trim(), body.locale);
+    return this.voice.interpret(body.text.trim(), body.locale, body.history);
   }
 }

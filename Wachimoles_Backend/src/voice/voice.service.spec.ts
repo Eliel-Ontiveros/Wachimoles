@@ -43,6 +43,27 @@ describe("VoiceService", () => {
     expect(system(1)).toContain("siempre en inglés");
   });
 
+  it("sends system, history in order, then the current text", async () => {
+    const fetchMock = reply('{"type":"help"}');
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const history = [
+      { role: "user" as const, content: "me duele el bíceps" },
+      { role: "assistant" as const, content: "¿derecho o izquierdo?" }
+    ];
+    await make().interpret("el derecho", "es", history);
+    const messages = JSON.parse(fetchMock.mock.calls[0][1].body).messages;
+    expect(messages).toHaveLength(4);
+    expect(messages[0].role).toBe("system");
+    expect(messages.slice(1)).toEqual([...history, { role: "user", content: "el derecho" }]);
+  });
+
+  it("sends only system + user when there is no history", async () => {
+    const fetchMock = reply('{"type":"help"}');
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await make().interpret("hola");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages).toHaveLength(2);
+  });
+
   it("returns the clarification message when the model has no action", async () => {
     global.fetch = reply('{"type":"unknown","message":"¿Qué lado?"}') as unknown as typeof fetch;
     expect(await make().interpret("bíceps")).toEqual({ intent: null, message: "¿Qué lado?" });

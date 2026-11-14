@@ -96,7 +96,7 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
 ## API
 
 - `GET /health` — estado del proceso, sin autenticación.
-- `POST /voice/interpret` `{ "text": "..." }` — token privado; devuelve
+- `POST /voice/interpret` `{ "text": "...", "history"?: [{ "role": "user"|"assistant", "content": "≤300" }] (máx. 6) }` — token privado; devuelve
   `{ intent, message? }` con una acción de la lista blanca de la app (DeepSeek).
 - `GET /dashboard/samples?limit=100&metric=heart_rate` — hasta 500 muestras
   del usuario fijo; `metric` puede ser `heart_rate`, `stress`, `spo2` o
