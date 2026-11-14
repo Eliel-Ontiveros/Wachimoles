@@ -28,7 +28,10 @@ export interface AssistantQuestion {
 }
 
 const MODES: readonly string[] = ['generated', 'evidence_only', 'insufficient_evidence', 'generation_unavailable'];
-const SOURCE_HOSTS = new Set(['www.nasa.gov', 'www.asc-csa.gc.ca', 'www.csa-asc.gc.ca']);
+const SOURCE_HOSTS = new Set([
+  'www.nasa.gov', 'www.asc-csa.gc.ca', 'www.csa-asc.gc.ca',
+  'pmc.ncbi.nlm.nih.gov', 'link.springer.com', 'www.frontiersin.org',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

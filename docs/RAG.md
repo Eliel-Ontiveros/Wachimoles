@@ -24,7 +24,7 @@ There are two separate workflows:
 
 The app calls NestJS. The DeepSeek key stays in NestJS. Supabase continues to store existing app records; this first RAG does not require database changes.
 
-The committed corpus already contains the five source snapshots. You can try retrieval without downloading them again or creating a DeepSeek account.
+The committed corpus contains five original source snapshots and twelve reviewed evidence summaries (17 sources, 23 passages). You can try retrieval without downloading them again or creating a DeepSeek account.
 
 ## Source catalog and its limits
 
@@ -36,7 +36,24 @@ The upstream [challenge page](https://www.spaceappschallenge.org/2026/challenges
 - [Monitoring Radiation for Astronaut Health — CSA](https://www.asc-csa.gc.ca/eng/news/articles/2026/2026-02-26-monitoring-radiation-astronaut-health.asp)
 - [Why Do We Conduct Science Experiments in Space? — CSA](https://www.asc-csa.gc.ca/eng/iss/science/why-do-we-conduct-science-experiments-in-space.asp)
 
-Only the text on these five pages is indexed. Linked articles, videos, PDFs, images and research datasets are not automatically followed. These overview pages support educational explanations; they do not constitute a diagnostic handbook or a complete medical protocol.
+The original pages remain indexed. Twelve additional sources are represented by **original curator-authored evidence summaries**, not complete papers or verbatim extracts. Each summary includes the population/environment, reviewed sections, findings and applicability limits together in one passage. Source links point to the original publications; `contentKind: reviewed_summary` explicitly identifies the indexed representation. `sourceLicense` describes the referenced document, not a claim that its full text has been redistributed. Linked articles, videos, PDFs, images and datasets are not automatically followed.
+
+| Added source ID | Coverage |
+|---|---|
+| chang-lumbar-2016 | Lumbar MRI, paraspinal muscle and back-discomfort limits |
+| nasa-shoulder-2025 | Shoulder mechanics and Earth-based EVA training; excludes treatment guidance |
+| english-sprint-2020 | Exercise, strength, endurance and residual deconditioning |
+| gabel-bone-recovery-2022 | Site-specific bone recovery after flight |
+| doherty-wearables-2024 | Device/outcome-specific validation; sleep and step limitations |
+| leeb-oximetry-2024 | Fingertip SpO2 validation and limits of transfer to wrist sensors |
+| hickey-stress-2021 | HR/HRV, physiological signals and proprietary stress-score limits |
+| flynn-evans-circadian-2016 | Sleep timing, modeled alignment and fatigue interpretation limits |
+| richter-partial-gravity-2017 | Partial-gravity evidence, analogs and chronic planetary uncertainty |
+| stahn-temperature-2017 | Temperature measurement site, method and exercise context |
+| tays-sensorimotor-2021 | Balance, mobility and task-specific readaptation |
+| george-artemis-radiation-2024 | Uncrewed dosimetry, shielding and exposure-data requirements |
+
+The catalog records original titles, authors, years, identifiers, source URLs, review dates and source reuse notices. Correction/retraction checks remain incomplete and are explicitly recorded. The evidence is educational; it does not validate Active 2 or support individual diagnosis, medication advice or duty clearance. Review date: November 14, 2026.
 
 ## 1. Start the backend in search-only mode
 
@@ -159,6 +176,14 @@ npm run start:prod
 Stop any older backend instance first. In watch mode, restart after updating the corpus. Redeploy the rebuilt backend to update a deployed index.
 
 The downloader identifies itself to source servers, accepts only curated HTTPS agency hosts, checks redirect destinations, and requires readable HTML. It replaces the corpus only after every listed source downloads and extracts successfully. If a source fails, the previous corpus stays intact. Inspect the generated text before committing it. Timestamps are stored in UTC.
+
+For an offline rebuild using the existing five snapshots and the local reviewed summaries:
+
+```sh
+npm run rag:ingest -- --offline
+```
+
+Offline mode verifies baseline manifest identity, chunk overlap, word counts and SHA-256 content hashes before reuse; it preserves original retrieval dates. Changed or missing remote sources require online ingestion. Local summaries are confined to `knowledge/reviewed/*.txt`, validated, hashed and indexed anew. Their `retrievedAt` is the local indexing time; `reviewedAt` is the evidence-review date. This route does not download publisher HTML or parse PDFs. The agency downloader's host restriction remains unchanged; web/mobile citation-link validators now also accept the exact selected PMC, Springer and Frontiers hosts.
 
 To add another agency host, update the downloader and mobile source-link allowlists after reviewing the source. To add a PDF, implement PDF-to-text extraction and preserve document/page metadata first; do not pass PDF bytes to this HTML extractor. Review each source's reuse terms before redistributing its content.
 
