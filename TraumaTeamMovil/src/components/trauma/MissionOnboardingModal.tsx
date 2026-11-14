@@ -14,17 +14,23 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClockPlus,
   Flag,
   Globe,
   Orbit,
   Rocket,
+  Satellite,
   Sparkles,
   X,
 } from 'lucide-react-native';
 import {
   addDaysToIsoDate,
   calculateMissionStateFromDeparture,
+  extendMissionArrivalIso,
+  formatRouteDays,
   getDateDaysAgoIso,
+  getDelayPresetDays,
+  getRouteDurationSpec,
   getRouteTotalDays,
   getTodayIsoDate,
   SPACE_LOCATIONS,
@@ -43,7 +49,7 @@ const MONTHS_FULL = [
 const WEEKDAYS_ES = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 function LocationIcon({ loc, color }: { loc: SpaceLocation; color: string }) {
-  if (loc === 'nave') return <Rocket size={14} color={color} />;
+  if (loc === 'estacion') return <Satellite size={14} color={color} />;
   if (loc === 'luna') return <Orbit size={14} color={color} />;
   return <Globe size={14} color={color} />;
 }
@@ -209,7 +215,7 @@ function SpaceDateCalendar({
   );
 }
 
-const LOCATION_OPTIONS: SpaceLocation[] = ['tierra', 'nave', 'luna', 'marte'];
+const LOCATION_OPTIONS: SpaceLocation[] = ['tierra', 'estacion', 'luna', 'marte'];
 
 // Modal de Plan de Vuelo blanco (manteniendo la tarjeta de trayectoria espacial oscura)
 export function MissionOnboardingModal() {
@@ -268,6 +274,7 @@ function MissionOnboardingModalContent({
   const [selectedArrivalDate, setSelectedArrivalDate] = useState<string | null>(arrivalDate);
   const [dateStep, setDateStep] = useState<'departure' | 'arrival'>('departure');
   const [calendarOpen, setCalendarOpen] = useState<boolean>(false);
+  const [delayExpanded, setDelayExpanded] = useState<boolean>(false);
 
   const [calendarAnim] = useState(() => new Animated.Value(0));
   const [chevronAnim] = useState(() => new Animated.Value(0));
@@ -301,8 +308,27 @@ function MissionOnboardingModalContent({
   );
 
   const isSameRoute = selectedOrigin === selectedDest;
+  const routeSpec = useMemo(
+    () => getRouteDurationSpec(selectedOrigin, selectedDest),
+    [selectedOrigin, selectedDest]
+  );
   const defaultRouteDays = getRouteTotalDays(selectedOrigin, selectedDest);
   const estimatedArrivalIso = addDaysToIsoDate(selectedDate, defaultRouteDays);
+  const delayPresets = useMemo(
+    () => getDelayPresetDays(preview.totalDays),
+    [preview.totalDays]
+  );
+
+  const handleAddDelayDays = (extraDays: number) => {
+    if (isSameRoute || extraDays <= 0) return;
+    const nextArrival = extendMissionArrivalIso(
+      selectedDate,
+      preview.effectiveArrivalDate,
+      extraDays
+    );
+    setSelectedArrivalDate(nextArrival);
+    setDelayExpanded(false);
+  };
 
   const calendarMaxHeight = calendarAnim.interpolate({
     inputRange: [0, 1],
@@ -418,7 +444,7 @@ function MissionOnboardingModalContent({
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Tarjeta de trayectoria espacial (mantiene fondo espacial) */}
-            <View className="mb-3.5">
+            <View className="mb-3">
               <SpaceJourneyTimeline
                 compact
                 previewDay={preview.missionDay}
@@ -429,6 +455,42 @@ function MissionOnboardingModalContent({
                 previewTotalDays={preview.totalDays}
               />
             </View>
+
+            {routeSpec && (
+              <View className="mb-3.5 rounded-xl border border-slate-200 bg-[#f7f7f7] px-3 py-2">
+                <View className="flex-row items-center justify-between gap-2">
+                  <Text className="font-mono text-[9.5px] font-bold text-slate-700">
+                    Trayecto: {formatRouteDays(routeSpec.minDias)}–{formatRouteDays(routeSpec.maxDias)} días
+                  </Text>
+                  <Text className="font-mono text-[9.5px] font-extrabold text-sky-700">
+                    Promedio: {formatRouteDays(routeSpec.promedioDias)}{' '}
+                    {routeSpec.promedioDias === 1 ? 'día' : 'días'}
+                  </Text>
+                </View>
+                {(routeSpec.ventanaLanzamientoMeses !== undefined ||
+                  (routeSpec.esperaRetornoDiasMin !== undefined &&
+                    routeSpec.esperaRetornoDiasMax !== undefined)) && (
+                  <View className="mt-1 flex-row flex-wrap gap-1.5">
+                    {routeSpec.ventanaLanzamientoMeses !== undefined && (
+                      <View className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5">
+                        <Text className="font-mono text-[8.5px] font-bold text-amber-800">
+                          Ventana de lanzamiento: c/{routeSpec.ventanaLanzamientoMeses} meses
+                        </Text>
+                      </View>
+                    )}
+                    {routeSpec.esperaRetornoDiasMin !== undefined &&
+                      routeSpec.esperaRetornoDiasMax !== undefined && (
+                        <View className="rounded-md border border-orange-200 bg-orange-50 px-2 py-0.5">
+                          <Text className="font-mono text-[8.5px] font-bold text-orange-800">
+                            Espera retorno en Marte: {routeSpec.esperaRetornoDiasMin}–
+                            {routeSpec.esperaRetornoDiasMax} días
+                          </Text>
+                        </View>
+                      )}
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* 1. Punto de salida */}
             <Text className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -442,13 +504,14 @@ function MissionOnboardingModalContent({
                   <Pressable
                     key={locId}
                     onPress={() => handleSelectOrigin(locId)}
-                    className={`flex-1 items-center rounded-xl border py-2 ${
+                    className={`flex-1 items-center rounded-xl border px-1 py-2 ${
                       active
                         ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
                         : 'border-slate-200 bg-[#f7f7f7]'
                     }`}>
                     <LocationIcon loc={locId} color={active ? '#0284c7' : '#64748b'} />
                     <Text
+                      numberOfLines={1}
                       className={`mt-1 font-mono text-[10px] font-bold ${
                         active ? 'text-trauma-ink' : 'text-slate-600'
                       }`}>
@@ -474,7 +537,7 @@ function MissionOnboardingModalContent({
                     disabled={isSameAsOrigin}
                     onPress={() => handleSelectDest(locId)}
                     style={isSameAsOrigin ? { opacity: 0.35 } : undefined}
-                    className={`flex-1 items-center rounded-xl border py-2 ${
+                    className={`flex-1 items-center rounded-xl border px-1 py-2 ${
                       active
                         ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
                         : 'border-slate-200 bg-[#f7f7f7]'
@@ -484,6 +547,7 @@ function MissionOnboardingModalContent({
                       color={active ? '#0284c7' : isSameAsOrigin ? '#94a3b8' : '#64748b'}
                     />
                     <Text
+                      numberOfLines={1}
                       className={`mt-1 font-mono text-[10px] font-bold ${
                         active
                           ? 'text-trauma-ink'
@@ -548,6 +612,43 @@ function MissionOnboardingModalContent({
               </Pressable>
             </View>
 
+            {/* Control para añadir tiempo si la misión se atrasa */}
+            <View className="mt-2 rounded-xl border border-amber-200 bg-amber-50/75 px-3 py-2">
+              <View className="flex-row items-center justify-between gap-2">
+                <View className="flex-1 flex-row items-center">
+                  <ClockPlus size={13} color="#b45309" />
+                  <Text className="ml-1.5 font-mono text-[10px] font-bold text-amber-900">
+                    ¿Se atrasó la misión?
+                  </Text>
+                </View>
+                <Pressable
+                  disabled={isSameRoute}
+                  onPress={() => setDelayExpanded((open) => !open)}
+                  style={isSameRoute ? { opacity: 0.45 } : undefined}
+                  accessibilityLabel="Añadir tiempo a la misión"
+                  className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 active:opacity-75">
+                  <Text className="font-mono text-[10px] font-extrabold text-amber-800">
+                    {delayExpanded ? 'Cerrar' : '+ Añadir tiempo'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {delayExpanded && (
+                <View className="mt-2 flex-row gap-1.5">
+                  {delayPresets.map((extra) => (
+                    <Pressable
+                      key={extra}
+                      onPress={() => handleAddDelayDays(extra)}
+                      className="flex-1 items-center rounded-lg border border-amber-300 bg-white py-1.5 active:opacity-75">
+                      <Text className="font-mono text-[10px] font-extrabold text-amber-900">
+                        +{extra}d
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
             {/* Contenedor animado del calendario al expandir o colapsar */}
             <Animated.View
               style={{
@@ -582,7 +683,7 @@ function MissionOnboardingModalContent({
                   <View className="flex-1 flex-row items-center pr-2">
                     <Sparkles size={13} color="#0284c7" />
                     <Text className="ml-1.5 font-mono text-[10px] font-bold text-slate-700" numberOfLines={1}>
-                      Estimar ({formatReadableIso(estimatedArrivalIso)} · {defaultRouteDays}d)
+                      Estimar ({formatReadableIso(estimatedArrivalIso)} · {formatRouteDays(defaultRouteDays)}d)
                     </Text>
                   </View>
                   <Text className="font-mono text-[9px] font-bold text-sky-700">

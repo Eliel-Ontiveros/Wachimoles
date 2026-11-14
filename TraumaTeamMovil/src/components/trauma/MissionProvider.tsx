@@ -4,6 +4,7 @@ import { useVitalSigns } from '../../hooks/use-vital-signs';
 import {
   calculateMissionStateFromDeparture,
   ENVIRONMENTS,
+  extendMissionArrivalIso,
   getDateDaysAgoIso,
   getMissionsForEnvironment,
   getRouteTotalDays,
@@ -199,12 +200,12 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     void syncEnvironmentToBackend(calc.calculatedEnvironment);
   }, []);
 
-  // Al cambiar manualmente la ubicación a Base Lunar o Marte, se adelanta la misión a su llegada
+  // Al cambiar manualmente la ubicación a Estación EEI, Base Lunar o Marte, se adelanta la misión a su llegada
   const setEnvironment = useCallback(
     (env: EnvironmentType) => {
       setEnvironmentState(env);
       setArrivalDate(null);
-      if (env === 'luna' || env === 'marte') {
+      if (env === 'estacion' || env === 'luna' || env === 'marte') {
         const nextOrigin = origin === env ? 'tierra' : origin;
         if (origin === env) setOrigin('tierra');
         setDestination(env);
@@ -238,7 +239,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           arrivalDate
         ).totalDays;
         const nextDay = Math.min(total, d + 1);
-        if (nextDay >= total && destination !== 'nave') {
+        if (nextDay >= total) {
           setEnvironmentState(destination);
         }
         return nextDay;
@@ -274,6 +275,31 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     setMissionSetupOpen(false);
     void syncEnvironmentToBackend(nextEnv);
   }, [origin, destination]);
+
+  // Extiende la fecha de llegada en caso de atraso de la misión
+  const delayMission = useCallback(
+    (extraDays: number) => {
+      if (extraDays <= 0) return;
+      const nextArrival = extendMissionArrivalIso(
+        departureDate,
+        effectiveArrivalDate,
+        extraDays
+      );
+      setArrivalDate(nextArrival);
+      const calc = calculateMissionStateFromDeparture(
+        origin,
+        destination,
+        departureDate,
+        nextArrival
+      );
+      setMissionDay(calc.missionDay);
+      if (!calc.arrived && calc.calculatedEnvironment !== environment) {
+        setEnvironmentState(calc.calculatedEnvironment);
+        void syncEnvironmentToBackend(calc.calculatedEnvironment);
+      }
+    },
+    [departureDate, effectiveArrivalDate, origin, destination, environment]
+  );
 
   const toggleTreadmillRoutine = useCallback(() => {
     setTreadmillRoutineActive((prev) => !prev);
@@ -444,6 +470,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       closeMissionSetup,
       configureMission,
       arriveEarly,
+      delayMission,
       setEnvironment,
       streakDays,
       checkedInToday,
@@ -481,6 +508,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       closeMissionSetup,
       configureMission,
       arriveEarly,
+      delayMission,
       setEnvironment,
       streakDays,
       checkedInToday,

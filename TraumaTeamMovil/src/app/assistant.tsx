@@ -6,7 +6,7 @@ import { TraumaScreen } from '@/components/trauma/TraumaHeader';
 import { useMission } from '@/components/trauma/mission-context';
 import { askAssistant, fetchAssistantStatus, type AssistantAnswer, type AssistantEnvironment, type AssistantStatus } from '@/services/assistant-api';
 
-const ENVIRONMENTS: Record<string, AssistantEnvironment> = { tierra: 'earth', nave: 'spacecraft', luna: 'moon', marte: 'mars' };
+const ENVIRONMENTS: Record<string, AssistantEnvironment> = { tierra: 'earth', nave: 'spacecraft', estacion: 'spacecraft', luna: 'moon', marte: 'mars' };
 const EXAMPLES = ['What are the five hazards of human spaceflight?', 'How does space radiation affect astronauts?', 'Why are bone and muscle changes studied in space?'];
 const MODE_LABELS = { generated: 'Evidence-based explanation', evidence_only: 'Retrieved passages', insufficient_evidence: 'Insufficient evidence', generation_unavailable: 'Passages available · AI unavailable' };
 

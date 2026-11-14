@@ -27,6 +27,7 @@ export type MissionCtx = {
   closeMissionSetup: () => void;
   configureMission: (setup: MissionSetup) => void;
   arriveEarly: () => void;
+  delayMission: (extraDays: number) => void;
   setEnvironment: (env: EnvironmentType) => void;
   streakDays: number;
   checkedInToday: boolean;

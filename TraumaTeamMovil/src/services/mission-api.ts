@@ -8,6 +8,7 @@ import {
   DailyMission,
   EnvironmentConfig,
   EnvironmentType,
+  RouteDurationSpec,
   SpaceLocation,
 } from '../types/mission';
 import { Platform } from 'react-native';
@@ -297,33 +298,80 @@ export const SPACE_LOCATIONS: Record<
   { id: SpaceLocation; label: string; shortLabel: string }
 > = {
   tierra: { id: 'tierra', label: 'Tierra', shortLabel: 'Tierra' },
-  nave: { id: 'nave', label: 'Estación Orbital', shortLabel: 'Estación' },
+  estacion: { id: 'estacion', label: 'Estación Espacial (EEI)', shortLabel: 'EEI' },
   luna: { id: 'luna', label: 'Base Lunar', shortLabel: 'Luna' },
   marte: { id: 'marte', label: 'Superficie de Marte', shortLabel: 'Marte' },
 };
 
-const ROUTE_DAYS: Record<string, number> = {
-  'tierra:nave': 30,
-  'nave:tierra': 30,
-  'tierra:luna': 45,
-  'luna:tierra': 45,
-  'tierra:marte': 180,
-  'marte:tierra': 180,
-  'nave:luna': 15,
-  'luna:nave': 15,
-  'nave:marte': 150,
-  'marte:nave': 150,
-  'luna:marte': 135,
-  'marte:luna': 135,
-};
+export const ROUTE_SPECS: readonly RouteDurationSpec[] = [
+  { origen: 'tierra', destino: 'estacion', minDias: 0.125, maxDias: 2, promedioDias: 1 },
+  { origen: 'tierra', destino: 'luna', minDias: 3, maxDias: 4, promedioDias: 3.5 },
+  {
+    origen: 'tierra',
+    destino: 'marte',
+    minDias: 180,
+    maxDias: 270,
+    promedioDias: 210,
+    ventanaLanzamientoMeses: 26,
+  },
+  { origen: 'estacion', destino: 'tierra', minDias: 0.15, maxDias: 1, promedioDias: 0.5 },
+  { origen: 'estacion', destino: 'luna', minDias: 3, maxDias: 4, promedioDias: 3.5 },
+  {
+    origen: 'estacion',
+    destino: 'marte',
+    minDias: 180,
+    maxDias: 270,
+    promedioDias: 210,
+    ventanaLanzamientoMeses: 26,
+  },
+  { origen: 'luna', destino: 'tierra', minDias: 3, maxDias: 4, promedioDias: 3.5 },
+  { origen: 'luna', destino: 'estacion', minDias: 3, maxDias: 5, promedioDias: 4 },
+  {
+    origen: 'luna',
+    destino: 'marte',
+    minDias: 180,
+    maxDias: 270,
+    promedioDias: 210,
+    ventanaLanzamientoMeses: 26,
+  },
+  {
+    origen: 'marte',
+    destino: 'tierra',
+    minDias: 180,
+    maxDias: 270,
+    promedioDias: 210,
+    esperaRetornoDiasMin: 450,
+    esperaRetornoDiasMax: 540,
+  },
+  { origen: 'marte', destino: 'luna', minDias: 180, maxDias: 270, promedioDias: 210 },
+  { origen: 'marte', destino: 'estacion', minDias: 180, maxDias: 270, promedioDias: 210 },
+];
+
+const ROUTE_SPEC_MAP = new Map<string, RouteDurationSpec>(
+  ROUTE_SPECS.map((route) => [`${route.origen}:${route.destino}`, route])
+);
+
+export function getRouteDurationSpec(
+  origin: SpaceLocation,
+  destination: SpaceLocation
+): RouteDurationSpec | null {
+  return ROUTE_SPEC_MAP.get(`${origin}:${destination}`) ?? null;
+}
+
+export function formatRouteDays(days: number): string {
+  if (!Number.isFinite(days)) return '0';
+  return Number.isInteger(days) ? String(days) : String(Number(days.toFixed(3)));
+}
 
 export function getRouteTotalDays(origin: SpaceLocation, destination: SpaceLocation): number {
+  const spec = getRouteDurationSpec(origin, destination);
+  if (spec) return spec.promedioDias;
   if (origin === destination) {
-    if (destination === 'marte') return 180;
-    if (destination === 'luna') return 45;
-    return 30;
+    if (destination === 'marte') return 210;
+    if (destination === 'luna') return 3.5;
+    return 1;
   }
-  return ROUTE_DAYS[`${origin}:${destination}`] ?? 45;
+  return 3.5;
 }
 
 export function getTodayIsoDate(): string {
@@ -336,7 +384,9 @@ export function getTodayIsoDate(): string {
 
 export function getDateDaysAgoIso(daysAgo: number): string {
   const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
+  // Redondeo hacia arriba en fracciones (> 0) para garantizar que la llegada marcada sea >= promedioDias
+  const wholeDays = daysAgo > 0 ? Math.max(1, Math.ceil(daysAgo)) : Math.round(daysAgo);
+  d.setDate(d.getDate() - wholeDays);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -349,11 +399,35 @@ export function addDaysToIsoDate(isoDate: string, daysToAdd: number): string {
     parts.length === 3 && !parts.some((n) => isNaN(n))
       ? new Date(parts[0], parts[1] - 1, parts[2])
       : new Date();
-  base.setDate(base.getDate() + daysToAdd);
+  const wholeDays = daysToAdd > 0 ? Math.max(1, Math.ceil(daysToAdd)) : Math.round(daysToAdd);
+  base.setDate(base.getDate() + wholeDays);
   const y = base.getFullYear();
   const m = String(base.getMonth() + 1).padStart(2, '0');
   const day = String(base.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * Extiende la fecha de llegada (YYYY-MM-DD) ante un atraso de misión,
+ * garantizando sumar `extraDays` sobre hoy o la llegada actual (la mayor).
+ */
+export function extendMissionArrivalIso(
+  departureDateIso: string,
+  currentEffectiveArrivalIso: string,
+  extraDays: number
+): string {
+  const todayIso = getTodayIsoDate();
+  const anchorIso =
+    currentEffectiveArrivalIso > todayIso ? currentEffectiveArrivalIso : todayIso;
+  const candidate = addDaysToIsoDate(anchorIso, extraDays);
+  return candidate > departureDateIso
+    ? candidate
+    : addDaysToIsoDate(departureDateIso, extraDays);
+}
+
+/** Atajos de días extra para atrasos según la duración de la ruta actual. */
+export function getDelayPresetDays(totalDays: number): number[] {
+  return [1, 3, 7, totalDays >= 30 ? 30 : 14];
 }
 
 export function diffDaysBetweenIso(startIso: string, endIso: string): number {
@@ -466,9 +540,19 @@ export const ENVIRONMENTS: Record<EnvironmentType, EnvironmentConfig> = {
     shortLabel: 'Nave',
     gravityLabel: '0g Microgravedad',
     destinationLabel: 'Estación Orbital',
-    missionTotalDays: 30,
+    missionTotalDays: 1,
     dailyStepsGoal: 3000,
     routineSummary: 'Prevención de pérdida ósea y muscular en microgravedad',
+  },
+  estacion: {
+    id: 'estacion',
+    label: 'Estación Espacial (EEI)',
+    shortLabel: 'Estación EEI',
+    gravityLabel: '0g Microgravedad',
+    destinationLabel: 'Estación Espacial (EEI)',
+    missionTotalDays: 1,
+    dailyStepsGoal: 3500,
+    routineSummary: 'Control en estación orbital, ejercicio ARED y monitoreo 0g',
   },
   luna: {
     id: 'luna',
@@ -476,7 +560,7 @@ export const ENVIRONMENTS: Record<EnvironmentType, EnvironmentConfig> = {
     shortLabel: 'Luna',
     gravityLabel: '0.16g Gravedad Lunar',
     destinationLabel: 'Base Lunar',
-    missionTotalDays: 45,
+    missionTotalDays: 3.5,
     dailyStepsGoal: 6000,
     routineSummary: 'Movilidad EVA y estabilidad articular en baja gravedad',
   },
@@ -486,7 +570,7 @@ export const ENVIRONMENTS: Record<EnvironmentType, EnvironmentConfig> = {
     shortLabel: 'Marte',
     gravityLabel: '0.38g Gravedad Marciana',
     destinationLabel: 'Marte',
-    missionTotalDays: 180,
+    missionTotalDays: 210,
     dailyStepsGoal: 8000,
     routineSummary: 'Resistencia de carga, recuperación lumbar y control respiratorio',
   },
@@ -496,7 +580,7 @@ export const ENVIRONMENTS: Record<EnvironmentType, EnvironmentConfig> = {
     shortLabel: 'Tierra',
     gravityLabel: '1.0g Gravedad Terrestre',
     destinationLabel: 'Tierra',
-    missionTotalDays: 30,
+    missionTotalDays: 1,
     dailyStepsGoal: 8000,
     routineSummary: 'Acondicionamiento pre-misión y readaptación cardiovascular 1g',
   },
@@ -559,6 +643,30 @@ export function getMissionsForEnvironment(
         environment: 'nave',
       },
     ],
+    estacion: [
+      {
+        id: 'env-estacion-ared',
+        title: 'Resistencia ARED en EEI',
+        description: 'Carga axial y tonificación muscular en estación orbital',
+        category: 'exercise',
+        targetValue: 25,
+        currentValue: 0,
+        unit: 'min',
+        completed: false,
+        environment: 'estacion',
+      },
+      {
+        id: 'env-estacion-sans',
+        title: 'Control cefálico y postura 0g',
+        description: 'Pausa visual y movilidad cervical en módulos orbitales',
+        category: 'exercise',
+        targetValue: 10,
+        currentValue: 0,
+        unit: 'min',
+        completed: false,
+        environment: 'estacion',
+      },
+    ],
     luna: [
       {
         id: 'env-luna-eva',
@@ -610,7 +718,7 @@ export function getMissionsForEnvironment(
   };
 
   const activityMission: DailyMission =
-    env === 'nave'
+    env === 'nave' || env === 'estacion'
       ? {
         id: 'treadmill-steps',
         title: treadmillActive ? 'Rutina de caminadora T2' : 'Caminadora 0g (Opcional)',
@@ -622,7 +730,7 @@ export function getMissionsForEnvironment(
         currentValue: treadmillActive ? currentSteps : 0,
         unit: 'pasos',
         completed: treadmillActive && currentSteps >= goal,
-        environment: 'nave',
+        environment: env,
       }
       : {
         id: 'daily-steps',

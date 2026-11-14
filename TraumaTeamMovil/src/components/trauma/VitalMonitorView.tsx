@@ -1253,8 +1253,8 @@ export function VitalMonitorView() {
         </View>
       </Pressable>
 
-      {/* Pasos en superficie (Luna/Marte) o rutina opcional de caminadora en microgravedad (Nave) */}
-      {environment === 'nave' ? (
+      {/* Pasos en superficie (Luna/Marte/Tierra) o rutina opcional de caminadora en microgravedad (Nave/EEI) */}
+      {environment === 'nave' || environment === 'estacion' ? (
         <View className="mb-5 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-xs">
           <View className="flex-1 flex-row items-center pr-3">
             <View
@@ -1264,7 +1264,11 @@ export function VitalMonitorView() {
             </View>
             <View className="flex-1">
               <Text className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
-                {treadmillRoutineActive ? 'Caminadora 0g activa' : 'En el espacio (0g)'}
+                {treadmillRoutineActive
+                  ? 'Caminadora 0g activa'
+                  : environment === 'estacion'
+                    ? 'En la EEI (0g)'
+                    : 'En el espacio (0g)'}
               </Text>
               <Text className="font-mono text-xs font-bold text-slate-800">
                 {treadmillRoutineActive
