@@ -1,10 +1,7 @@
 import React, { useId, useMemo, useState } from 'react';
-import brandLogo from '../assets/Recurso 6.svg';
 import {
   getMuscleKnowledge,
   getPainColorHex,
-  getRiskTierFromIntensity,
-  getRiskTierMeta,
 } from '../data/anatomy-catalog';
 import type { SaveMuscleUpdateInput } from '../App';
 import type {
@@ -43,7 +40,6 @@ function getPainSeverityLabel(intensity: number): string {
 
 interface MuscleDetailAndAiPanelProps {
   muscle: MuscleData | null;
-  allMuscles: MuscleData[];
   latestHealthCheck: DailyHealthCheck | null;
   photos: InjuryPhoto[];
   photosStatus: ConnectionEndpointStatus['photosStatus'];
@@ -52,7 +48,6 @@ interface MuscleDetailAndAiPanelProps {
   snapshotUri?: string;
   environment: EnvironmentType;
   resolvedRecord?: BodyConditionRecord | null;
-  onSelectMuscle: (muscleId: string) => void;
   onSaveUpdate?: (muscle: MuscleData, input: SaveMuscleUpdateInput) => Promise<void>;
   onCureMuscle?: (muscle: MuscleData, closingNote?: string) => Promise<void>;
 }
@@ -135,10 +130,6 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
       : 2
     : 1;
 
-  const tier = getRiskTierFromIntensity(obs?.painIntensity ?? 0);
-  const tierMeta = getRiskTierMeta(tier);
-  const heroColor = hasReport ? tierMeta.color : isResolvedHistory ? '#10b981' : '#38bdf8';
-
   const displaySwelling = hasReport ? Boolean(obs?.swelling) : Boolean(resolvedRecord?.swelling);
   const displayLimitation = hasReport
     ? Boolean(obs?.functionalLimitation)
@@ -200,89 +191,22 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
 
   return (
     <section className="panel-card muscle-panel-card" aria-label={`Ficha de ${muscle.name}`}>
-      <div
-        className="muscle-hero-dark"
-        style={
-          {
-            borderColor:
-              hasReport || isResolvedHistory ? `${heroColor}99` : 'rgba(56, 189, 248, 0.32)',
-            '--hero-glow':
-              hasReport || isResolvedHistory ? `${heroColor}36` : 'rgba(56, 189, 248, 0.22)',
-          } as React.CSSProperties
-        }
-      >
-        <svg
-          className="muscle-hero-stars"
-          viewBox="0 0 360 96"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <circle cx="48" cy="18" r="1" fill="#93c5fd" opacity="0.55" />
-          <circle cx="136" cy="72" r="0.9" fill="#e2e8f0" opacity="0.45" />
-          <circle cx="222" cy="20" r="1.1" fill="#38bdf8" opacity="0.65" />
-          <circle cx="294" cy="64" r="1" fill="#e2e8f0" opacity="0.45" />
-          <circle cx="332" cy="24" r="1.2" fill="#7dd3fc" opacity="0.6" />
-        </svg>
-
-        <div className="muscle-hero-left">
-          <div
-            className="muscle-snapshot-box"
-            style={{
-              borderColor: heroColor,
-              boxShadow: `0 0 16px ${heroColor}40`,
-            }}
-          >
-            {snapshotUri ? (
-              <>
-                <img src={snapshotUri} alt={muscle.name} className="muscle-snapshot-img" />
-                <span
-                  className="muscle-snapshot-cat-badge"
-                  style={{ color: heroColor }}
-                >
-                  <RegionCategoryIcon category={muscle.category} size={12} />
-                </span>
-              </>
-            ) : (
-              <RegionCategoryIcon category={muscle.category} size={24} />
-            )}
-          </div>
-
-          <div className="muscle-hero-meta">
-            <span className="muscle-hero-eyebrow">ZONA SELECCIONADA</span>
-            <h2 className="muscle-hero-title">{muscle.name}</h2>
-            <span className="muscle-hero-cat-row">
-              <RegionCategoryIcon category={muscle.category} size={11} />
-              <span>{muscle.category}</span>
-            </span>
-          </div>
+      <div className="muscle-zone-summary">
+        <div className="muscle-snapshot-box" aria-hidden="true">
+          {snapshotUri ? (
+            <img src={snapshotUri} alt="" className="muscle-snapshot-img" />
+          ) : (
+            <RegionCategoryIcon category={muscle.category} size={28} />
+          )}
         </div>
 
-        <span
-          className="muscle-hero-badge"
-          style={{
-            backgroundColor: hasReport
-              ? `${tierMeta.color}28`
-              : isResolvedHistory
-                ? 'rgba(16, 185, 129, 0.22)'
-                : 'rgba(88, 199, 243, 0.16)',
-            color: hasReport ? '#ffffff' : isResolvedHistory ? '#a7f3d0' : '#58c7f3',
-            borderColor: hasReport
-              ? tierMeta.color
-              : isResolvedHistory
-                ? '#10b981'
-                : 'rgba(88, 199, 243, 0.45)',
-          }}
-        >
-          <span
-            className="hero-status-dot"
-            style={{ backgroundColor: heroColor }}
-          />
-          {hasReport
-            ? `Activo · ${obs?.painIntensity}/10`
-            : isResolvedHistory
-              ? 'Curado · Historial'
-              : 'Sin reporte'}
-        </span>
+        <div className="muscle-hero-meta">
+          <h2 className="muscle-hero-title">{muscle.name}</h2>
+          <span className="muscle-hero-cat-row">
+            <RegionCategoryIcon category={muscle.category} size={14} />
+            <span>{muscle.category}</span>
+          </span>
+        </div>
       </div>
 
       <div
@@ -791,7 +715,6 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
 
 export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
   muscle,
-  allMuscles,
   latestHealthCheck,
   photos,
   photosStatus,
@@ -800,7 +723,6 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
   snapshotUri,
   environment,
   resolvedRecord,
-  onSelectMuscle,
   onSaveUpdate,
   onCureMuscle,
 }) => {
@@ -821,114 +743,7 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
     return latestHealthCheck.symptoms.filter((s) => s.toLowerCase() !== 'ninguno');
   }, [latestHealthCheck]);
 
-  const affectedMuscles = useMemo(
-    () =>
-      allMuscles
-        .filter((m) => m.status !== 'normal' && Boolean(m.observation))
-        .sort(
-          (a, b) => (b.observation?.painIntensity ?? 0) - (a.observation?.painIntensity ?? 0)
-        ),
-    [allMuscles]
-  );
-
-  if (!muscle || !knowledge) {
-    return (
-      <section className="panel-card muscle-panel-card" aria-label="Sin zona muscular seleccionada">
-        <div className="muscle-empty-card">
-          <div className="muscle-empty-cosmic">
-            <svg
-              className="muscle-hero-stars"
-              viewBox="0 0 360 110"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <circle cx="34" cy="22" r="1" fill="#93c5fd" opacity="0.65" />
-              <circle cx="96" cy="78" r="1.1" fill="#e2e8f0" opacity="0.5" />
-              <circle cx="152" cy="18" r="1.2" fill="#38bdf8" opacity="0.7" />
-              <circle cx="242" cy="84" r="1" fill="#e2e8f0" opacity="0.45" />
-              <circle cx="312" cy="26" r="1.3" fill="#7dd3fc" opacity="0.75" />
-              <path
-                d="M14 90 Q 175 18 346 72"
-                fill="none"
-                stroke="rgba(56, 189, 248, 0.25)"
-                strokeWidth="1.2"
-                strokeDasharray="3 4"
-              />
-            </svg>
-            <div className="muscle-empty-emblem">
-              <img src={brandLogo} alt="TraumaTeam" className="muscle-empty-emblem-img" />
-              <span className="muscle-empty-emblem-ring" aria-hidden="true" />
-            </div>
-            <div className="muscle-empty-cosmic-copy">
-              <span className="muscle-empty-eyebrow">ESCÁNER ANATÓMICO · EN ESPERA</span>
-              <strong>Selecciona una región 3D</strong>
-              <p>
-                Toca un punto anatómico en el modelo 3D, usa el selector superior o elige un
-                registro activo o historial para consultar síntomas e informes.
-              </p>
-            </div>
-          </div>
-
-          {affectedMuscles.length > 0 ? (
-            <div className="muscle-empty-actions">
-              <div className="muscle-empty-actions-head">
-                <span>Reportes activos en curso</span>
-                <span className="muscle-empty-count">{affectedMuscles.length}</span>
-              </div>
-              <div className="muscle-empty-records">
-                {affectedMuscles.map((m) => {
-                  const pain = m.observation?.painIntensity ?? 0;
-                  const painColor = getPainColorHex(pain);
-                  const sevLabel = getPainSeverityLabel(pain);
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className="muscle-empty-record-btn"
-                      onClick={() => onSelectMuscle(m.id)}
-                    >
-                      <span
-                        className="record-icon-box"
-                        style={{
-                          backgroundColor: `${painColor}18`,
-                          borderColor: `${painColor}45`,
-                          color: painColor,
-                        }}
-                      >
-                        <RegionCategoryIcon category={m.category} size={15} />
-                      </span>
-                      <div className="muscle-empty-record-copy">
-                        <strong>{m.name}</strong>
-                        <span>
-                          {m.category} · {m.observation?.conditionName || 'Con reporte'}
-                        </span>
-                      </div>
-                      <span
-                        className="record-severity-pill"
-                        style={{
-                          backgroundColor: `${painColor}16`,
-                          borderColor: `${painColor}40`,
-                          color: painColor,
-                        }}
-                      >
-                        {sevLabel}
-                      </span>
-                      <ChevronRightIcon size={14} />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="muscle-empty-clear-pill">
-              <CheckIcon size={14} />
-              <span>Sin zonas musculares con síntomas activos</span>
-            </div>
-          )}
-        </div>
-      </section>
-    );
-  }
+  if (!muscle || !knowledge) return null;
 
   return (
     <SelectedMuscleContent
