@@ -21,5 +21,9 @@ Examples: "abre signos vitales", "iniciar chequeo diario", "ve al bíceps derech
 ## Tests
 `npm run test:voice` (parser, Node built-in runner).
 
-## Next
-Optional LLM fallback for phrases the local parser misses (a backend endpoint returning the same `VoiceIntent` JSON).
+## LLM fallback (DeepSeek)
+When the local parser returns `unknown`, the app calls `POST /voice/interpret` on the backend, which asks DeepSeek (`deepseek-chat`, JSON mode, temperature 0) to map the phrase to one action. The key never reaches the client.
+- The model output is **never trusted**: `sanitizeIntent` rebuilds the intent from a whitelist (routes, tabs, 36 muscle ids), so hallucinated or prompt-injected output is dropped.
+- If the key is missing, the service is down or it times out (8 s), the app silently falls back to the local hint.
+- Config (backend env): `DEEPSEEK_API_KEY` (enables it), optional `DEEPSEEK_MODEL`, `DEEPSEEK_BASE_URL`.
+- Web needs the app origin in `CORS_ORIGINS`.

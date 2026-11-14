@@ -46,6 +46,10 @@ Completa `.env` con:
   llamadas servidor-a-servidor de la API. No se incluye en el frontend web.
 - `DASHBOARD_WEB_PASSWORD`: contraseña independiente de al menos 16 caracteres
   para consultar el dashboard web. El usuario es `dashboard`.
+- `DEEPSEEK_API_KEY` (opcional): habilita `POST /voice/interpret`, que convierte
+  frases libres de voz en acciones de la app con DeepSeek. Sin ella el endpoint
+  responde 503 y la app usa solo el intérprete local. Opcionales:
+  `DEEPSEEK_MODEL` (por defecto `deepseek-chat`) y `DEEPSEEK_BASE_URL`.
 - `CORS_ORIGINS`: debe incluir el origen del frontend, por defecto
   `http://localhost:5173`.
 
@@ -92,6 +96,8 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
 ## API
 
 - `GET /health` — estado del proceso, sin autenticación.
+- `POST /voice/interpret` `{ "text": "..." }` — token privado; devuelve
+  `{ intent, message? }` con una acción de la lista blanca de la app (DeepSeek).
 - `GET /dashboard/samples?limit=100&metric=heart_rate` — hasta 500 muestras
   del usuario fijo; `metric` puede ser `heart_rate`, `stress`, `spo2` o
   `steps` o `sleep`.

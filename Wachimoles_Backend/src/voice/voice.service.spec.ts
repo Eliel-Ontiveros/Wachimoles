@@ -1,0 +1,51 @@
+import { BadGatewayException, ServiceUnavailableException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { VoiceService } from "./voice.service";
+
+const reply = (content: string, ok = true) =>
+  jest.fn().mockResolvedValue({
+    ok,
+    json: async () => ({ choices: [{ message: { content } }] })
+  });
+
+describe("VoiceService", () => {
+  const original = global.fetch;
+  afterEach(() => {
+    global.fetch = original;
+  });
+  const make = (env: Record<string, string> = { DEEPSEEK_API_KEY: "k" }) =>
+    new VoiceService(new ConfigService(env));
+
+  it("is unavailable without an API key", async () => {
+    await expect(make({}).interpret("hola")).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it("maps a model reply to a sanitized intent and calls DeepSeek with the key", async () => {
+    const fetchMock = reply('{"type":"body-zone","muscleId":"dorsal_izq"}');
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const result = await make().interpret("me duele la espalda de la izquierda");
+    expect(result.intent).toEqual({ type: "body-zone", muscleId: "dorsal_izq", muscleName: "Dorsal izquierdo" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.deepseek.com/chat/completions");
+    expect(init.headers.Authorization).toBe("Bearer k");
+  });
+
+  it("returns the clarification message when the model has no action", async () => {
+    global.fetch = reply('{"type":"unknown","message":"¿Qué lado?"}') as unknown as typeof fetch;
+    expect(await make().interpret("bíceps")).toEqual({ intent: null, message: "¿Qué lado?" });
+  });
+
+  it("ignores malformed or hostile model output", async () => {
+    global.fetch = reply("not json") as unknown as typeof fetch;
+    expect((await make().interpret("x")).intent).toBeNull();
+    global.fetch = reply('{"type":"body-zone","muscleId":"nope"}') as unknown as typeof fetch;
+    expect((await make().interpret("x")).intent).toBeNull();
+  });
+
+  it("maps upstream failures to 502", async () => {
+    global.fetch = reply("{}", false) as unknown as typeof fetch;
+    await expect(make().interpret("x")).rejects.toBeInstanceOf(BadGatewayException);
+    global.fetch = jest.fn().mockRejectedValue(new Error("down")) as unknown as typeof fetch;
+    await expect(make().interpret("x")).rejects.toBeInstanceOf(BadGatewayException);
+  });
+});

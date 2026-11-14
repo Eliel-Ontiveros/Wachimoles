@@ -7,6 +7,8 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 import { useDrawer } from '@/components/trauma/drawer-context';
 import { useMission } from '@/components/trauma/mission-context';
 
+import { interpretWithLlm } from '@/services/voice-api';
+
 import { parseCommand, type VoiceIntent } from './parser';
 import { VoiceContext, type BodyIntent, type VoiceFeedback } from './voice-context';
 
@@ -139,8 +141,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const runText = useCallback(
     (text: string) => {
       const result = parseCommand(text);
-      if (result.ok) execute(result.intent);
-      else report({ kind: 'error', text: result.hint }, result.reason !== 'empty');
+      if (result.ok) {
+        execute(result.intent);
+        return;
+      }
+      if (result.reason !== 'unknown') {
+        report({ kind: 'error', text: result.hint }, result.reason !== 'empty');
+        return;
+      }
+      // El intérprete local no lo entendió: se consulta al LLM (DeepSeek vía backend).
+      report({ kind: 'info', text: 'Pensando…' });
+      void interpretWithLlm(text).then((llm) => {
+        if (llm?.intent) execute(llm.intent);
+        else report({ kind: 'error', text: llm?.message ?? result.hint }, true);
+      });
     },
     [execute, report]
   );
