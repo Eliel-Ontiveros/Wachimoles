@@ -25,6 +25,197 @@ const MAX_HEART_RATE_AGE_MS = 5 * UPLOAD_INTERVAL_MS;
 const SPO2_LOOKBACK_HOURS = 24;
 const SPO2_STARTUP_LOOKBACK_SECONDS = 10 * 60;
 const SLEEP_UPLOAD_INTERVAL_MINUTES = 30;
+const MINUTOS_POR_DIA = 24 * 60;
+const TOLERANCIA_FIN_SUENO_MINUTOS = 5;
+
+function calcularDuracionTramoMinutos(inicio, fin, esInclusivo = false) {
+  if (!Number.isFinite(inicio) || !Number.isFinite(fin)) {
+    return 0;
+  }
+  const diferenciaBase =
+    fin >= inicio ? fin - inicio : fin + MINUTOS_POR_DIA - inicio;
+  const duracion = esInclusivo ? diferenciaBase + 1 : diferenciaBase;
+  return duracion > 0 && duracion <= MINUTOS_POR_DIA ? duracion : 0;
+}
+
+function determinarEtapasInclusivas(etapasValidas, info, constantesEtapa) {
+  if (
+    info &&
+    Number.isFinite(info.deepTime) &&
+    info.deepTime > 0 &&
+    constantesEtapa &&
+    Number.isFinite(constantesEtapa.DEEP_STAGE)
+  ) {
+    const etapasProfundas = etapasValidas.filter(
+      (etapa) => etapa.model === constantesEtapa.DEEP_STAGE
+    );
+    if (etapasProfundas.length > 0) {
+      let sumaBase = 0;
+      let sumaInclusiva = 0;
+      etapasProfundas.forEach((etapa) => {
+        sumaBase += calcularDuracionTramoMinutos(etapa.start, etapa.stop, false);
+        sumaInclusiva += calcularDuracionTramoMinutos(
+          etapa.start,
+          etapa.stop,
+          true
+        );
+      });
+      const diferenciaBase = Math.abs(sumaBase - info.deepTime);
+      const diferenciaInclusiva = Math.abs(sumaInclusiva - info.deepTime);
+      if (diferenciaInclusiva < diferenciaBase) {
+        return true;
+      }
+      if (diferenciaBase < diferenciaInclusiva) {
+        return false;
+      }
+    }
+  }
+
+  if (etapasValidas.length >= 2) {
+    let paresInclusivos = 0;
+    let paresContinuos = 0;
+    for (let indice = 1; indice < etapasValidas.length; indice += 1) {
+      const anterior = etapasValidas[indice - 1];
+      const actual = etapasValidas[indice];
+      const inicioActual =
+        ((actual.start % MINUTOS_POR_DIA) + MINUTOS_POR_DIA) % MINUTOS_POR_DIA;
+      const finAnterior =
+        ((anterior.stop % MINUTOS_POR_DIA) + MINUTOS_POR_DIA) % MINUTOS_POR_DIA;
+      if (inicioActual === (finAnterior + 1) % MINUTOS_POR_DIA) {
+        paresInclusivos += 1;
+      } else if (inicioActual === finAnterior) {
+        paresContinuos += 1;
+      }
+    }
+    if (paresInclusivos > paresContinuos) {
+      return true;
+    }
+    if (paresContinuos > paresInclusivos) {
+      return false;
+    }
+  }
+
+  if (info && Number.isFinite(info.totalTime) && info.totalTime > 0) {
+    let totalBase = 0;
+    let totalInclusivo = 0;
+    etapasValidas.forEach((etapa) => {
+      totalBase += calcularDuracionTramoMinutos(etapa.start, etapa.stop, false);
+      totalInclusivo += calcularDuracionTramoMinutos(
+        etapa.start,
+        etapa.stop,
+        true
+      );
+    });
+    if (
+      Math.abs(totalInclusivo - info.totalTime) <
+      Math.abs(totalBase - info.totalTime)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function obtenerLecturaSuenoEfectiva(sensorSueno) {
+  if (typeof sensorSueno.updateInfo === "function") {
+    try {
+      sensorSueno.updateInfo();
+    } catch (error) {
+      logger.error("Could not refresh system sleep info:", error);
+    }
+  }
+
+  const info =
+    typeof sensorSueno.getInfo === "function" ? sensorSueno.getInfo() : null;
+  const constantesEtapa =
+    typeof sensorSueno.getStageConstantObj === "function"
+      ? sensorSueno.getStageConstantObj()
+      : null;
+  const etapas =
+    typeof sensorSueno.getStage === "function" ? sensorSueno.getStage() : null;
+
+  const etapasValidas = Array.isArray(etapas)
+    ? etapas.filter(
+        (etapa) =>
+          etapa &&
+          Number.isFinite(etapa.model) &&
+          Number.isFinite(etapa.start) &&
+          Number.isFinite(etapa.stop)
+      )
+    : [];
+
+  let minutosSuenoEfectivo = 0;
+  let minutosDespierto = 0;
+  let finSuenoMinuto =
+    info && Number.isFinite(info.endTime) ? info.endTime : null;
+
+  if (etapasValidas.length > 0) {
+    const esInclusivo = determinarEtapasInclusivas(
+      etapasValidas,
+      info,
+      constantesEtapa
+    );
+    const codigoDespierto =
+      constantesEtapa && Number.isFinite(constantesEtapa.WAKE_STAGE)
+        ? constantesEtapa.WAKE_STAGE
+        : null;
+    const codigosSueno = new Set(
+      [
+        constantesEtapa && constantesEtapa.LIGHT_STAGE,
+        constantesEtapa && constantesEtapa.DEEP_STAGE,
+        constantesEtapa && constantesEtapa.REM_STAGE
+      ].filter((codigo) => Number.isFinite(codigo))
+    );
+
+    etapasValidas.forEach((etapa) => {
+      const duracion = calcularDuracionTramoMinutos(
+        etapa.start,
+        etapa.stop,
+        esInclusivo
+      );
+      if (duracion <= 0) {
+        return;
+      }
+
+      if (codigoDespierto !== null && etapa.model === codigoDespierto) {
+        minutosDespierto += duracion;
+        return;
+      }
+
+      if (codigosSueno.size > 0) {
+        if (codigosSueno.has(etapa.model)) {
+          minutosSuenoEfectivo += duracion;
+        }
+      } else {
+        minutosSuenoEfectivo += duracion;
+      }
+    });
+
+    const ultimaEtapa = etapasValidas[etapasValidas.length - 1];
+    if (finSuenoMinuto === null && ultimaEtapa) {
+      finSuenoMinuto = ultimaEtapa.stop;
+    }
+  }
+
+  const tiempoTotalInfo =
+    info && Number.isFinite(info.totalTime) ? info.totalTime : 0;
+
+  if (minutosSuenoEfectivo <= 0 && tiempoTotalInfo > 0) {
+    if (minutosDespierto > 0 && tiempoTotalInfo > minutosDespierto) {
+      minutosSuenoEfectivo = tiempoTotalInfo - minutosDespierto;
+    } else {
+      minutosSuenoEfectivo = tiempoTotalInfo;
+    }
+  }
+
+  return {
+    minutosSuenoEfectivo,
+    minutosDespierto,
+    tiempoTotalInfo,
+    finSuenoMinuto
+  };
+}
 
 function parseResponseBody(body) {
   const parsed = typeof body === "string" ? JSON.parse(body) : body;
@@ -139,6 +330,7 @@ AppService(
         sleep: false
       },
       lastSpo2SensorTime: null,
+      ultimoValorSuenoSubido: null,
       sleepMinuteTicks: 0,
       timeSensor: null,
       timeCallback: null
@@ -148,6 +340,15 @@ AppService(
       logger.log(`Background health monitoring started: ${param || "manual"}`);
       BgService.onMessage = (message) => {
         if (message && message.type === "GET_LATEST") {
+          const lecturaSueno = service.captureSleepReading("page request");
+          if (lecturaSueno) {
+            const cambioSueno =
+              service.state.lastUploaded.sleep !== lecturaSueno.sampleId ||
+              service.state.ultimoValorSuenoSubido !== lecturaSueno.value;
+            if (cambioSueno) {
+              service.uploadSampleIfNeeded(lecturaSueno, true);
+            }
+          }
           Object.keys(service.state.latestSamples).forEach((metric) => {
             const sample = service.state.latestSamples[metric];
             if (sample) {
@@ -292,29 +493,50 @@ AppService(
       }
 
       try {
-        const info = this.state.sleepSensor.getInfo();
+        const lecturaSueno = obtenerLecturaSuenoEfectiva(this.state.sleepSensor);
+        const minutosEfectivos = lecturaSueno.minutosSuenoEfectivo;
         if (
-          !info ||
-          !Number.isFinite(info.totalTime) ||
-          info.totalTime <= 0 ||
-          info.totalTime > 24 * 60
+          !Number.isFinite(minutosEfectivos) ||
+          minutosEfectivos <= 0 ||
+          minutosEfectivos > MINUTOS_POR_DIA
         ) {
           logger.log(`No valid system sleep duration is available (${source})`);
           return null;
         }
 
-        const now = new Date();
+        const ahora = new Date();
+        const minutoActualDia = ahora.getHours() * 60 + ahora.getMinutes();
+        const fechaMuestra = new Date(ahora.getTime());
+        let instanteMedicion = ahora.getTime();
+
+        if (
+          Number.isFinite(lecturaSueno.finSuenoMinuto) &&
+          lecturaSueno.finSuenoMinuto >= 0 &&
+          lecturaSueno.finSuenoMinuto < MINUTOS_POR_DIA &&
+          lecturaSueno.finSuenoMinuto >
+            minutoActualDia + TOLERANCIA_FIN_SUENO_MINUTOS
+        ) {
+          fechaMuestra.setDate(fechaMuestra.getDate() - 1);
+          instanteMedicion = new Date(
+            fechaMuestra.getFullYear(),
+            fechaMuestra.getMonth(),
+            fechaMuestra.getDate(),
+            Math.floor(lecturaSueno.finSuenoMinuto / 60),
+            lecturaSueno.finSuenoMinuto % 60
+          ).getTime();
+        }
+
         const sample = {
           metric: "sleep",
-          value: Math.round((info.totalTime / 60) * 100) / 100,
+          value: Math.round((minutosEfectivos / 60) * 100) / 100,
           unit: "hours",
-          measuredAt: now.getTime(),
-          sampleId: `sleep-${getLocalDateKey(now)}`
+          measuredAt: instanteMedicion,
+          sampleId: `sleep-${getLocalDateKey(fechaMuestra)}`
         };
         this.state.latestSamples.sleep = sample;
         publishToPage({ type: "SAMPLE", sample });
         logger.log(
-          `System sleep duration read: ${sample.value} hours (${source})`
+          `System sleep duration read: ${sample.value} hours (effective=${minutosEfectivos}m, awake=${lecturaSueno.minutosDespierto}m, total=${lecturaSueno.tiempoTotalInfo}m, source=${source})`
         );
         return sample;
       } catch (error) {
@@ -533,6 +755,9 @@ AppService(
       uploadSample(this, sample).then(
         (uploadedSampleId) => {
           this.state.lastUploaded[metric] = uploadedSampleId;
+          if (metric === "sleep") {
+            this.state.ultimoValorSuenoSubido = sample.value;
+          }
           this.state.uploadsInFlight[metric] = false;
         },
         (error) => {
@@ -571,10 +796,16 @@ AppService(
         this.uploadSampleIfNeeded(steps, true);
       }
 
-      if (this.state.sleepMinuteTicks >= SLEEP_UPLOAD_INTERVAL_MINUTES) {
-        this.state.sleepMinuteTicks = 0;
-        const sleep = this.captureSleepReading("scheduled");
-        if (sleep) {
+      const sleep = this.captureSleepReading("scheduled");
+      if (sleep) {
+        const cambioSueno =
+          this.state.lastUploaded.sleep !== sleep.sampleId ||
+          this.state.ultimoValorSuenoSubido !== sleep.value;
+        if (
+          cambioSueno ||
+          this.state.sleepMinuteTicks >= SLEEP_UPLOAD_INTERVAL_MINUTES
+        ) {
+          this.state.sleepMinuteTicks = 0;
           this.uploadSampleIfNeeded(sleep, true);
         }
       }
