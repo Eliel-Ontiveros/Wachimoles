@@ -38,7 +38,44 @@ export type VoiceIntent =
       notes?: string;
     }
   | { type: "vital-history"; metric: VitalMetric }
-  | { type: "dismiss-alert" };
+  | { type: "dismiss-alert" }
+  | { type: "describe-screen"; screen?: "/" | "/explore" | "/missions" };
+
+export type VoiceScreen = "/" | "/explore" | "/missions";
+export type VoiceTab = "body" | "health" | "records";
+/** Dónde está el usuario cuando habla (S5). */
+export interface VoiceContext {
+  screen: VoiceScreen;
+  tab?: VoiceTab;
+}
+
+/** Todos los tipos de intención que sanitizeIntent acepta. */
+export const INTENT_TYPES = [
+  "navigate",
+  "open-menu",
+  "close-menu",
+  "open-alerts",
+  "ack-alerts",
+  "start-checkin",
+  "body-tab",
+  "body-zone",
+  "toggle-treadmill",
+  "read-vitals",
+  "help",
+  "stop",
+  "register-observation",
+  "zone-detail",
+  "zone-photos",
+  "set-environment",
+  "open-mission-setup",
+  "arrive-early",
+  "complete-mission",
+  "fill-health-check",
+  "vital-history",
+  "dismiss-alert",
+  "describe-screen"
+] as const satisfies readonly VoiceIntent["type"][];
+export type IntentType = (typeof INTENT_TYPES)[number];
 
 export type Environment = "tierra" | "nave" | "luna" | "marte";
 export type VitalMetric = "heart_rate" | "spo2" | "stress" | "sleep";
@@ -165,6 +202,11 @@ export function sanitizeIntent(raw: unknown): VoiceIntent | null {
 
   if (SIMPLE.has(type)) return { type } as VoiceIntent;
 
+  if (type === "describe-screen") {
+    return typeof r.screen === "string" && Object.hasOwn(ROUTES, r.screen)
+      ? { type, screen: r.screen as VoiceScreen }
+      : { type };
+  }
   if (type === "navigate" && typeof r.route === "string" && r.route in ROUTES) {
     return {
       type,

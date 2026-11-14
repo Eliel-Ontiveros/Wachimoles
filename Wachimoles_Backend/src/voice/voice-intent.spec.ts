@@ -63,4 +63,15 @@ describe("sanitizeIntent", () => {
       expect(sanitizeIntent({ type: "fill-health-check" })).toBeNull();
     });
   });
+
+  it("sanitizes describe-screen", () => {
+    expect(sanitizeIntent({ type: "describe-screen" })).toEqual({ type: "describe-screen" });
+    expect(sanitizeIntent({ type: "describe-screen", screen: "/missions" })).toEqual({
+      type: "describe-screen",
+      screen: "/missions"
+    });
+    expect(sanitizeIntent({ type: "describe-screen", screen: "/nope" })).toEqual({ type: "describe-screen" });
+    expect(sanitizeIntent({ type: "describe-screen", screen: "__proto__" })).toEqual({ type: "describe-screen" });
+    expect(sanitizeIntent({ type: "describe-screen", screen: 3, extra: 1 })).toEqual({ type: "describe-screen" });
+  });
 });

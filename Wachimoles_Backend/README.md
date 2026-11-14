@@ -96,7 +96,7 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
 ## API
 
 - `GET /health` — estado del proceso, sin autenticación.
-- `POST /voice/interpret` `{ "text": "...", "history"?: [{ "role": "user"|"assistant", "content": "≤300" }] (máx. 6) }` — token privado; devuelve
+- `POST /voice/interpret` `{ "text": "...", "history"?: [{ "role": "user"|"assistant", "content": "≤300" }] (máx. 6), "context"?: { "screen": "/"|"/explore"|"/missions", "tab"?: "body"|"health"|"records" } }` — token privado. `context` es la pantalla/pestaña actual del usuario: el prompt (generado desde el catálogo `src/voice/voice-catalog.ts`) la usa para preferir acciones de esa pantalla si la frase es ambigua; otras claves se rechazan (400); devuelve
   `{ intent, message? }` con una acción de la lista blanca de la app (DeepSeek).
 - `GET /dashboard/samples?limit=100&metric=heart_rate` — hasta 500 muestras
   del usuario fijo; `metric` puede ser `heart_rate`, `stress`, `spo2` o

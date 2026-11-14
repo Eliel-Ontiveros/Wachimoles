@@ -35,3 +35,18 @@ describe("InterpretVoiceDto history", () => {
     expect(check({ text: "hola", history: [{ role: "user", content: "x", extra: 1 }] }).length).toBeGreaterThan(0);
   });
 });
+
+describe("InterpretVoiceDto context", () => {
+  it("accepts a valid or missing context", () => {
+    expect(check({ text: "hola", context: { screen: "/" } })).toHaveLength(0);
+    expect(check({ text: "hola", context: { screen: "/explore", tab: "records" } })).toHaveLength(0);
+  });
+
+  it("rejects bad screen, bad tab, unknown keys and non-objects", () => {
+    expect(check({ text: "hola", context: { screen: "/x" } }).length).toBeGreaterThan(0);
+    expect(check({ text: "hola", context: {} }).length).toBeGreaterThan(0);
+    expect(check({ text: "hola", context: { screen: "/", tab: "nope" } }).length).toBeGreaterThan(0);
+    expect(check({ text: "hola", context: { screen: "/", extra: 1 } }).length).toBeGreaterThan(0);
+    expect(check({ text: "hola", context: "/" }).length).toBeGreaterThan(0);
+  });
+});

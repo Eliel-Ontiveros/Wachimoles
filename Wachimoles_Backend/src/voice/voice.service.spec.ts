@@ -82,4 +82,15 @@ describe("VoiceService", () => {
     global.fetch = jest.fn().mockRejectedValue(new Error("down")) as unknown as typeof fetch;
     await expect(make().interpret("x")).rejects.toBeInstanceOf(BadGatewayException);
   });
+
+  it("puts the context into the system prompt", async () => {
+    const fetchMock = reply('{"type":"help"}');
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await make().interpret("detalles", "es", [], { screen: "/", tab: undefined });
+    await make().interpret("detalles");
+    const system = (i: number) =>
+      JSON.parse(fetchMock.mock.calls[i][1].body).messages[0].content as string;
+    expect(system(0)).toContain("El usuario está en Monitoreo Vital");
+    expect(system(1)).not.toContain("El usuario está en");
+  });
 });
