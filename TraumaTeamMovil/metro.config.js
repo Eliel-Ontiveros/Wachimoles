@@ -13,8 +13,15 @@ function buildProxyTargets() {
   )
     .trim()
     .replace(/\/+$/, "");
+  const isMetroPort = /^https?:\/\/(localhost|127\.0\.0\.1):8081$/i.test(configured);
   return Array.from(
-    new Set([configured, "http://127.0.0.1:3000", "http://localhost:3000"].filter(Boolean))
+    new Set(
+      [
+        isMetroPort ? "" : configured,
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+      ].filter(Boolean)
+    )
   );
 }
 
@@ -102,6 +109,11 @@ config.server = {
               forwardHeaders,
               body
             );
+            const contentType = String(upstream.headers["content-type"] || "");
+            if (contentType.includes("text/html")) {
+              lastError = new Error("Upstream target returned HTML instead of API JSON");
+              continue;
+            }
             const responseHeaders = {};
             if (upstream.headers["content-type"]) {
               responseHeaders["content-type"] = upstream.headers["content-type"];

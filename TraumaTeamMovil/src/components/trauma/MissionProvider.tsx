@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { useVitalSigns } from '../../hooks/use-vital-signs';
 import {
+  addDaysToIsoDate,
+  AstronautMissionStatePayload,
   calculateMissionStateFromDeparture,
+  cancelAstronautMissionInBackend,
   ENVIRONMENTS,
   extendMissionArrivalIso,
+  fetchAstronautLocationFromBackend,
+  fetchAstronautMissionStateFromBackend,
+  fetchDailyMissionsFromBackend,
+  getBodyConditionImagesFromBackend,
+  getDailyHealthChecksFromBackend,
   getDateDaysAgoIso,
   getMissionsForEnvironment,
   getRouteTotalDays,
   getTodayIsoDate,
-  getBodyConditionImagesFromBackend,
-  getDailyHealthChecksFromBackend,
+  markEarlyArrivalInBackend,
+  saveAstronautLocationToBackend,
+  syncAstronautMissionStateToBackend,
   syncEnvironmentToBackend,
   syncHealthCheckToBackend,
   uploadBodyConditionImageToBackend,
-  fetchDailyMissionsFromBackend,
-  markEarlyArrivalInBackend,
-  syncAstronautMissionStateToBackend,
-  fetchAstronautLocationFromBackend,
 } from '../../services/mission-api';
 import {
   CriticalAlert,
@@ -25,10 +30,47 @@ import {
   DailyMission,
   EnvironmentType,
   InjuryPhoto,
+  MissionExecutionStatus,
   MissionSetup,
   SpaceLocation,
 } from '../../types/mission';
 import { MissionContext } from './mission-context';
+
+function buildMissionSyncPayload(
+  origin: SpaceLocation,
+  destination: SpaceLocation,
+  departureDate: string,
+  calc: ReturnType<typeof calculateMissionStateFromDeparture>
+): AstronautMissionStatePayload {
+  const status: MissionExecutionStatus = calc.arrived
+    ? 'arrived'
+    : calc.isScheduledFuture
+      ? 'scheduled'
+      : 'in_transit';
+  const progressPct =
+    calc.totalDays > 0
+      ? Math.min(100, Math.round((calc.missionDay / Math.max(0.01, calc.totalDays)) * 10000) / 100)
+      : 0;
+  return {
+    origen: origin,
+    destino: destination,
+    fechaSalida: departureDate,
+    fechaLlegadaEstimada: calc.effectiveArrivalDate,
+    diasTotales: calc.totalDays,
+    diaActual: calc.missionDay,
+    porcentajeProgresoRelativo: progressPct,
+    entornoActual: calc.calculatedEnvironment,
+    estado: status,
+  };
+}
+
+async function persistMissionAndLocation(
+  payload: AstronautMissionStatePayload,
+  env: EnvironmentType
+): Promise<void> {
+  await syncAstronautMissionStateToBackend(payload);
+  await saveAstronautLocationToBackend(env);
+}
 
 function formatNowLabel() {
   const now = new Date();
@@ -57,8 +99,9 @@ export function MissionProvider({ children }: { children: ReactNode }) {
   const [departureDate, setDepartureDate] = useState<string>(() => getTodayIsoDate());
   const [arrivalDate, setArrivalDate] = useState<string | null>(null);
   const [missionSetupOpen, setMissionSetupOpen] = useState<boolean>(false);
+  const [flightPlanAccepted, setFlightPlanAccepted] = useState<boolean>(false);
 
-  const [environment, setEnvironmentState] = useState<EnvironmentType>('nave');
+  const [environment, setEnvironmentState] = useState<EnvironmentType>('tierra');
   const [streakDays, setStreakDays] = useState<number>(0);
   const [checkedInToday, setCheckedInToday] = useState<boolean>(false);
   const [missionDay, setMissionDay] = useState<number>(0);
@@ -74,6 +117,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
   const highStressCountRef = useRef(0);
   const lastAlertTimeRef = useRef<Record<string, number>>({});
   const locallyEditedHealthCheckDates = useRef(new Set<string>());
+  const locallyModifiedMissionRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -115,13 +159,86 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Carga la ubicación actual guardada en backend/base de datos (independiente de misión)
+  // Carga plan de vuelo activo y ubicación actual desde el backend al iniciar
   useEffect(() => {
     let isMounted = true;
-    void fetchAstronautLocationFromBackend()
-      .then((loc) => {
-        if (!isMounted || !loc) return;
-        setEnvironmentState(loc.entorno);
+    void Promise.all([
+      fetchAstronautMissionStateFromBackend(),
+      fetchAstronautLocationFromBackend(),
+    ])
+      .then(([savedMission, savedLocation]) => {
+        if (!isMounted || locallyModifiedMissionRef.current) return;
+
+        const hasValidRoute = Boolean(savedMission && savedMission.origen !== savedMission.destino);
+        const isMissionActiveInDb = Boolean(
+          hasValidRoute &&
+            savedMission &&
+            (savedMission.estado === 'scheduled' || savedMission.estado === 'in_transit')
+        );
+
+        if (savedMission && isMissionActiveInDb) {
+          const defaultDays = getRouteTotalDays(savedMission.origen, savedMission.destino);
+          const estimatedDefaultArrival = addDaysToIsoDate(savedMission.fechaSalida, defaultDays);
+          const storedCustomArrival =
+            savedMission.fechaLlegadaEstimada &&
+            savedMission.fechaLlegadaEstimada !== estimatedDefaultArrival
+              ? savedMission.fechaLlegadaEstimada
+              : null;
+
+          const calc = calculateMissionStateFromDeparture(
+            savedMission.origen,
+            savedMission.destino,
+            savedMission.fechaSalida,
+            storedCustomArrival
+          );
+
+          setOrigin(savedMission.origen);
+          setDestination(savedMission.destino);
+          setDepartureDate(savedMission.fechaSalida);
+          setArrivalDate(storedCustomArrival);
+          setMissionDay(calc.missionDay);
+
+          if (calc.arrived) {
+            setFlightPlanAccepted(false);
+            setEnvironmentState(savedMission.destino);
+            const completedPayload = buildMissionSyncPayload(
+              savedMission.origen,
+              savedMission.destino,
+              savedMission.fechaSalida,
+              calc
+            );
+            void persistMissionAndLocation(completedPayload, savedMission.destino);
+          } else {
+            setFlightPlanAccepted(true);
+            setEnvironmentState(calc.calculatedEnvironment);
+            const syncedPayload = buildMissionSyncPayload(
+              savedMission.origen,
+              savedMission.destino,
+              savedMission.fechaSalida,
+              calc
+            );
+            if (
+              savedMission.entornoActual !== calc.calculatedEnvironment ||
+              savedMission.estado !== syncedPayload.estado ||
+              Math.abs(savedMission.diaActual - calc.missionDay) > 0.01
+            ) {
+              void persistMissionAndLocation(syncedPayload, calc.calculatedEnvironment);
+            }
+          }
+          return;
+        }
+
+        // Sin plan de vuelo activo: respetar la ubicación guardada independientemente en BD
+        setFlightPlanAccepted(false);
+        if (savedMission && hasValidRoute) {
+          setOrigin(savedMission.origen);
+          setDestination(savedMission.destino);
+        }
+        if (savedLocation) {
+          setEnvironmentState(savedLocation.entorno);
+        } else if (savedMission?.entornoActual) {
+          setEnvironmentState(savedMission.entornoActual);
+        }
       })
       .catch(() => {});
 
@@ -201,9 +318,10 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     }
   }, [vitals.heartRate, vitals.stress, vitals.spo2, pushCriticalAlert]);
 
-  // Configura la misión inicial y calcula automáticamente día y ubicación del astronauta
+  // Configura y acepta el plan de vuelo, automatizando la ubicación del astronauta en BD
   const configureMission = useCallback((setup: MissionSetup) => {
     if (setup.origin === setup.destination) return;
+    locallyModifiedMissionRef.current = true;
     setOrigin(setup.origin);
     setDestination(setup.destination);
     setDepartureDate(setup.departureDate);
@@ -217,70 +335,47 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     );
     setMissionDay(calc.missionDay);
     setEnvironmentState(calc.calculatedEnvironment);
+    setFlightPlanAccepted(!calc.arrived);
     setMissionSetupOpen(false);
-    void syncEnvironmentToBackend(calc.calculatedEnvironment);
-    void syncAstronautMissionStateToBackend({
-      origen: setup.origin,
-      destino: setup.destination,
-      fechaSalida: setup.departureDate,
-      fechaLlegadaEstimada: calc.effectiveArrivalDate,
-      diasTotales: calc.totalDays,
-      diaActual: calc.missionDay,
-      porcentajeProgresoRelativo: Math.min(
-        100,
-        Math.round((calc.missionDay / Math.max(0.01, calc.totalDays)) * 100)
-      ),
-      entornoActual: calc.calculatedEnvironment,
-      estado: calc.arrived ? 'arrived' : calc.missionDay === 0 ? 'scheduled' : 'in_transit',
-    });
+
+    const payload = buildMissionSyncPayload(
+      setup.origin,
+      setup.destination,
+      setup.departureDate,
+      calc
+    );
+    void persistMissionAndLocation(payload, calc.calculatedEnvironment);
   }, []);
 
-  // Al cambiar manualmente la ubicación a Estación EEI, Base Lunar o Marte, se adelanta la misión a su llegada
+  // Cancela el plan de vuelo aceptado y desbloquea la selección manual de ubicación en BD
+  const cancelFlightPlan = useCallback(() => {
+    locallyModifiedMissionRef.current = true;
+    setFlightPlanAccepted(false);
+    setArrivalDate(null);
+    setMissionSetupOpen(false);
+    void cancelAstronautMissionInBackend(environment, origin, destination);
+  }, [environment, origin, destination]);
+
+  // Solo permite cambiar la ubicación manualmente cuando no hay un plan de vuelo activo
   const setEnvironment = useCallback(
-    (env: EnvironmentType) => {
-      setEnvironmentState(env);
-      setArrivalDate(null);
-      if (env === 'estacion' || env === 'luna' || env === 'marte') {
-        const nextOrigin = origin === env ? 'tierra' : origin;
-        if (origin === env) setOrigin('tierra');
-        setDestination(env);
-        setMissionDay(getRouteTotalDays(nextOrigin, env));
-      } else if (env === 'tierra') {
-        if (destination === 'tierra') {
-          setMissionDay(getRouteTotalDays(origin, 'tierra'));
-        } else {
-          setOrigin('tierra');
-          setMissionDay(0);
-        }
-      } else {
-        const calc = calculateMissionStateFromDeparture(origin, destination, departureDate);
-        const total = getRouteTotalDays(origin, destination);
-        setMissionDay(calc.missionDay >= total ? 0 : calc.missionDay);
+    (env: EnvironmentType): boolean => {
+      if (flightPlanAccepted) {
+        return false;
       }
+      locallyModifiedMissionRef.current = true;
+      setEnvironmentState(env);
       void syncEnvironmentToBackend(env);
+      return true;
     },
-    [origin, destination, departureDate]
+    [flightPlanAccepted]
   );
 
   const doDailyCheckIn = useCallback(() => {
     if (!checkedInToday) {
       setCheckedInToday(true);
       setStreakDays((d) => d + 1);
-      setMissionDay((d) => {
-        const total = calculateMissionStateFromDeparture(
-          origin,
-          destination,
-          departureDate,
-          arrivalDate
-        ).totalDays;
-        const nextDay = Math.min(total, d + 1);
-        if (nextDay >= total) {
-          setEnvironmentState(destination);
-        }
-        return nextDay;
-      });
     }
-  }, [checkedInToday, origin, destination, departureDate, arrivalDate]);
+  }, [checkedInToday]);
 
   const missionTiming = useMemo(
     () =>
@@ -299,23 +394,79 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     totalDays: totalMissionDays,
   } = missionTiming;
 
-  // Marca llegada anticipada al destino actual
-  const arriveEarly = useCallback(() => {
-    const total = getRouteTotalDays(origin, destination);
+  // Mantiene automatizada la ubicación mientras el plan de vuelo siga activo (al cambiar el día o volver a primer plano)
+  useEffect(() => {
+    if (!flightPlanAccepted) return;
+
+    const syncProgress = () => {
+      const calc = calculateMissionStateFromDeparture(
+        origin,
+        destination,
+        departureDate,
+        arrivalDate
+      );
+      if (calc.arrived) {
+        setFlightPlanAccepted(false);
+        setMissionDay(calc.totalDays);
+        setEnvironmentState(destination);
+        const payload = buildMissionSyncPayload(origin, destination, departureDate, calc);
+        void persistMissionAndLocation(payload, destination);
+        return;
+      }
+      if (calc.calculatedEnvironment !== environment || calc.missionDay !== missionDay) {
+        setMissionDay(calc.missionDay);
+        setEnvironmentState(calc.calculatedEnvironment);
+        const payload = buildMissionSyncPayload(origin, destination, departureDate, calc);
+        void persistMissionAndLocation(payload, calc.calculatedEnvironment);
+      }
+    };
+
+    const interval = setInterval(syncProgress, 60000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        syncProgress();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [flightPlanAccepted, origin, destination, departureDate, arrivalDate, environment, missionDay]);
+
+  // Marca llegada anticipada al destino (solo válido cuando hay un plan de vuelo aceptado)
+  const arriveEarly = useCallback((): boolean => {
+    if (!flightPlanAccepted) {
+      return false;
+    }
+    locallyModifiedMissionRef.current = true;
+    const total = calculateMissionStateFromDeparture(
+      origin,
+      destination,
+      departureDate,
+      arrivalDate
+    ).totalDays;
     const nextEnv: EnvironmentType = destination;
+    const todayIso = getTodayIsoDate();
+
+    setFlightPlanAccepted(false);
     setArrivalDate(null);
     setDepartureDate(getDateDaysAgoIso(total));
     setMissionDay(total);
     setEnvironmentState(nextEnv);
     setMissionSetupOpen(false);
-    void syncEnvironmentToBackend(nextEnv);
-    void markEarlyArrivalInBackend();
-  }, [origin, destination]);
+    void (async () => {
+      await markEarlyArrivalInBackend(todayIso);
+      await saveAstronautLocationToBackend(nextEnv);
+    })();
+    return true;
+  }, [flightPlanAccepted, origin, destination, departureDate, arrivalDate]);
 
-  // Extiende la fecha de llegada en caso de atraso de la misión
+  // Extiende la fecha de llegada en caso de atraso de la misión (solo con plan de vuelo aceptado)
   const delayMission = useCallback(
-    (extraDays: number) => {
-      if (extraDays <= 0) return;
+    (extraDays: number): boolean => {
+      if (!flightPlanAccepted || extraDays <= 0) return false;
+      locallyModifiedMissionRef.current = true;
       const nextArrival = extendMissionArrivalIso(
         departureDate,
         effectiveArrivalDate,
@@ -329,12 +480,15 @@ export function MissionProvider({ children }: { children: ReactNode }) {
         nextArrival
       );
       setMissionDay(calc.missionDay);
-      if (!calc.arrived && calc.calculatedEnvironment !== environment) {
-        setEnvironmentState(calc.calculatedEnvironment);
-        void syncEnvironmentToBackend(calc.calculatedEnvironment);
+      setEnvironmentState(calc.calculatedEnvironment);
+      if (calc.arrived) {
+        setFlightPlanAccepted(false);
       }
+      const payload = buildMissionSyncPayload(origin, destination, departureDate, calc);
+      void persistMissionAndLocation(payload, calc.calculatedEnvironment);
+      return true;
     },
-    [departureDate, effectiveArrivalDate, origin, destination, environment]
+    [flightPlanAccepted, departureDate, effectiveArrivalDate, origin, destination]
   );
 
   const toggleTreadmillRoutine = useCallback(() => {
@@ -546,9 +700,11 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       totalMissionDays,
       daysUntilDeparture,
       missionSetupOpen,
+      flightPlanAccepted,
       openMissionSetup,
       closeMissionSetup,
       configureMission,
+      cancelFlightPlan,
       arriveEarly,
       delayMission,
       setEnvironment,
@@ -584,9 +740,11 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       totalMissionDays,
       daysUntilDeparture,
       missionSetupOpen,
+      flightPlanAccepted,
       openMissionSetup,
       closeMissionSetup,
       configureMission,
+      cancelFlightPlan,
       arriveEarly,
       delayMission,
       setEnvironment,

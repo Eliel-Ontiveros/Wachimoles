@@ -1,22 +1,10 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Svg, {
-  Circle,
-  Defs,
-  Ellipse,
-  LinearGradient,
-  Path,
-  Rect,
-  Stop,
-} from 'react-native-svg';
-import { Calendar, Check, ChevronDown, Globe, Orbit, Rocket, Satellite, X } from 'lucide-react-native';
-import {
-  ENVIRONMENTS,
-  formatRouteDays,
-  getRouteDurationSpec,
-  SPACE_LOCATIONS,
-} from '../../services/mission-api';
-import { EnvironmentType, SpaceLocation } from '../../types/mission';
+import { Image, type ImageProps } from 'expo-image';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { Calendar, Check, ChevronDown, Globe, Lock, Orbit, Rocket, Satellite, X } from 'lucide-react-native';
+import { ENVIRONMENTS, SPACE_LOCATIONS } from '../../services/mission-api';
+import { EnvironmentType } from '../../types/mission';
 import { useMission } from './mission-context';
 
 function EnvironmentIcon({ env, color }: { env: EnvironmentType; color: string }) {
@@ -26,215 +14,191 @@ function EnvironmentIcon({ env, color }: { env: EnvironmentType; color: string }
   return <Globe size={15} color={color} />;
 }
 
-const CARD_THEME: Record<
+// Todos los SVGs de tarjetas comparten viewBox="0 0 809.1 184.7"
+const ENV_CARD_BG: Record<
   EnvironmentType,
   {
-    activeBorder: string;
-    badgeBg: string;
-    iconColor: string;
-    subtitleColor: string;
+    source: ImageProps['source'];
+    labelLeftPct: number;
+    labelTopPct: number;
   }
 > = {
   nave: {
-    activeBorder: '#38bdf8',
-    badgeBg: 'rgba(56, 189, 248, 0.22)',
-    iconColor: '#7dd3fc',
-    subtitleColor: '#bae6fd',
+    source: require('@/assets/images/fondos/Ship.svg'),
+    labelLeftPct: 4.8,
+    labelTopPct: 41.5,
   },
   estacion: {
-    activeBorder: '#22d3ee',
-    badgeBg: 'rgba(34, 211, 238, 0.24)',
-    iconColor: '#67e8f9',
-    subtitleColor: '#cffafe',
+    source: require('@/assets/images/fondos/Station.svg'),
+    labelLeftPct: 3.9,
+    labelTopPct: 39,
   },
   luna: {
-    activeBorder: '#cbd5e1',
-    badgeBg: 'rgba(203, 213, 225, 0.22)',
-    iconColor: '#e2e8f0',
-    subtitleColor: '#cbd5e1',
+    source: require('@/assets/images/fondos/Moon.svg'),
+    labelLeftPct: 4.8,
+    labelTopPct: 39.5,
   },
   marte: {
-    activeBorder: '#fb923c',
-    badgeBg: 'rgba(251, 146, 60, 0.24)',
-    iconColor: '#fdba74',
-    subtitleColor: '#fed7aa',
+    source: require('@/assets/images/fondos/Mars.svg'),
+    labelLeftPct: 3.6,
+    labelTopPct: 40,
   },
   tierra: {
-    activeBorder: '#34d399',
-    badgeBg: 'rgba(255, 255, 255, 0.22)',
-    iconColor: '#ffffff',
-    subtitleColor: '#e0f2fe',
+    source: require('@/assets/images/fondos/REAL EARTH.svg'),
+    labelLeftPct: 3.4,
+    labelTopPct: 42.5,
   },
 };
 
-function EnvironmentCardBackdrop({ env }: { env: EnvironmentType }) {
+const ENV_BANNER_BG: Record<
+  EnvironmentType,
+  {
+    source: ImageProps['source'];
+    scrimStartOpacity: number;
+    scrimMidOpacity: number;
+  }
+> = {
+  nave: {
+    source: require('@/assets/images/fondos/banners/ShipBanner.svg'),
+    scrimStartOpacity: 0.42,
+    scrimMidOpacity: 0.14,
+  },
+  estacion: {
+    source: require('@/assets/images/fondos/banners/StationBanner.svg'),
+    scrimStartOpacity: 0.36,
+    scrimMidOpacity: 0.12,
+  },
+  luna: {
+    source: require('@/assets/images/fondos/banners/MoonBanner.svg'),
+    scrimStartOpacity: 0.45,
+    scrimMidOpacity: 0.16,
+  },
+  marte: {
+    source: require('@/assets/images/fondos/banners/MarsBanner.svg'),
+    scrimStartOpacity: 0.56,
+    scrimMidOpacity: 0.24,
+  },
+  tierra: {
+    source: require('@/assets/images/fondos/banners/EarthBanner.svg'),
+    scrimStartOpacity: 0.64,
+    scrimMidOpacity: 0.28,
+  },
+};
+
+export function EnvironmentBannerBackdrop({ env }: { env: EnvironmentType }) {
+  const banner = ENV_BANNER_BG[env] ?? ENV_BANNER_BG.tierra;
+
   return (
-    <Svg
-      viewBox="0 0 320 90"
-      preserveAspectRatio="xMidYMid slice"
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none">
-      <Defs>
-        <LinearGradient id="envGradNave" x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0%" stopColor="#050a18" />
-          <Stop offset="55%" stopColor="#0b132b" />
-          <Stop offset="100%" stopColor="#0f172a" />
-        </LinearGradient>
-        <LinearGradient id="envGradEstacion" x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0%" stopColor="#07142b" />
-          <Stop offset="58%" stopColor="#0d2f5e" />
-          <Stop offset="100%" stopColor="#155e75" />
-        </LinearGradient>
-        <LinearGradient id="envGradLuna" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor="#090d16" />
-          <Stop offset="62%" stopColor="#1e293b" />
-          <Stop offset="100%" stopColor="#334155" />
-        </LinearGradient>
-        <LinearGradient id="envGradMarte" x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0%" stopColor="#431407" />
-          <Stop offset="55%" stopColor="#9a3412" />
-          <Stop offset="100%" stopColor="#c2410c" />
-        </LinearGradient>
-        <LinearGradient id="envGradTierra" x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0%" stopColor="#0369a1" />
-          <Stop offset="55%" stopColor="#0284c7" />
-          <Stop offset="100%" stopColor="#38bdf8" />
-        </LinearGradient>
-      </Defs>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Image
+        source={banner.source}
+        style={{ width: '100%', height: '100%' }}
+        contentFit="cover"
+      />
+      <Svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id={`bannerScrim-${env}`} x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%" stopColor="#060b19" stopOpacity={banner.scrimStartOpacity} />
+            <Stop offset="58%" stopColor="#060b19" stopOpacity={banner.scrimMidOpacity} />
+            <Stop offset="100%" stopColor="#060b19" stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={100} height={100} fill={`url(#bannerScrim-${env})`} />
+      </Svg>
+    </View>
+  );
+}
 
-      {env === 'nave' && (
-        <>
-          <Rect x={0} y={0} width={320} height={90} fill="url(#envGradNave)" />
-          <Circle cx={268} cy={46} r={34} fill="#0ea5e9" opacity={0.12} />
-          <Path
-            d="M 185 88 Q 250 18 326 30"
-            fill="none"
-            stroke="#38bdf8"
-            strokeWidth={1.4}
-            strokeDasharray="4 4"
-            opacity={0.5}
-          />
-          <Circle cx={292} cy={22} r={9} fill="#1e3a8a" stroke="#38bdf8" strokeWidth={1} opacity={0.55} />
-          <Circle cx={34} cy={18} r={1} fill="#e0f2fe" opacity={0.75} />
-          <Circle cx={88} cy={12} r={1.2} fill="#ffffff" opacity={0.85} />
-          <Circle cx={142} cy={24} r={0.9} fill="#bae6fd" opacity={0.65} />
-          <Circle cx={196} cy={14} r={1.3} fill="#ffffff" opacity={0.8} />
-          <Circle cx={238} cy={30} r={1} fill="#7dd3fc" opacity={0.75} />
-          <Circle cx={62} cy={72} r={0.9} fill="#ffffff" opacity={0.5} />
-          <Circle cx={172} cy={66} r={1.1} fill="#e0f2fe" opacity={0.65} />
-          <Circle cx={255} cy={70} r={1.2} fill="#ffffff" opacity={0.7} />
-        </>
+export function EnvironmentLocationCard({
+  env,
+  selected = false,
+  dimmed = false,
+  locked = false,
+}: {
+  env: EnvironmentType;
+  selected?: boolean;
+  dimmed?: boolean;
+  locked?: boolean;
+}) {
+  const bg = ENV_CARD_BG[env] ?? ENV_CARD_BG.tierra;
+  const config = ENVIRONMENTS[env] ?? ENVIRONMENTS.tierra;
+
+  return (
+    <View
+      style={{
+        aspectRatio: 809.1 / 184.7,
+        opacity: dimmed ? 0.52 : 1,
+        borderRadius: 13,
+      }}
+      className="w-full overflow-hidden">
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Image
+          source={bg.source}
+          style={{ width: '100%', height: '100%' }}
+          contentFit="fill"
+        />
+      </View>
+
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: `${bg.labelLeftPct}%`,
+          top: `${bg.labelTopPct}%`,
+          right: 46,
+        }}>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
+          style={{
+            fontFamily: 'ASpace-Regular',
+            fontSize: 10.5,
+            color: '#f8f7f7',
+            textShadowColor: 'rgba(6, 11, 25, 0.72)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 3,
+          }}>
+          {config.gravityLabel}
+        </Text>
+      </View>
+
+      {(selected || locked) && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 0,
+            bottom: 0,
+            justifyContent: 'center',
+          }}>
+          {selected && (
+            <View
+              style={{
+                backgroundColor: '#38bdf8',
+                borderColor: '#ffffff',
+                borderWidth: 1.5,
+              }}
+              className="h-6 w-6 items-center justify-center rounded-full shadow-sm">
+              <Check size={13} color="#060b19" strokeWidth={3} />
+            </View>
+          )}
+          {locked && !selected && (
+            <View
+              style={{ backgroundColor: 'rgba(15, 23, 42, 0.55)' }}
+              className="h-6 w-6 items-center justify-center rounded-full">
+              <Lock size={11} color="#e2e8f0" />
+            </View>
+          )}
+        </View>
       )}
-
-      {env === 'estacion' && (
-        <>
-          <Rect x={0} y={0} width={320} height={90} fill="url(#envGradEstacion)" />
-          {/* Estrellas en órbita baja */}
-          <Circle cx={38} cy={16} r={1} fill="#cffafe" opacity={0.8} />
-          <Circle cx={96} cy={12} r={1.2} fill="#ffffff" opacity={0.85} />
-          <Circle cx={152} cy={22} r={0.9} fill="#bae6fd" opacity={0.7} />
-          <Circle cx={204} cy={14} r={1.1} fill="#ffffff" opacity={0.75} />
-          <Circle cx={292} cy={18} r={1.2} fill="#67e8f9" opacity={0.8} />
-
-          {/* Horizonte curvo terrestre y halo atmosférico */}
-          <Path
-            d="M 110 90 Q 225 56 320 72 L 320 90 Z"
-            fill="#0284c7"
-            opacity={0.45}
-          />
-          <Path
-            d="M 122 90 Q 226 59 320 74"
-            fill="none"
-            stroke="#38bdf8"
-            strokeWidth={2}
-            opacity={0.72}
-          />
-
-          {/* Silueta geométrica de la Estación Espacial (EEI) */}
-          <Rect x={236} y={32} width={38} height={3.5} rx={1.5} fill="#cbd5e1" />
-          <Rect x={249} y={24} width={11} height={19} rx={3} fill="#e2e8f0" />
-          <Circle cx={254.5} cy={33.5} r={2.2} fill="#22d3ee" />
-          {/* Paneles solares */}
-          <Rect x={234} y={14} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
-          <Rect x={234} y={37} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
-          <Rect x={269} y={14} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
-          <Rect x={269} y={37} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
-        </>
-      )}
-
-      {env === 'luna' && (
-        <>
-          <Rect x={0} y={0} width={320} height={90} fill="url(#envGradLuna)" />
-          <Circle cx={42} cy={16} r={1.1} fill="#ffffff" opacity={0.8} />
-          <Circle cx={108} cy={12} r={0.9} fill="#e2e8f0" opacity={0.65} />
-          <Circle cx={166} cy={20} r={1.2} fill="#ffffff" opacity={0.85} />
-          <Circle cx={224} cy={14} r={1} fill="#cbd5e1" opacity={0.7} />
-          <Circle cx={286} cy={22} r={1.3} fill="#ffffff" opacity={0.8} />
-          <Circle cx={260} cy={28} r={0.8} fill="#e2e8f0" opacity={0.55} />
-          {/* Horizonte y superficie gris lunar con cráteres */}
-          <Path
-            d="M 0 60 Q 75 46 155 56 T 320 50 L 320 90 L 0 90 Z"
-            fill="#475569"
-          />
-          <Path
-            d="M 0 68 Q 90 58 190 66 T 320 62 L 320 90 L 0 90 Z"
-            fill="#64748b"
-          />
-          <Ellipse cx={245} cy={73} rx={22} ry={6.5} fill="#334155" opacity={0.75} />
-          <Ellipse cx={245} cy={74} rx={17} ry={4.2} fill="#475569" opacity={0.7} />
-          <Ellipse cx={110} cy={78} rx={15} ry={4.5} fill="#334155" opacity={0.65} />
-          <Ellipse cx={288} cy={63} rx={10} ry={3} fill="#94a3b8" opacity={0.35} />
-        </>
-      )}
-
-      {env === 'marte' && (
-        <>
-          <Rect x={0} y={0} width={320} height={90} fill="url(#envGradMarte)" />
-          <Circle cx={274} cy={24} r={16} fill="#fb923c" opacity={0.18} />
-          <Circle cx={274} cy={24} r={8} fill="#fdba74" opacity={0.3} />
-          <Circle cx={72} cy={16} r={1} fill="#fed7aa" opacity={0.55} />
-          <Circle cx={154} cy={12} r={1.1} fill="#ffedd5" opacity={0.6} />
-          <Circle cx={216} cy={20} r={0.9} fill="#fed7aa" opacity={0.5} />
-          {/* Dunas y cañones rojizos de Marte */}
-          <Path
-            d="M 0 56 Q 80 42 165 54 T 320 46 L 320 90 L 0 90 Z"
-            fill="#7c2d12"
-          />
-          <Path
-            d="M 0 68 Q 105 55 205 68 T 320 60 L 320 90 L 0 90 Z"
-            fill="#ea580c"
-            opacity={0.78}
-          />
-          <Ellipse cx={250} cy={76} rx={20} ry={5.5} fill="#431407" opacity={0.55} />
-          <Ellipse cx={95} cy={80} rx={14} ry={4} fill="#7c2d12" opacity={0.6} />
-        </>
-      )}
-
-      {env === 'tierra' && (
-        <>
-          <Rect x={0} y={0} width={320} height={90} fill="url(#envGradTierra)" />
-          {/* Nubes atmosféricas */}
-          <Ellipse cx={225} cy={22} rx={24} ry={6} fill="#ffffff" opacity={0.22} />
-          <Ellipse cx={240} cy={20} rx={14} ry={5} fill="#ffffff" opacity={0.28} />
-          <Ellipse cx={125} cy={16} rx={18} ry={4.5} fill="#ffffff" opacity={0.18} />
-          {/* Océano y colinas verdes terrestres */}
-          <Path
-            d="M 0 60 Q 95 54 195 58 T 320 55 L 320 90 L 0 90 Z"
-            fill="#0369a1"
-            opacity={0.75}
-          />
-          <Path
-            d="M 0 66 Q 72 52 155 66 T 320 58 L 320 90 L 0 90 Z"
-            fill="#059669"
-          />
-          <Path
-            d="M 110 90 Q 200 60 320 68 L 320 90 Z"
-            fill="#10b981"
-            opacity={0.9}
-          />
-        </>
-      )}
-    </Svg>
+    </View>
   );
 }
 
@@ -243,9 +207,10 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
   const {
     environment,
     environmentConfig,
-    origin,
     destination,
+    flightPlanAccepted,
     setEnvironment,
+    cancelFlightPlan,
     openMissionSetup,
   } = useMission();
   const [open, setOpen] = useState(false);
@@ -262,9 +227,8 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
         <Pressable
           onPress={() => setOpen(true)}
           accessibilityLabel="Cambiar ubicación del astronauta"
-          className={`flex-1 flex-row items-center justify-between rounded-xl border border-trauma-line bg-white active:opacity-75 ${
-            compact ? 'px-3 py-1.5' : 'px-3.5 py-2.5 shadow-xs'
-          }`}>
+          className={`flex-1 flex-row items-center justify-between rounded-xl border border-trauma-line bg-white active:opacity-75 ${compact ? 'px-3 py-1.5' : 'px-3.5 py-2.5 shadow-xs'
+            }`}>
           <View className="flex-1 flex-row items-center pr-2">
             <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-sky-50">
               <EnvironmentIcon env={environment} color="#0284c7" />
@@ -280,6 +244,11 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
           </View>
 
           <View className="flex-row items-center">
+            {flightPlanAccepted && (
+              <View className="mr-1.5 h-5 w-5 items-center justify-center rounded-md bg-sky-50">
+                <Lock size={11} color="#0284c7" />
+              </View>
+            )}
             <View className="mr-1.5 rounded-md bg-slate-100 px-1.5 py-0.5">
               <Text className="font-mono text-[9px] font-bold text-slate-600">
                 {environmentConfig.gravityLabel.split(' ')[0]}
@@ -293,13 +262,15 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
         <Pressable
           onPress={openMissionSetup}
           accessibilityLabel="Abrir plan de vuelo"
-          className={`flex-row items-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft active:opacity-75 ${
-            compact ? 'px-3 py-2' : 'px-3.5 py-3 shadow-xs'
-          }`}>
+          className={`flex-row items-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft active:opacity-75 ${compact ? 'px-3 py-2' : 'px-3.5 py-3 shadow-xs'
+            }`}>
           <Calendar size={14} color="#0f172a" />
           <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-trauma-ink">
             Plan de vuelo
           </Text>
+          {flightPlanAccepted && (
+            <View className="ml-1.5 h-2 w-2 rounded-full bg-sky-600" />
+          )}
         </Pressable>
       </View>
 
@@ -316,7 +287,7 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
             onPress={(e) => e.stopPropagation()}
             style={{ maxHeight: '88%' }}
             className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
-            <View className="mb-1 flex-row items-center justify-between">
+            <View className="mb-3 flex-row items-center justify-between">
               <Text className="font-mono text-sm font-bold text-trauma-ink">
                 Ubicación actual del astronauta
               </Text>
@@ -327,96 +298,56 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
                 <X size={15} color="#475569" />
               </Pressable>
             </View>
-            <Text className="mb-4 font-mono text-[10px] text-slate-400">
-              Si cambias tu ubicación a Estación EEI, Base Lunar o Marte, la misión se adelantará a la llegada.
-            </Text>
+
+            {flightPlanAccepted ? (
+              <View className="mb-3.5 flex-row gap-2">
+                <Pressable
+                  onPress={() => {
+                    setOpen(false);
+                    openMissionSetup();
+                  }}
+                  className="flex-1 items-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-2.5 active:opacity-75">
+                  <Text className="font-mono text-[10.5px] font-bold text-trauma-ink">
+                    Ver plan de vuelo
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={cancelFlightPlan}
+                  className="flex-1 items-center rounded-xl border border-slate-200 bg-white py-2.5 active:opacity-75">
+                  <Text className="font-mono text-[10.5px] font-bold text-slate-700">
+                    Cancelar plan
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Text className="mb-3.5 font-mono text-[10px] text-slate-400">
+                Elige tu ubicación actual y se guardará en tu perfil.
+              </Text>
+            )}
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
               <View className="gap-2.5">
                 {options.map((opt) => {
                   const active = opt.id === environment;
-                  const theme = CARD_THEME[opt.id];
-                  const targetLoc = opt.id === 'nave' ? null : (opt.id as SpaceLocation);
-                  const routeSpec = targetLoc
-                    ? getRouteDurationSpec(origin === targetLoc ? 'tierra' : origin, targetLoc)
-                    : null;
-                  const routeAvg = routeSpec ? formatRouteDays(routeSpec.promedioDias) : '';
-                  const routeRange = routeSpec
-                    ? `${formatRouteDays(routeSpec.minDias)}–${formatRouteDays(routeSpec.maxDias)}d`
-                    : '';
-                  const subtitle =
-                    opt.id === 'nave'
-                      ? `${opt.gravityLabel} · En tránsito / órbita`
-                      : opt.id === 'tierra'
-                        ? `${opt.gravityLabel} · ${
-                            destination === 'tierra' && origin !== 'tierra' && routeAvg
-                              ? `Retorno ${routeAvg}d (${routeRange})`
-                              : 'Base / Readaptación'
-                          }`
-                        : `${opt.gravityLabel} · Día ${routeAvg} (${routeRange})`;
+                  const lockedCard = flightPlanAccepted && !active;
 
                   return (
                     <Pressable
                       key={opt.id}
+                      disabled={flightPlanAccepted}
                       onPress={() => {
-                        setEnvironment(opt.id);
-                        setOpen(false);
+                        const changed = setEnvironment(opt.id);
+                        if (changed) {
+                          setOpen(false);
+                        }
                       }}
-                      style={{
-                        borderColor: active ? theme.activeBorder : 'rgba(15, 23, 42, 0.14)',
-                        borderWidth: active ? 2 : 1,
-                      }}
-                      className="overflow-hidden rounded-2xl active:opacity-85">
-                      <EnvironmentCardBackdrop env={opt.id} />
-
-                      <View
-                        style={{
-                          backgroundColor: active
-                            ? 'rgba(15, 23, 42, 0.14)'
-                            : 'rgba(15, 23, 42, 0.24)',
-                        }}
-                        className="flex-row items-center justify-between px-3.5 py-3.5">
-                        <View className="flex-1 flex-row items-center pr-2">
-                          <View
-                            style={{
-                              backgroundColor: theme.badgeBg,
-                              borderColor: active
-                                ? theme.activeBorder
-                                : 'rgba(255, 255, 255, 0.22)',
-                              borderWidth: 1,
-                            }}
-                            className="mr-3 h-9 w-9 items-center justify-center rounded-xl">
-                            <EnvironmentIcon env={opt.id} color={theme.iconColor} />
-                          </View>
-                          <View className="flex-1">
-                            <Text className="font-mono text-xs font-extrabold text-white">
-                              {opt.label}
-                            </Text>
-                            <Text
-                              style={{ color: theme.subtitleColor }}
-                              className="mt-0.5 font-mono text-[9.5px] font-semibold">
-                              {subtitle}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View className="flex-row items-center gap-2">
-                          <View
-                            style={{ backgroundColor: 'rgba(255, 255, 255, 0.16)' }}
-                            className="rounded-md px-1.5 py-0.5">
-                            <Text className="font-mono text-[9px] font-bold text-white">
-                              {opt.gravityLabel.split(' ')[0]}
-                            </Text>
-                          </View>
-                          {active && (
-                            <View
-                              style={{ backgroundColor: theme.activeBorder }}
-                              className="h-5 w-5 items-center justify-center rounded-full">
-                              <Check size={12} color="#0f172a" strokeWidth={3} />
-                            </View>
-                          )}
-                        </View>
-                      </View>
+                      className="active:opacity-85">
+                      <EnvironmentLocationCard
+                        env={opt.id}
+                        selected={active}
+                        dimmed={lockedCard}
+                        locked={lockedCard}
+                      />
                     </Pressable>
                   );
                 })}

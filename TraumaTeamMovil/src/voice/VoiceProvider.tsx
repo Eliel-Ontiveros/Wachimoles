@@ -312,7 +312,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           return;
         case 'set-environment': {
           const env = t(`env.${intent.environment}` as MessageKey);
-          m.setEnvironment(intent.environment);
+          const changed = m.setEnvironment(intent.environment);
+          if (!changed) {
+            report({ kind: 'error', text: t('action.environmentLocked') }, true);
+            return;
+          }
           report({ kind: 'success', text: t('action.environment', { env }) }, true);
           return;
         }
@@ -321,10 +325,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           m.openMissionSetup();
           setPanelOpen(false);
           return;
-        case 'arrive-early':
-          m.arriveEarly();
+        case 'arrive-early': {
+          const arrived = m.arriveEarly();
+          if (!arrived) {
+            report({ kind: 'info', text: t('action.arriveEarlyNoPlan') }, true);
+            return;
+          }
           report({ kind: 'success', text: t('action.arriveEarly') }, true);
           return;
+        }
         case 'complete-mission': {
           const mission = m.missions.find((x) => x.id === intent.missionId);
           if (!mission) {

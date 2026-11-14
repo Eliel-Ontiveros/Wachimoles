@@ -22,6 +22,25 @@ export interface MissionSetup {
   arrivalDate?: string | null; // YYYY-MM-DD (opcional; si falta se estima)
 }
 
+export type MissionExecutionStatus = 'scheduled' | 'in_transit' | 'arrived';
+
+export interface AstronautMissionStateRecord {
+  id: string;
+  usuarioId: string;
+  origen: SpaceLocation;
+  destino: SpaceLocation;
+  fechaSalida: string;
+  fechaLlegadaEstimada: string;
+  fechaLlegadaReal: string | null;
+  diasTotales: number;
+  diaActual: number;
+  porcentajeProgresoRelativo: number;
+  entornoActual: EnvironmentType;
+  estado: MissionExecutionStatus;
+  llegadaAnticipada: boolean;
+  actualizadoEn?: string;
+}
+
 export interface EnvironmentConfig {
   id: EnvironmentType;
   label: string;

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { ClockPlus, Flag, X } from 'lucide-react-native';
+import { Calendar, ClockPlus, X } from 'lucide-react-native';
 import {
-  ENVIRONMENTS,
   formatRouteDays,
   getDelayPresetDays,
+  getRouteDurationSpec,
   SPACE_LOCATIONS,
 } from '../../services/mission-api';
 import { EnvironmentType, SpaceLocation } from '../../types/mission';
@@ -185,11 +185,13 @@ export function SpaceJourneyTimeline({
 }) {
   const {
     missionDay,
-    environment,
     origin,
     destination,
     daysUntilDeparture,
     totalMissionDays,
+    flightPlanAccepted,
+    openMissionSetup,
+    cancelFlightPlan,
     arriveEarly,
     delayMission,
   } = useMission();
@@ -201,22 +203,24 @@ export function SpaceJourneyTimeline({
 
   const activeOrigin = previewOrigin ?? origin;
   const activeDest = previewDestination ?? destination;
-  const activeEnv = previewEnvironment ?? environment;
   const activeDay = previewDay ?? missionDay;
   const activeDaysUntil = previewDaysUntilDeparture ?? daysUntilDeparture;
 
   const originInfo = SPACE_LOCATIONS[activeOrigin];
   const destInfo = SPACE_LOCATIONS[activeDest];
-  const envConfig = ENVIRONMENTS[activeEnv];
+  const routeSpec = getRouteDurationSpec(activeOrigin, activeDest);
 
   const totalDays = previewTotalDays ?? totalMissionDays;
-  const ratio = Math.max(0.06, Math.min(0.96, totalDays > 0 ? activeDay / totalDays : 0.06));
-  const progressPct = totalDays > 0 ? Math.min(100, Math.round((activeDay / totalDays) * 100)) : 0;
-  const activeDayLabel = formatRouteDays(activeDay);
+  const isStandby = !compact && !previewDay && previewOrigin === undefined && !flightPlanAccepted;
+  const effectiveTrackDay = isStandby ? 0 : activeDay;
+  const ratio = Math.max(
+    0.06,
+    Math.min(0.96, totalDays > 0 ? effectiveTrackDay / totalDays : 0.06)
+  );
   const totalDaysLabel = formatRouteDays(totalDays);
   const isPreview = previewDay !== undefined || previewOrigin !== undefined;
-  const canArriveEarly = !compact && !isPreview && activeDaysUntil === 0 && activeDay < totalDays;
-  const canDelayMission = !compact && !isPreview;
+  const canShowActiveControls =
+    !compact && !isPreview && flightPlanAccepted && effectiveTrackDay < totalDays;
   const delayPresets = useMemo(() => getDelayPresetDays(totalDays), [totalDays]);
 
   useEffect(() => {
@@ -306,30 +310,31 @@ export function SpaceJourneyTimeline({
     <View
       style={{ backgroundColor: '#060b19', borderColor: 'rgba(56, 189, 248, 0.25)' }}
       className={`overflow-hidden rounded-2xl border shadow-md ${compact ? 'p-3.5' : 'p-4'}`}>
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="font-mono text-[9px] font-bold uppercase tracking-wider text-sky-400">
-            {activeDaysUntil > 0
-              ? `Despegue en ${activeDaysUntil} ${activeDaysUntil === 1 ? 'día' : 'días'}`
-              : activeEnv === 'nave'
-                ? 'En tránsito espacial'
-                : envConfig.label}
-          </Text>
-          <Text className="font-mono text-xs font-bold text-slate-100">
+      <View className="flex-row items-center justify-between gap-2">
+        <View className="flex-1">
+          {!compact && (
+            <Text className="mb-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-sky-400">
+              {isStandby
+                ? 'Sin plan de vuelo activo'
+                : activeDaysUntil > 0
+                  ? `Despegue en ${activeDaysUntil} ${activeDaysUntil === 1 ? 'día' : 'días'}`
+                  : 'Plan de vuelo activo · En ruta'}
+            </Text>
+          )}
+          <Text className="font-mono text-xs font-bold text-slate-100" numberOfLines={1}>
             {originInfo.shortLabel} → {destInfo.label}
           </Text>
-        </View>
-        <View
-          style={{
-            backgroundColor: 'rgba(56, 189, 248, 0.14)',
-            borderColor: 'rgba(56, 189, 248, 0.4)',
-          }}
-          className="rounded-lg border px-2.5 py-1">
-          <Text className="font-mono text-[10px] font-bold text-sky-300">
-            {activeDaysUntil > 0
-              ? `Sale en ${activeDaysUntil}d`
-              : `Día ${activeDayLabel} / ${totalDaysLabel}`}
-          </Text>
+          {routeSpec && (
+            <Text className="mt-0.5 font-mono text-[9.5px] text-slate-400">
+              Trayecto: {formatRouteDays(routeSpec.minDias)}–{formatRouteDays(routeSpec.maxDias)} días · Promedio:{' '}
+              {formatRouteDays(routeSpec.promedioDias)}{' '}
+              {routeSpec.promedioDias === 1 ? 'día' : 'días'}
+              {routeSpec.esperaRetornoDiasMin !== undefined &&
+                routeSpec.esperaRetornoDiasMax !== undefined
+                ? ` · Espera retorno: ${routeSpec.esperaRetornoDiasMin}–${routeSpec.esperaRetornoDiasMax} días`
+                : ''}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -433,14 +438,6 @@ export function SpaceJourneyTimeline({
           </Text>
         </View>
 
-        <View
-          style={{ backgroundColor: 'rgba(56, 189, 248, 0.16)' }}
-          className="rounded-md px-2 py-0.5">
-          <Text className="font-mono text-[9px] font-bold text-sky-300">
-            Día {activeDayLabel} ({progressPct}%)
-          </Text>
-        </View>
-
         <View className="flex-row items-center">
           <Text className="font-mono text-[9px] text-slate-300">
             Día {totalDaysLabel} · {destInfo.shortLabel}
@@ -449,69 +446,85 @@ export function SpaceJourneyTimeline({
         </View>
       </View>
 
-      {(canArriveEarly || canDelayMission) && (
-        <View className="mt-2.5 gap-2">
-          <View className="flex-row gap-2">
-            {canArriveEarly && (
-              <Pressable
-                onPress={() => {
-                  setDelayPickerOpen(false);
-                  arriveEarly();
-                }}
-                accessibilityLabel="Marcar llegada anticipada"
-                style={{
-                  backgroundColor: 'rgba(56, 189, 248, 0.14)',
-                  borderColor: 'rgba(56, 189, 248, 0.35)',
-                }}
-                className="flex-1 flex-row items-center justify-center rounded-xl border px-2.5 py-2 active:opacity-75">
-                <Flag size={12} color="#38bdf8" />
-                <Text
-                  numberOfLines={1}
-                  className="ml-1.5 font-mono text-[10.5px] font-bold text-sky-300">
-                  Llegué antes
-                </Text>
-              </Pressable>
-            )}
+      {isStandby && (
+        <Pressable
+          onPress={openMissionSetup}
+          accessibilityLabel="Configurar y aceptar plan de vuelo"
+          style={{
+            backgroundColor: 'rgba(56, 189, 248, 0.14)',
+            borderColor: 'rgba(56, 189, 248, 0.4)',
+          }}
+          className="mt-3 flex-row items-center justify-center rounded-xl border px-3 py-2.5 active:opacity-80">
+          <Calendar size={13} color="#7dd3fc" />
+          <Text className="ml-2 font-mono text-[11px] font-bold text-sky-200">
+            Configurar plan de vuelo
+          </Text>
+        </Pressable>
+      )}
 
-            {canDelayMission && (
-              <Pressable
-                onPress={() => setDelayPickerOpen((open) => !open)}
-                accessibilityLabel="Añadir tiempo por atraso de misión"
-                style={{
-                  backgroundColor: delayPickerOpen
-                    ? 'rgba(251, 191, 36, 0.22)'
-                    : 'rgba(251, 191, 36, 0.12)',
-                  borderColor: delayPickerOpen
-                    ? 'rgba(251, 191, 36, 0.65)'
-                    : 'rgba(251, 191, 36, 0.38)',
-                }}
-                className="flex-1 flex-row items-center justify-center rounded-xl border px-2.5 py-2 active:opacity-75">
-                <ClockPlus size={12} color="#fbbf24" />
-                <Text
-                  numberOfLines={1}
-                  className="ml-1.5 font-mono text-[10.5px] font-bold text-amber-300">
-                  Añadir tiempo
-                </Text>
-              </Pressable>
-            )}
+      {canShowActiveControls && (
+        <View className="mt-3 gap-2">
+          <View className="flex-row gap-2">
+            <Pressable
+              onPress={() => {
+                setDelayPickerOpen(false);
+                arriveEarly();
+              }}
+              accessibilityLabel="Marcar llegada anticipada"
+              style={{
+                backgroundColor: 'rgba(56, 189, 248, 0.14)',
+                borderColor: 'rgba(56, 189, 248, 0.4)',
+              }}
+              className="flex-1 items-center justify-center rounded-xl border px-2.5 py-2 active:opacity-75">
+              <Text
+                numberOfLines={1}
+                className="font-mono text-[10.5px] font-bold text-sky-200">
+                Llegué antes
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setDelayPickerOpen((open) => !open)}
+              accessibilityLabel="¿Se atrasó la misión?"
+              style={{
+                backgroundColor: delayPickerOpen
+                  ? 'rgba(56, 189, 248, 0.22)'
+                  : 'rgba(148, 163, 184, 0.12)',
+                borderColor: delayPickerOpen
+                  ? 'rgba(56, 189, 248, 0.6)'
+                  : 'rgba(148, 163, 184, 0.3)',
+              }}
+              className="flex-1 flex-row items-center justify-center rounded-xl border px-2.5 py-2 active:opacity-75">
+              <ClockPlus size={12} color="#7dd3fc" />
+              <Text
+                numberOfLines={1}
+                className="ml-1.5 font-mono text-[10.5px] font-bold text-slate-200">
+                ¿Se atrasó?
+              </Text>
+            </Pressable>
           </View>
 
-          {delayPickerOpen && canDelayMission && (
+          {delayPickerOpen && (
             <View
               style={{
-                backgroundColor: 'rgba(15, 23, 42, 0.72)',
-                borderColor: 'rgba(251, 191, 36, 0.34)',
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                borderColor: 'rgba(56, 189, 248, 0.34)',
               }}
-              className="rounded-xl border p-2.5">
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text className="font-mono text-[9.5px] font-bold text-amber-200">
-                  Sumar días por atraso a la llegada
-                </Text>
+              className="rounded-xl border p-3">
+              <View className="mb-2.5 flex-row items-center justify-between">
+                <View className="flex-1 pr-2">
+                  <Text className="font-mono text-[10.5px] font-bold text-slate-100">
+                    ¿Se atrasó la misión?
+                  </Text>
+                  <Text className="mt-0.5 font-mono text-[9px] text-slate-400">
+                    Extiende la fecha estimada de llegada
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => setDelayPickerOpen(false)}
                   accessibilityLabel="Cerrar selector de atraso"
-                  className="h-5 w-5 items-center justify-center rounded-full bg-slate-800 active:opacity-75">
-                  <X size={11} color="#cbd5e1" />
+                  className="h-6 w-6 items-center justify-center rounded-full bg-slate-800 active:opacity-75">
+                  <X size={12} color="#cbd5e1" />
                 </Pressable>
               </View>
               <View className="flex-row gap-1.5">
@@ -523,11 +536,11 @@ export function SpaceJourneyTimeline({
                       setDelayPickerOpen(false);
                     }}
                     style={{
-                      backgroundColor: 'rgba(251, 191, 36, 0.16)',
-                      borderColor: 'rgba(251, 191, 36, 0.42)',
+                      backgroundColor: 'rgba(56, 189, 248, 0.14)',
+                      borderColor: 'rgba(56, 189, 248, 0.4)',
                     }}
-                    className="flex-1 items-center rounded-lg border py-1.5 active:opacity-75">
-                    <Text className="font-mono text-[10.5px] font-extrabold text-amber-300">
+                    className="flex-1 items-center rounded-lg border py-2 active:opacity-75">
+                    <Text className="font-mono text-[10.5px] font-extrabold text-sky-300">
                       +{extra}d
                     </Text>
                   </Pressable>
@@ -535,6 +548,19 @@ export function SpaceJourneyTimeline({
               </View>
             </View>
           )}
+
+          <Pressable
+            onPress={cancelFlightPlan}
+            accessibilityLabel="Cancelar plan de vuelo"
+            style={{
+              backgroundColor: 'rgba(148, 163, 184, 0.12)',
+              borderColor: 'rgba(148, 163, 184, 0.3)',
+            }}
+            className="items-center justify-center rounded-xl border py-2 active:opacity-75">
+            <Text className="font-mono text-[10.5px] font-bold text-slate-200">
+              Cancelar plan
+            </Text>
+          </Pressable>
         </View>
       )}
     </View>

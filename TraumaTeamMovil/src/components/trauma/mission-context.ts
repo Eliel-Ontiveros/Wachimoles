@@ -23,12 +23,14 @@ export type MissionCtx = {
   totalMissionDays: number;
   daysUntilDeparture: number;
   missionSetupOpen: boolean;
+  flightPlanAccepted: boolean;
   openMissionSetup: () => void;
   closeMissionSetup: () => void;
   configureMission: (setup: MissionSetup) => void;
-  arriveEarly: () => void;
-  delayMission: (extraDays: number) => void;
-  setEnvironment: (env: EnvironmentType) => void;
+  cancelFlightPlan: () => void;
+  arriveEarly: () => boolean;
+  delayMission: (extraDays: number) => boolean;
+  setEnvironment: (env: EnvironmentType) => boolean;
   streakDays: number;
   checkedInToday: boolean;
   missionDay: number;

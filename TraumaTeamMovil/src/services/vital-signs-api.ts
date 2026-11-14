@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { DashboardSample, SampleMetric, VitalSignsData } from '../types/vital-signs';
 
 // Conexión y procesamiento de signos vitales desde el backend NestJS
@@ -59,19 +60,50 @@ function parseSamples(value: unknown): DashboardSample[] {
   });
 }
 
+function isMetroDevBase(base: string): boolean {
+  try {
+    return new URL(base).port === '8081';
+  } catch {
+    return false;
+  }
+}
+
 function getBackendCandidateBases(): string[] {
   const candidates: string[] = [];
   if (typeof window !== 'undefined' && window.location?.origin) {
     candidates.push(`${window.location.origin.replace(/\/+$/, '')}/__api_proxy`);
   }
+
+  const pushConfiguredBase = (rawBase: string) => {
+    const clean = rawBase.replace(/\/+$/, '');
+    if (!clean) return;
+    if (isMetroDevBase(clean)) {
+      candidates.push(`${clean}/__api_proxy`);
+    } else {
+      candidates.push(clean);
+    }
+  };
+
   if (API_CONFIG.apiBaseUrl) {
-    candidates.push(API_CONFIG.apiBaseUrl.replace(/\/+$/, ''));
+    pushConfiguredBase(API_CONFIG.apiBaseUrl);
   }
   for (const localUrl of API_CONFIG.localUrls) {
     if (localUrl) {
-      candidates.push(localUrl.replace(/\/+$/, ''));
+      pushConfiguredBase(localUrl);
     }
   }
+
+  if (typeof window === 'undefined' && __DEV__) {
+    const rawHostUri = Constants.expoConfig?.hostUri;
+    const expoHost =
+      typeof rawHostUri === 'string' ? rawHostUri.split(':')[0]?.trim() : '';
+    if (expoHost) {
+      candidates.push(`http://${expoHost}:8081/__api_proxy`);
+      candidates.push(`http://${expoHost}:3000`);
+    }
+    candidates.push('http://localhost:3000', 'http://127.0.0.1:3000');
+  }
+
   if (typeof window !== 'undefined') {
     const host = window.location?.hostname?.trim();
     if (host) {
@@ -114,20 +146,20 @@ export async function fetchBackendWithFallback(
     const isProxy = base.endsWith('/__api_proxy');
     let targetUrl = `${base}${normalizedPath}`;
 
-    if (!isProxy) {
-      try {
-        const parsedBase = new URL(base);
-        if (
-          parsedBase.protocol !== 'https:' &&
-          !(__DEV__ && parsedBase.protocol === 'http:')
-        ) {
-          continue;
-        }
-        targetUrl = new URL(normalizedPath, parsedBase).toString();
-      } catch (err) {
-        lastError = err;
+    try {
+      const parsedBase = new URL(base);
+      if (
+        parsedBase.protocol !== 'https:' &&
+        !(__DEV__ && parsedBase.protocol === 'http:')
+      ) {
         continue;
       }
+      if (!isProxy) {
+        targetUrl = new URL(normalizedPath, parsedBase).toString();
+      }
+    } catch (err) {
+      lastError = err;
+      continue;
     }
 
     const controller = new AbortController();
@@ -154,12 +186,12 @@ export async function fetchBackendWithFallback(
 
       const contentType = response.headers.get('content-type') || '';
       const isProxyUnavailable =
-        isProxy &&
-        (response.status === 404 ||
-          response.status === 502 ||
-          response.status === 503 ||
-          response.status === 504 ||
-          contentType.includes('text/html'));
+        contentType.includes('text/html') ||
+        (isProxy &&
+          (response.status === 404 ||
+            response.status === 502 ||
+            response.status === 503 ||
+            response.status === 504));
 
       if (isProxyUnavailable) {
         lastError = new TypeError('Failed to fetch via proxy');

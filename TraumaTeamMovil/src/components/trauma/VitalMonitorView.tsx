@@ -17,8 +17,6 @@ import Svg, {
   Line,
   LinearGradient,
   Path,
-  RadialGradient,
-  Rect,
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
@@ -37,7 +35,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { DashboardSample } from '../../types/vital-signs';
-import { EnvironmentSelector } from './EnvironmentSelector';
+import { EnvironmentBannerBackdrop, EnvironmentSelector } from './EnvironmentSelector';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
 import { useVoice } from '@/voice/voice-context';
@@ -370,16 +368,6 @@ function buildSmoothCurvePath(pts: { x: number; y: number }[]): string {
   return d;
 }
 
-const BANNER_STARS = [
-  { x: 24, y: 16, r: 1.1, o: 0.6 },
-  { x: 78, y: 42, r: 0.9, o: 0.45 },
-  { x: 138, y: 14, r: 1.3, o: 0.75 },
-  { x: 210, y: 54, r: 1.0, o: 0.5 },
-  { x: 295, y: 20, r: 1.2, o: 0.7 },
-  { x: 350, y: 48, r: 1.1, o: 0.6 },
-  { x: 392, y: 18, r: 1.3, o: 0.78 },
-];
-
 const METRIC_META: Record<
   HistoryMetric,
   {
@@ -527,47 +515,38 @@ function VitalHistoryModal({
   loading: boolean;
 }) {
   const { height: windowHeight } = useWindowDimensions();
+  const { environment } = useMission();
   const dismissDistance = Math.max(760, windowHeight);
-  const dismissDistanceRef = useRef(dismissDistance);
   const [chartWidth, setChartWidth] = useState(0);
-  const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
-  const sheetTranslateY = useRef(new Animated.Value(dismissDistance)).current;
-  const scrollYRef = useRef(0);
-  const onCloseRef = useRef(onClose);
+  const [selectedPoint, setSelectedPoint] = useState<{
+    metric: HistoryMetric;
+    idx: number;
+  } | null>(null);
+  const [scrollAtTop, setScrollAtTop] = useState(true);
+  const [sheetTranslateY] = useState(() => new Animated.Value(dismissDistance));
   const meta = METRIC_META[metric];
 
   useEffect(() => {
-    dismissDistanceRef.current = dismissDistance;
-  }, [dismissDistance]);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    setSelectedPointIdx(null);
-  }, [metric, visible]);
-
-  useEffect(() => {
     if (!visible) return;
-    scrollYRef.current = 0;
-    sheetTranslateY.setValue(dismissDistanceRef.current);
+    sheetTranslateY.setValue(dismissDistance);
     Animated.timing(sheetTranslateY, {
       toValue: 0,
       duration: 280,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
-  }, [visible, sheetTranslateY]);
+  }, [visible, sheetTranslateY, dismissDistance]);
 
   const dismissSheet = () => {
     Animated.timing(sheetTranslateY, {
-      toValue: dismissDistanceRef.current,
+      toValue: dismissDistance,
       duration: 200,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start(() => {
-      onCloseRef.current();
+      setSelectedPoint(null);
+      setScrollAtTop(true);
+      onClose();
     });
   };
 
@@ -581,12 +560,14 @@ function VitalHistoryModal({
     const finishDrag = (dy: number, vy: number) => {
       if (dy > 95 || vy > 0.65) {
         Animated.timing(sheetTranslateY, {
-          toValue: dismissDistanceRef.current,
+          toValue: dismissDistance,
           duration: 190,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }).start(() => {
-          onCloseRef.current();
+          setSelectedPoint(null);
+          setScrollAtTop(true);
+          onClose();
         });
       } else {
         Animated.spring(sheetTranslateY, {
@@ -619,11 +600,11 @@ function VitalHistoryModal({
       }),
       bodyPanResponder: PanResponder.create({
         onMoveShouldSetPanResponderCapture: (_, gs) =>
-          scrollYRef.current <= 1 && gs.dy > 10 && gs.dy > Math.abs(gs.dx),
+          scrollAtTop && gs.dy > 10 && gs.dy > Math.abs(gs.dx),
         ...sharedCallbacks,
       }),
     };
-  }, [sheetTranslateY]);
+  }, [sheetTranslateY, dismissDistance, onClose, scrollAtTop]);
 
   const validSamples = useMemo(() => {
     return history.filter((s) => s.metric === metric && Number(s.value) > 0);
@@ -760,6 +741,8 @@ function VitalHistoryModal({
     };
   }, [chartWidth, metricSeries, meta]);
 
+  const selectedPointIdx =
+    visible && selectedPoint && selectedPoint.metric === metric ? selectedPoint.idx : null;
   const activePoint =
     selectedPointIdx !== null && chartGeometry.points[selectedPointIdx]
       ? chartGeometry.points[selectedPointIdx]
@@ -802,54 +785,36 @@ function VitalHistoryModal({
             <View
               {...headerPanResponder.panHandlers}
               style={{ backgroundColor: '#060b19', position: 'relative' }}>
-              <Svg
-                width="100%"
-                height="100%"
-                viewBox="0 0 420 96"
-                preserveAspectRatio="xMidYMid slice"
-                style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
-                <Defs>
-                  <LinearGradient id="mobileHistorySky" x1="0" y1="0" x2="1" y2="1">
-                    <Stop offset="0%" stopColor="#060b19" />
-                    <Stop offset="100%" stopColor="#0b1633" />
-                  </LinearGradient>
-                  <RadialGradient id="mobileEarth" cx="35%" cy="30%" r="65%">
-                    <Stop offset="0%" stopColor="#38bdf8" />
-                    <Stop offset="100%" stopColor="#0369a1" />
-                  </RadialGradient>
-                  <RadialGradient id="mobileMoon" cx="35%" cy="30%" r="65%">
-                    <Stop offset="0%" stopColor="#f1f5f9" />
-                    <Stop offset="100%" stopColor="#94a3b8" />
-                  </RadialGradient>
-                </Defs>
-                <Rect x={0} y={0} width={420} height={96} fill="url(#mobileHistorySky)" />
-                {BANNER_STARS.map((st, idx) => (
-                  <Circle key={idx} cx={st.x} cy={st.y} r={st.r} fill="#e0f2fe" opacity={st.o} />
-                ))}
-                <Path
-                  d="M 226 68 Q 312 18 390 54"
-                  fill="none"
-                  stroke="#38bdf8"
-                  strokeWidth={1.3}
-                  strokeDasharray="4 4"
-                  opacity={0.5}
-                />
-                <Circle cx={226} cy={68} r={9} fill="url(#mobileEarth)" opacity={0.92} />
-                <Circle cx={390} cy={54} r={7.5} fill="url(#mobileMoon)" opacity={0.92} />
-                <Circle cx={312} cy={38} r={4} fill="#7dd3fc" opacity={0.9} />
-                <Circle cx={312} cy={38} r={9} fill="rgba(125,211,252,0.18)" />
-              </Svg>
+              <EnvironmentBannerBackdrop env={environment} />
 
               <View className="px-5 pb-3.5 pt-2.5">
-                <View className="mx-auto mb-2.5 h-1 w-12 rounded-full bg-white/35" />
+                <View className="mx-auto mb-2.5 h-1 w-12 rounded-full bg-white/45" />
                 <View>
-                  <Text className="font-mono text-[9px] font-bold uppercase tracking-[1.6px] text-sky-300">
+                  <Text
+                    style={{
+                      textShadowColor: 'rgba(6, 11, 25, 0.75)',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 3,
+                    }}
+                    className="font-mono text-[9px] font-bold uppercase tracking-[1.6px] text-sky-200">
                     BITÁCORA DE VUELO
                   </Text>
-                  <Text className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  <Text
+                    style={{
+                      textShadowColor: 'rgba(6, 11, 25, 0.8)',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 4,
+                    }}
+                    className="mt-0.5 font-mono text-lg font-extrabold text-white">
                     {meta.title}
                   </Text>
-                  <Text className="mt-0.5 font-mono text-[10px] text-slate-300">
+                  <Text
+                    style={{
+                      textShadowColor: 'rgba(6, 11, 25, 0.75)',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 3,
+                    }}
+                    className="mt-0.5 font-mono text-[10px] text-slate-200">
                     {stats.count > 0 && stats.latestTime
                       ? `${stats.count} registros recientes · última ${formatDateTimeShort(stats.latestTime)}`
                       : 'Sin lecturas sincronizadas para esta señal'}
@@ -904,7 +869,10 @@ function VitalHistoryModal({
               bounces={false}
               scrollEventThrottle={16}
               onScroll={(e) => {
-                scrollYRef.current = e.nativeEvent.contentOffset.y;
+                const atTop = e.nativeEvent.contentOffset.y <= 1;
+                if (atTop !== scrollAtTop) {
+                  setScrollAtTop(atTop);
+                }
               }}>
               {loading ? (
                 <HistorySkeleton />
@@ -1164,7 +1132,7 @@ function VitalHistoryModal({
                                         cy={pt.y}
                                         r={12}
                                         fill="transparent"
-                                        onPress={() => setSelectedPointIdx(idx)}
+                                        onPress={() => setSelectedPoint({ metric, idx })}
                                       />
                                     </Fragment>
                                   );
@@ -1516,8 +1484,12 @@ export function VitalMonitorView() {
   const { vitalsIntent, consumeVitalsIntent } = useVoice();
   useEffect(() => {
     if (!vitalsIntent) return;
+    const targetMetric = vitalsIntent.metric;
     consumeVitalsIntent(vitalsIntent.nonce);
-    void handleOpenMetricHistory(vitalsIntent.metric);
+    const timer = setTimeout(() => {
+      void handleOpenMetricHistory(targetMetric);
+    }, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vitalsIntent, consumeVitalsIntent]);
 

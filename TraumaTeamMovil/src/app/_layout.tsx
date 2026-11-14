@@ -1,5 +1,6 @@
 import '../utils/web-interop-init';
 import '../global.css';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
@@ -32,10 +33,22 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
+  const [fontsLoaded, fontError] = useFonts({
+    'ASpace-Regular': require('@/assets/tipografía/A-Space Regular Demo.otf'),
+    'ASpace-Bold': require('@/assets/tipografía/A-Space Bold Demo.otf'),
+    'ASpace-Light': require('@/assets/tipografía/A-Space Light Demo.otf'),
+    'ASpace-Black': require('@/assets/tipografía/A-Space Black Demo.otf'),
+  });
 
   useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <I18nProvider>

@@ -4,10 +4,12 @@ import {
   isNetworkFetchError,
 } from './vital-signs-api';
 import {
+  AstronautMissionStateRecord,
   DailyHealthCheck,
   DailyMission,
   EnvironmentConfig,
   EnvironmentType,
+  MissionExecutionStatus,
   RouteDurationSpec,
   SpaceLocation,
 } from '../types/mission';
@@ -772,7 +774,7 @@ export async function fetchDailyMissionsFromBackend(
   dateIso?: string
 ): Promise<DailyMission[]> {
   const authHeadersList = getMobileFallbackAuthHeaders();
-  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+  if (!canUseBackend(authHeadersList)) {
     return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
   }
 
@@ -831,7 +833,147 @@ export interface AstronautMissionStatePayload {
   diaActual: number;
   porcentajeProgresoRelativo?: number;
   entornoActual: EnvironmentType;
-  estado?: 'scheduled' | 'in_transit' | 'arrived';
+  estado?: MissionExecutionStatus;
+}
+
+const VALID_SPACE_LOCATIONS: readonly SpaceLocation[] = [
+  'tierra',
+  'estacion',
+  'luna',
+  'marte',
+];
+
+const VALID_ENVIRONMENTS: readonly EnvironmentType[] = [
+  'tierra',
+  'nave',
+  'estacion',
+  'luna',
+  'marte',
+];
+
+function isSpaceLocation(value: unknown): value is SpaceLocation {
+  return typeof value === 'string' && VALID_SPACE_LOCATIONS.includes(value as SpaceLocation);
+}
+
+function isEnvironmentType(value: unknown): value is EnvironmentType {
+  return typeof value === 'string' && VALID_ENVIRONMENTS.includes(value as EnvironmentType);
+}
+
+function canUseBackend(authHeadersList: Record<string, string>[]): boolean {
+  return (
+    authHeadersList.length > 0 &&
+    (Boolean(API_CONFIG.apiBaseUrl) || typeof window !== 'undefined' || __DEV__)
+  );
+}
+
+function normalizeAstronautMissionStateRecord(
+  value: unknown
+): AstronautMissionStateRecord | null {
+  if (!isRecord(value)) return null;
+
+  const id = typeof value.id === 'string' ? value.id : '';
+  const usuarioId =
+    typeof value.usuarioId === 'string'
+      ? value.usuarioId
+      : typeof value.userId === 'string'
+        ? value.userId
+        : '';
+  const origen = value.origen ?? value.origin;
+  const destino = value.destino ?? value.destination;
+  const fechaSalida = value.fechaSalida ?? value.departureDate;
+  const fechaLlegadaEstimada =
+    value.fechaLlegadaEstimada ?? value.estimatedArrivalDate;
+  const rawActualArrival = value.fechaLlegadaReal ?? value.actualArrivalDate ?? null;
+  const diasTotales = Number(value.diasTotales ?? value.totalDays);
+  const diaActual = Number(value.diaActual ?? value.currentDay);
+  const porcentajeProgresoRelativo = Number(
+    value.porcentajeProgresoRelativo ?? value.relativeProgressPct ?? 0
+  );
+  const entornoActual = value.entornoActual ?? value.currentEnvironment;
+  const estado = value.estado ?? value.status;
+  const llegadaAnticipada = Boolean(
+    value.llegadaAnticipada ?? value.arrivedEarly ?? false
+  );
+  const actualizadoEn =
+    typeof value.actualizadoEn === 'string'
+      ? value.actualizadoEn
+      : typeof value.updatedAt === 'string'
+        ? value.updatedAt
+        : undefined;
+
+  if (
+    !isSpaceLocation(origen) ||
+    !isSpaceLocation(destino) ||
+    typeof fechaSalida !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(fechaSalida) ||
+    typeof fechaLlegadaEstimada !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(fechaLlegadaEstimada) ||
+    (rawActualArrival !== null && typeof rawActualArrival !== 'string') ||
+    !Number.isFinite(diasTotales) ||
+    !Number.isFinite(diaActual) ||
+    !Number.isFinite(porcentajeProgresoRelativo) ||
+    !isEnvironmentType(entornoActual) ||
+    (estado !== 'scheduled' && estado !== 'in_transit' && estado !== 'arrived')
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    usuarioId,
+    origen,
+    destino,
+    fechaSalida,
+    fechaLlegadaEstimada,
+    fechaLlegadaReal: rawActualArrival,
+    diasTotales,
+    diaActual,
+    porcentajeProgresoRelativo,
+    entornoActual,
+    estado,
+    llegadaAnticipada,
+    actualizadoEn,
+  };
+}
+
+// Consulta el plan de vuelo y estado relativo de misión guardado en BD
+export async function fetchAstronautMissionStateFromBackend(): Promise<AstronautMissionStateRecord | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (!canUseBackend(authHeadersList)) {
+    return null;
+  }
+
+  try {
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback('/dashboard/mission-state', {
+        method: 'GET',
+        headers: { ...headers, Accept: 'application/json' },
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (!response || !response.ok) {
+      if (response) {
+        console.warn('[mission-api] Error al consultar mission-state:', response.status);
+      }
+      return null;
+    }
+
+    const rawText = await response.text();
+    if (!rawText.trim()) {
+      return null;
+    }
+
+    const parsed: unknown = JSON.parse(rawText);
+    if (parsed === null) {
+      return null;
+    }
+    return normalizeAstronautMissionStateRecord(parsed);
+  } catch (err) {
+    console.warn('[mission-api] No se pudo cargar el estado de misión desde backend:', err);
+    return null;
+  }
 }
 
 // Guarda la ubicación relativa del astronauta en el backend en perspectiva de los días de misión
@@ -839,8 +981,35 @@ export async function syncAstronautMissionStateToBackend(
   payload: AstronautMissionStatePayload
 ): Promise<boolean> {
   const authHeadersList = getMobileFallbackAuthHeaders();
-  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+  if (!canUseBackend(authHeadersList)) {
     return false;
+  }
+
+  const safeTotalDays = Math.max(0.1, Number(payload.diasTotales) || 1);
+  const safeCurrentDay = Math.max(0, Number(payload.diaActual) || 0);
+  const rawPct =
+    payload.porcentajeProgresoRelativo !== undefined
+      ? Number(payload.porcentajeProgresoRelativo)
+      : (safeCurrentDay / safeTotalDays) * 100;
+  const safePct = Math.max(0, Math.min(100, Math.round(rawPct * 100) / 100));
+
+  const requestBody: Record<string, unknown> = {
+    origen: payload.origen,
+    destino: payload.destino,
+    fechaSalida: payload.fechaSalida,
+    diasTotales: safeTotalDays,
+    diaActual: safeCurrentDay,
+    porcentajeProgresoRelativo: safePct,
+    entornoActual: payload.entornoActual,
+  };
+  if (
+    typeof payload.fechaLlegadaEstimada === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(payload.fechaLlegadaEstimada)
+  ) {
+    requestBody.fechaLlegadaEstimada = payload.fechaLlegadaEstimada;
+  }
+  if (payload.estado) {
+    requestBody.estado = payload.estado;
   }
 
   const path = '/dashboard/mission-state';
@@ -854,21 +1023,15 @@ export async function syncAstronautMissionStateToBackend(
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({
-          origen: payload.origen,
-          destino: payload.destino,
-          fechaSalida: payload.fechaSalida,
-          fechaLlegadaEstimada: payload.fechaLlegadaEstimada ?? undefined,
-          diasTotales: payload.diasTotales,
-          diaActual: payload.diaActual,
-          porcentajeProgresoRelativo: payload.porcentajeProgresoRelativo,
-          entornoActual: payload.entornoActual,
-          estado: payload.estado,
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (response.status !== 401) break;
     }
-    return Boolean(response?.ok);
+    if (!response || !response.ok) {
+      console.warn('[mission-api] Backend rechazó sync de mission-state:', response?.status ?? 0);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.warn('[mission-api] No se pudo sincronizar ubicación de misión con backend:', err);
     return false;
@@ -880,7 +1043,7 @@ export async function markEarlyArrivalInBackend(
   fechaLlegadaReal?: string
 ): Promise<boolean> {
   const authHeadersList = getMobileFallbackAuthHeaders();
-  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+  if (!canUseBackend(authHeadersList)) {
     return false;
   }
 
@@ -901,11 +1064,37 @@ export async function markEarlyArrivalInBackend(
       });
       if (response.status !== 401) break;
     }
-    return Boolean(response?.ok);
+    if (!response || !response.ok) {
+      console.warn('[mission-api] Error al registrar llegada anticipada:', response?.status ?? 0);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.warn('[mission-api] No se pudo registrar llegada anticipada en backend:', err);
     return false;
   }
+}
+
+// Cancela el plan de vuelo activo en BD sin modificar endpoints del backend, liberando la ubicación actual
+export async function cancelAstronautMissionInBackend(
+  currentEnvironment: EnvironmentType,
+  origin: SpaceLocation,
+  destination: SpaceLocation
+): Promise<boolean> {
+  const todayIso = getTodayIsoDate();
+  const missionUpdated = await syncAstronautMissionStateToBackend({
+    origen: origin,
+    destino: destination,
+    fechaSalida: todayIso,
+    fechaLlegadaEstimada: todayIso,
+    diasTotales: 1,
+    diaActual: 1,
+    porcentajeProgresoRelativo: 100,
+    entornoActual: currentEnvironment,
+    estado: 'arrived',
+  });
+  const locationUpdated = await saveAstronautLocationToBackend(currentEnvironment);
+  return missionUpdated && locationUpdated;
 }
 
 // Endpoint para guardar la ubicación actual del astronauta en el backend de forma independiente (con o sin misión)
@@ -913,7 +1102,7 @@ export async function saveAstronautLocationToBackend(
   entorno: EnvironmentType
 ): Promise<boolean> {
   const authHeadersList = getMobileFallbackAuthHeaders();
-  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+  if (!canUseBackend(authHeadersList)) {
     return false;
   }
 
@@ -922,6 +1111,14 @@ export async function saveAstronautLocationToBackend(
     '/dashboard/mission-state/location',
     '/mission/environment',
   ];
+
+  const payload: Record<string, string> = {
+    entorno,
+    environment: entorno,
+  };
+  if (API_CONFIG.userId) {
+    payload.userId = API_CONFIG.userId;
+  }
 
   for (const path of paths) {
     try {
@@ -934,11 +1131,7 @@ export async function saveAstronautLocationToBackend(
             'Content-Type': 'application/json',
             Accept: 'application/json',
           },
-          body: JSON.stringify({
-            entorno,
-            environment: entorno,
-            userId: API_CONFIG.userId,
-          }),
+          body: JSON.stringify(payload),
         });
         if (response.status !== 401 && response.status !== 404) break;
       }
@@ -949,6 +1142,7 @@ export async function saveAstronautLocationToBackend(
       // Intentar siguiente ruta de fallback si hay fallo de red específico
     }
   }
+  console.warn('[mission-api] No se pudo guardar la ubicación actual en backend:', entorno);
   return false;
 }
 
@@ -959,7 +1153,7 @@ export async function fetchAstronautLocationFromBackend(): Promise<{
   gravityLabel: string;
 } | null> {
   const authHeadersList = getMobileFallbackAuthHeaders();
-  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+  if (!canUseBackend(authHeadersList)) {
     return null;
   }
 
@@ -976,16 +1170,12 @@ export async function fetchAstronautLocationFromBackend(): Promise<{
       }
 
       if (response && response.ok) {
-        const data: unknown = await response.json();
+        const rawText = await response.text();
+        if (!rawText.trim()) continue;
+        const data: unknown = JSON.parse(rawText);
         if (isRecord(data)) {
-          const entorno = (data.entorno ?? data.environment) as EnvironmentType;
-          if (
-            entorno === 'tierra' ||
-            entorno === 'nave' ||
-            entorno === 'estacion' ||
-            entorno === 'luna' ||
-            entorno === 'marte'
-          ) {
+          const entorno = data.entorno ?? data.environment;
+          if (isEnvironmentType(entorno)) {
             return {
               entorno,
               label: typeof data.etiqueta === 'string' ? data.etiqueta : (data.label as string) || entorno,
@@ -1005,11 +1195,11 @@ export async function fetchAstronautLocationFromBackend(): Promise<{
 }
 
 // Guarda el entorno seleccionado en el backend de forma inmediata
-export async function syncEnvironmentToBackend(environment: EnvironmentType): Promise<void> {
+export async function syncEnvironmentToBackend(environment: EnvironmentType): Promise<boolean> {
   try {
-    await saveAstronautLocationToBackend(environment);
+    return await saveAstronautLocationToBackend(environment);
   } catch {
-    // Si la red no está disponible, el frontend mantiene su estado local sin bloquear al usuario
+    return false;
   }
 }
 

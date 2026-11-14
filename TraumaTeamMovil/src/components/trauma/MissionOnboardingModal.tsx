@@ -9,16 +9,15 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import {
   Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClockPlus,
-  Flag,
   Globe,
   Orbit,
-  Rocket,
   Satellite,
   Sparkles,
   X,
@@ -28,9 +27,7 @@ import {
   calculateMissionStateFromDeparture,
   extendMissionArrivalIso,
   formatRouteDays,
-  getDateDaysAgoIso,
   getDelayPresetDays,
-  getRouteDurationSpec,
   getRouteTotalDays,
   getTodayIsoDate,
   SPACE_LOCATIONS,
@@ -221,36 +218,49 @@ const LOCATION_OPTIONS: SpaceLocation[] = ['tierra', 'estacion', 'luna', 'marte'
 export function MissionOnboardingModal() {
   const {
     missionSetupOpen,
+    flightPlanAccepted,
     closeMissionSetup,
     origin,
     destination,
     departureDate,
     arrivalDate,
     configureMission,
+    cancelFlightPlan,
+    arriveEarly,
+    delayMission,
   } = useMission();
 
   if (!missionSetupOpen) return null;
 
   return (
     <MissionOnboardingModalContent
+      flightPlanAccepted={flightPlanAccepted}
       origin={origin}
       destination={destination}
       departureDate={departureDate}
       arrivalDate={arrivalDate}
       closeMissionSetup={closeMissionSetup}
       configureMission={configureMission}
+      cancelFlightPlan={cancelFlightPlan}
+      arriveEarly={arriveEarly}
+      delayMission={delayMission}
     />
   );
 }
 
 function MissionOnboardingModalContent({
+  flightPlanAccepted,
   origin,
   destination,
   departureDate,
   arrivalDate,
   closeMissionSetup,
   configureMission,
+  cancelFlightPlan,
+  arriveEarly,
+  delayMission,
 }: {
+  flightPlanAccepted: boolean;
   origin: SpaceLocation;
   destination: SpaceLocation;
   departureDate: string;
@@ -262,6 +272,9 @@ function MissionOnboardingModalContent({
     departureDate: string;
     arrivalDate?: string | null;
   }) => void;
+  cancelFlightPlan: () => void;
+  arriveEarly: () => boolean;
+  delayMission: (extraDays: number) => boolean;
 }) {
   const locationOptions = LOCATION_OPTIONS;
   const [selectedOrigin, setSelectedOrigin] = useState<SpaceLocation>(origin);
@@ -308,10 +321,6 @@ function MissionOnboardingModalContent({
   );
 
   const isSameRoute = selectedOrigin === selectedDest;
-  const routeSpec = useMemo(
-    () => getRouteDurationSpec(selectedOrigin, selectedDest),
-    [selectedOrigin, selectedDest]
-  );
   const defaultRouteDays = getRouteTotalDays(selectedOrigin, selectedDest);
   const estimatedArrivalIso = addDaysToIsoDate(selectedDate, defaultRouteDays);
   const delayPresets = useMemo(
@@ -328,7 +337,22 @@ function MissionOnboardingModalContent({
     );
     setSelectedArrivalDate(nextArrival);
     setDelayExpanded(false);
+
+    const matchesActivePlan =
+      flightPlanAccepted &&
+      selectedOrigin === origin &&
+      selectedDest === destination &&
+      selectedDate === departureDate;
+    if (matchesActivePlan) {
+      delayMission(extraDays);
+    }
   };
+
+  const hasDraftChanges =
+    selectedOrigin !== origin ||
+    selectedDest !== destination ||
+    selectedDate !== departureDate ||
+    (selectedArrivalDate ?? null) !== (arrivalDate ?? null);
 
   const calendarMaxHeight = calendarAnim.interpolate({
     inputRange: [0, 1],
@@ -398,13 +422,8 @@ function MissionOnboardingModalContent({
   };
 
   const handleArriveEarly = () => {
-    if (isSameRoute) return;
-    configureMission({
-      origin: selectedOrigin,
-      destination: selectedDest,
-      departureDate: getDateDaysAgoIso(defaultRouteDays),
-      arrivalDate: null,
-    });
+    if (!flightPlanAccepted) return;
+    arriveEarly();
   };
 
   return (
@@ -428,12 +447,33 @@ function MissionOnboardingModalContent({
           {/* Cabecera */}
           <View className="mb-3 flex-row items-center justify-between">
             <View className="flex-row items-center">
-              <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft">
-                <Rocket size={16} color="#0284c7" />
+              <View
+                style={{
+                  backgroundColor: '#060b19',
+                  borderColor: '#38bdf8',
+                  borderWidth: 1.5,
+                }}
+                className="mr-2.5 h-9 w-9 items-center justify-center overflow-hidden rounded-full shadow-xs">
+                <Image
+                  source={require('@/assets/images/Naveee (1).svg')}
+                  style={{ width: 22, height: 15 }}
+                  contentFit="contain"
+                />
               </View>
-              <Text className="font-mono text-sm font-extrabold text-trauma-ink">
-                Plan de vuelo
-              </Text>
+              <View>
+                <View className="flex-row items-center gap-2">
+                  <Text className="font-mono text-sm font-extrabold text-trauma-ink">
+                    Plan de vuelo
+                  </Text>
+                  {flightPlanAccepted && (
+                    <View className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5">
+                      <Text className="font-mono text-[8.5px] font-bold uppercase tracking-wider text-sky-700">
+                        Activo
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
             </View>
             <Pressable
               onPress={closeMissionSetup}
@@ -444,7 +484,7 @@ function MissionOnboardingModalContent({
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Tarjeta de trayectoria espacial (mantiene fondo espacial) */}
-            <View className="mb-3">
+            <View className="mb-3.5">
               <SpaceJourneyTimeline
                 compact
                 previewDay={preview.missionDay}
@@ -455,42 +495,6 @@ function MissionOnboardingModalContent({
                 previewTotalDays={preview.totalDays}
               />
             </View>
-
-            {routeSpec && (
-              <View className="mb-3.5 rounded-xl border border-slate-200 bg-[#f7f7f7] px-3 py-2">
-                <View className="flex-row items-center justify-between gap-2">
-                  <Text className="font-mono text-[9.5px] font-bold text-slate-700">
-                    Trayecto: {formatRouteDays(routeSpec.minDias)}–{formatRouteDays(routeSpec.maxDias)} días
-                  </Text>
-                  <Text className="font-mono text-[9.5px] font-extrabold text-sky-700">
-                    Promedio: {formatRouteDays(routeSpec.promedioDias)}{' '}
-                    {routeSpec.promedioDias === 1 ? 'día' : 'días'}
-                  </Text>
-                </View>
-                {(routeSpec.ventanaLanzamientoMeses !== undefined ||
-                  (routeSpec.esperaRetornoDiasMin !== undefined &&
-                    routeSpec.esperaRetornoDiasMax !== undefined)) && (
-                  <View className="mt-1 flex-row flex-wrap gap-1.5">
-                    {routeSpec.ventanaLanzamientoMeses !== undefined && (
-                      <View className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5">
-                        <Text className="font-mono text-[8.5px] font-bold text-amber-800">
-                          Ventana de lanzamiento: c/{routeSpec.ventanaLanzamientoMeses} meses
-                        </Text>
-                      </View>
-                    )}
-                    {routeSpec.esperaRetornoDiasMin !== undefined &&
-                      routeSpec.esperaRetornoDiasMax !== undefined && (
-                        <View className="rounded-md border border-orange-200 bg-orange-50 px-2 py-0.5">
-                          <Text className="font-mono text-[8.5px] font-bold text-orange-800">
-                            Espera retorno en Marte: {routeSpec.esperaRetornoDiasMin}–
-                            {routeSpec.esperaRetornoDiasMax} días
-                          </Text>
-                        </View>
-                      )}
-                  </View>
-                )}
-              </View>
-            )}
 
             {/* 1. Punto de salida */}
             <Text className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -612,42 +616,65 @@ function MissionOnboardingModalContent({
               </Pressable>
             </View>
 
-            {/* Control para añadir tiempo si la misión se atrasa */}
-            <View className="mt-2 rounded-xl border border-amber-200 bg-amber-50/75 px-3 py-2">
-              <View className="flex-row items-center justify-between gap-2">
-                <View className="flex-1 flex-row items-center">
-                  <ClockPlus size={13} color="#b45309" />
-                  <Text className="ml-1.5 font-mono text-[10px] font-bold text-amber-900">
-                    ¿Se atrasó la misión?
-                  </Text>
-                </View>
-                <Pressable
-                  disabled={isSameRoute}
-                  onPress={() => setDelayExpanded((open) => !open)}
-                  style={isSameRoute ? { opacity: 0.45 } : undefined}
-                  accessibilityLabel="Añadir tiempo a la misión"
-                  className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 active:opacity-75">
-                  <Text className="font-mono text-[10px] font-extrabold text-amber-800">
-                    {delayExpanded ? 'Cerrar' : '+ Añadir tiempo'}
-                  </Text>
-                </Pressable>
-              </View>
-
-              {delayExpanded && (
-                <View className="mt-2 flex-row gap-1.5">
-                  {delayPresets.map((extra) => (
-                    <Pressable
-                      key={extra}
-                      onPress={() => handleAddDelayDays(extra)}
-                      className="flex-1 items-center rounded-lg border border-amber-300 bg-white py-1.5 active:opacity-75">
-                      <Text className="font-mono text-[10px] font-extrabold text-amber-900">
-                        +{extra}d
+            {/* Control rediseñado de atraso: solo visible cuando el plan de vuelo ya fue aceptado */}
+            {flightPlanAccepted && !preview.arrived && (
+              <View
+                className={`mt-3 rounded-2xl border p-3 ${
+                  delayExpanded
+                    ? 'border-trauma-cyanEdge bg-sky-50/50'
+                    : 'border-slate-200 bg-[#f7f7f7]'
+                }`}>
+                <View className="flex-row items-center justify-between gap-2.5">
+                  <View className="flex-1 flex-row items-center">
+                    <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white">
+                      <ClockPlus size={15} color="#0284c7" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-mono text-[11px] font-bold text-trauma-ink">
+                        ¿Se atrasó la misión?
                       </Text>
-                    </Pressable>
-                  ))}
+                      <Text className="mt-0.5 font-mono text-[9px] text-slate-500" numberOfLines={1}>
+                        Extender llegada ({formatReadableIso(preview.effectiveArrivalDate)})
+                      </Text>
+                    </View>
+                  </View>
+                  <Pressable
+                    disabled={isSameRoute}
+                    onPress={() => setDelayExpanded((open) => !open)}
+                    style={isSameRoute ? { opacity: 0.45 } : undefined}
+                    accessibilityLabel="Añadir tiempo a la misión"
+                    className={`rounded-xl border px-3 py-1.5 active:opacity-75 ${
+                      delayExpanded
+                        ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
+                        : 'border-slate-200 bg-white'
+                    }`}>
+                    <Text className="font-mono text-[10px] font-extrabold text-sky-700">
+                      {delayExpanded ? 'Ocultar' : '+ Añadir días'}
+                    </Text>
+                  </Pressable>
                 </View>
-              )}
-            </View>
+
+                {delayExpanded && (
+                  <View className="mt-2.5 border-t border-slate-200/80 pt-2.5">
+                    <Text className="mb-2 font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                      Sumar días de atraso a la llegada
+                    </Text>
+                    <View className="flex-row gap-2">
+                      {delayPresets.map((extra) => (
+                        <Pressable
+                          key={extra}
+                          onPress={() => handleAddDelayDays(extra)}
+                          className="flex-1 items-center rounded-xl border border-sky-200 bg-white py-2 active:bg-sky-50">
+                          <Text className="font-mono text-[11px] font-extrabold text-sky-700">
+                            +{extra}d
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Contenedor animado del calendario al expandir o colapsar */}
             <Animated.View
@@ -705,29 +732,55 @@ function MissionOnboardingModalContent({
             </Animated.View>
           </ScrollView>
 
-          <View className="mt-3 flex-row gap-2">
-            {!preview.arrived && (
+          <View className="mt-3 gap-2">
+            {!flightPlanAccepted ? (
               <Pressable
                 disabled={isSameRoute}
-                onPress={handleArriveEarly}
+                onPress={handleConfirm}
                 style={isSameRoute ? { opacity: 0.45 } : undefined}
-                className="flex-row items-center justify-center rounded-2xl border border-slate-200 bg-[#f7f7f7] px-3.5 py-3 active:opacity-80">
-                <Flag size={13} color="#0284c7" />
-                <Text className="ml-1.5 font-mono text-[11px] font-bold text-slate-700">
-                  Llegué antes
+                className="items-center justify-center rounded-2xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-3 active:opacity-85">
+                <Text className="font-mono text-xs font-extrabold text-trauma-ink">
+                  Aceptar plan de vuelo
                 </Text>
               </Pressable>
-            )}
+            ) : (
+              <>
+                {hasDraftChanges && (
+                  <Pressable
+                    disabled={isSameRoute}
+                    onPress={handleConfirm}
+                    style={isSameRoute ? { opacity: 0.45 } : undefined}
+                    className="items-center justify-center rounded-2xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-3 active:opacity-85">
+                    <Text className="font-mono text-xs font-extrabold text-trauma-ink">
+                      Actualizar plan de vuelo
+                    </Text>
+                  </Pressable>
+                )}
 
-            <Pressable
-              disabled={isSameRoute}
-              onPress={handleConfirm}
-              style={isSameRoute ? { opacity: 0.45 } : undefined}
-              className="flex-1 items-center justify-center rounded-2xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-3 active:opacity-85">
-              <Text className="font-mono text-xs font-extrabold text-trauma-ink">
-                Guardar plan de vuelo
-              </Text>
-            </Pressable>
+                <View className="flex-row gap-2">
+                  {!preview.arrived && (
+                    <Pressable
+                      disabled={isSameRoute}
+                      onPress={handleArriveEarly}
+                      style={isSameRoute ? { opacity: 0.45 } : undefined}
+                      className="flex-1 items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft px-3 py-2.5 active:opacity-80">
+                      <Text className="font-mono text-[11px] font-bold text-trauma-ink">
+                        Llegué antes
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  <Pressable
+                    onPress={cancelFlightPlan}
+                    accessibilityLabel="Cancelar plan de vuelo"
+                    className="flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 active:opacity-80">
+                    <Text className="font-mono text-[11px] font-bold text-slate-700">
+                      Cancelar plan
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </Pressable>
       </Pressable>
