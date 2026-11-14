@@ -15,6 +15,10 @@ import {
 import { getTodayIsoDate } from '../../services/mission-api';
 import { DailyHealthCheck, HealthStatusLevel } from '../../types/mission';
 import { useMission } from './mission-context';
+import { formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/I18nProvider';
+import type { MessageKey } from '@/i18n/messages';
+import { useAppTheme, type Palette, type Scheme } from '@/theme';
 import { DictationButton } from '@/voice/VoiceButton';
 import { useVoice } from '@/voice/voice-context';
 
@@ -30,27 +34,44 @@ const HERO_STARS = [
 
 const STATUS_STYLE: Record<
   HealthStatusLevel,
-  { label: string; color: string; bg: string; border: string }
+  { labelKey: MessageKey; color: string; bg: string; border: string }
 > = {
-  normal: { label: 'Óptimo', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-  warning: { label: 'Vigilar', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-  critical: { label: 'Atención', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+  normal: { labelKey: 'body.health.optimal', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+  warning: { labelKey: 'body.health.watch', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+  critical: { labelKey: 'body.health.attention', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
 };
+
+// Variante oscura de los chips de estado (el color de acento se mantiene; fondo/borde se oscurecen).
+function statusStyle(status: HealthStatusLevel, colors: Palette, scheme: Scheme) {
+  const base = STATUS_STYLE[status];
+  if (scheme !== 'dark') return base;
+  const soft = { normal: colors.successSoft, warning: colors.warningSoft, critical: colors.dangerSoft }[status];
+  const accent = { normal: colors.success, warning: colors.warning, critical: colors.danger }[status];
+  return { ...base, color: accent, bg: soft, border: `${accent}66` };
+}
 
 const MOOD_OPTIONS: {
   value: 1 | 2 | 3 | 4 | 5;
-  label: string;
+  labelKey: MessageKey;
   tag: string;
   status: HealthStatusLevel;
 }[] = [
-  { value: 5, label: 'Óptimo', tag: '5/5', status: 'normal' },
-  { value: 4, label: 'Estable', tag: '4/5', status: 'normal' },
-  { value: 3, label: 'Cansado', tag: '3/5', status: 'warning' },
-  { value: 2, label: 'Tenso', tag: '2/5', status: 'warning' },
-  { value: 1, label: 'Crítico', tag: '1/5', status: 'critical' },
+  { value: 5, labelKey: 'body.mood.5', tag: '5/5', status: 'normal' },
+  { value: 4, labelKey: 'body.mood.4', tag: '4/5', status: 'normal' },
+  { value: 3, labelKey: 'body.mood.3', tag: '3/5', status: 'warning' },
+  { value: 2, labelKey: 'body.mood.2', tag: '2/5', status: 'warning' },
+  { value: 1, labelKey: 'body.mood.1', tag: '1/5', status: 'critical' },
 ];
 
+// Los valores (en español) se envían al backend y los usa la voz: solo se traduce lo que se muestra.
 const SYMPTOM_CHIPS = ['Ninguno', 'Mareo 0g', 'Congestión', 'Fatiga', 'Cefalea'];
+const SYMPTOM_LABEL_KEYS: Record<string, MessageKey> = {
+  Ninguno: 'body.symptom.none',
+  'Mareo 0g': 'body.symptom.dizzy',
+  Congestión: 'body.symptom.congestion',
+  Fatiga: 'body.symptom.fatigue',
+  Cefalea: 'body.symptom.headache',
+};
 
 function parseNum(raw: string): number | null {
   const clean = raw.replace(',', '.').trim();
@@ -93,7 +114,13 @@ function evalSleep(h: number | null): HealthStatusLevel | null {
 
 function StatusPill({ status }: { status: HealthStatusLevel | null }) {
   if (!status) return null;
-  const cfg = STATUS_STYLE[status];
+  return <StatusPillInner status={status} />;
+}
+
+function StatusPillInner({ status }: { status: HealthStatusLevel }) {
+  const { t } = useI18n();
+  const { colors, scheme } = useAppTheme();
+  const cfg = statusStyle(status, colors, scheme);
   return (
     <View
       style={{ backgroundColor: cfg.bg, borderColor: cfg.border, borderWidth: 1 }}
@@ -103,7 +130,7 @@ function StatusPill({ status }: { status: HealthStatusLevel | null }) {
         className="mr-1 h-1.5 w-1.5 rounded-full"
       />
       <Text style={{ color: cfg.color }} className="font-mono text-[9px] font-bold">
-        {cfg.label}
+        {t(cfg.labelKey)}
       </Text>
     </View>
   );
@@ -125,10 +152,11 @@ function MetricRangeBar({
     value === null
       ? 0
       : Math.max(4, Math.min(100, Math.round(((value - min) / (max - min)) * 100)));
-  const fill = status ? STATUS_STYLE[status].color : '#cbd5e1';
+  const { colors, scheme } = useAppTheme();
+  const fill = status ? STATUS_STYLE[status].color : scheme === 'dark' ? colors.border : '#cbd5e1';
 
   return (
-    <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+    <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-trauma-nightAlt">
       <View
         style={{
           width: `${pct}%`,
@@ -144,6 +172,10 @@ function MetricRangeBar({
 // Cuestionario médico diario editable durante el día, con diseño visual acorde a la app
 export function HealthQuestionnaireSection() {
   const { vitals, healthChecks, submitHealthCheck } = useMission();
+  const { t, locale } = useI18n();
+  const { colors, scheme } = useAppTheme();
+  const isDark = scheme === 'dark';
+  const iconInk = isDark ? colors.text : '#0f172a';
   const todayIso = getTodayIsoDate();
 
   const todayCheck = useMemo(
@@ -227,34 +259,34 @@ export function HealthQuestionnaireSection() {
 
     const actions: string[] = [];
     if (sGlucose === 'critical') {
-      actions.push('Glucosa fuera de rango seguro: ajustar ingesta y notificar a control en tierra.');
+      actions.push(t('body.health.actGlucoseCritical'));
     } else if (sGlucose === 'warning') {
-      actions.push('Glucosa alterada: repetir prueba capilar en 30 min.');
+      actions.push(t('body.health.actGlucoseWarning'));
     }
 
     if (sBp === 'critical') {
-      actions.push('Presión arterial crítica: reposar 10 min y contactar médico de vuelo.');
+      actions.push(t('body.health.actBpCritical'));
     } else if (sBp === 'warning') {
-      actions.push('Presión fuera de rango óptimo: vigilar hidratación.');
+      actions.push(t('body.health.actBpWarning'));
     }
 
     if (sTemp === 'critical') {
-      actions.push('Temperatura anormal: revisar posible infección o enfriamiento del traje.');
+      actions.push(t('body.health.actTempCritical'));
     } else if (sTemp === 'warning') {
-      actions.push('Temperatura límite: reevaluar en 1 hora.');
+      actions.push(t('body.health.actTempWarning'));
     }
 
     if (sSleep === 'critical' || sSleep === 'warning') {
-      actions.push('Déficit de sueño: priorizar bloque de descanso y luz tenue en cabina.');
+      actions.push(t('body.health.actSleep'));
     }
     if (sMood === 'critical' || sMood === 'warning') {
-      actions.push('Carga emocional: realizar pausa activa o sesión con soporte en tierra.');
+      actions.push(t('body.health.actMood'));
     }
 
     const recommendation =
       actions.length > 0
         ? actions[0]
-        : 'Indicadores dentro de parámetros esperados. Mantén hidratación y rutina diaria.';
+        : t('body.health.actNone');
 
     const completedCount =
       (glucose !== null ? 1 : 0) +
@@ -264,7 +296,7 @@ export function HealthQuestionnaireSection() {
       1; // ánimo siempre tiene valor seleccionado
 
     return { sGlucose, sBp, sTemp, sSleep, sMood, overall, recommendation, completedCount };
-  }, [glucose, sys, dia, temp, sleep, mood]);
+  }, [glucose, sys, dia, temp, sleep, mood, t]);
 
   const toggleSymptom = (sym: string) => {
     if (sym === 'Ninguno') {
@@ -298,22 +330,22 @@ export function HealthQuestionnaireSection() {
     setTimeout(() => setSavedBanner(false), 2600);
   };
 
-  const overallCfg = STATUS_STYLE[evaluation.overall];
+  const overallCfg = statusStyle(evaluation.overall, colors, scheme);
   const completionPct = Math.round((evaluation.completedCount / 5) * 100);
 
   const renderHelp = (key: string, text: string) =>
     openHelp === key ? (
-      <View className="mt-2.5 rounded-xl border border-slate-200 bg-[#f7f7f7] p-2.5">
-        <Text className="font-mono text-[10px] leading-4 text-slate-600">{text}</Text>
+      <View className="mt-2.5 rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt p-2.5">
+        <Text className="font-mono text-[10px] leading-4 text-slate-600 dark:text-trauma-nightMuted">{text}</Text>
       </View>
     ) : null;
 
-  const summaryItems: { label: string; status: HealthStatusLevel | null }[] = [
-    { label: 'Glucosa', status: evaluation.sGlucose },
-    { label: 'PA', status: evaluation.sBp },
-    { label: 'Temp', status: evaluation.sTemp },
-    { label: 'Sueño', status: evaluation.sSleep },
-    { label: 'Ánimo', status: evaluation.sMood },
+  const summaryItems: { id: string; label: string; status: HealthStatusLevel | null }[] = [
+    { id: 'glucose', label: t('body.health.glucose'), status: evaluation.sGlucose },
+    { id: 'bp', label: t('body.health.bpShort'), status: evaluation.sBp },
+    { id: 'temp', label: t('body.health.tempShort'), status: evaluation.sTemp },
+    { id: 'sleep', label: t('body.health.sleep'), status: evaluation.sSleep },
+    { id: 'mood', label: t('body.health.mood'), status: evaluation.sMood },
   ];
 
   return (
@@ -353,12 +385,14 @@ export function HealthQuestionnaireSection() {
             </View>
             <View className="flex-1">
               <Text className="font-mono text-xs font-extrabold text-white">
-                Cuestionario Médico Diario
+                {t('body.health.title')}
               </Text>
               <View className="mt-0.5 flex-row items-center">
                 <Clock size={10} color="#94a3b8" />
                 <Text className="ml-1 font-mono text-[9.5px] text-slate-300">
-                  {todayCheck ? `Actualizado ${todayCheck.recordedAt}` : 'Pendiente hoy · Editable todo el día'}
+                  {todayCheck
+                    ? t('body.health.updated', { time: todayCheck.recordedAt })
+                    : t('body.health.pending')}
                 </Text>
               </View>
             </View>
@@ -370,7 +404,7 @@ export function HealthQuestionnaireSection() {
         <View className="mt-3">
           <View className="mb-1 flex-row items-center justify-between">
             <Text className="font-mono text-[9.5px] text-sky-300">
-              {evaluation.completedCount}/5 indicadores evaluados hoy
+              {t('body.health.progress', { count: evaluation.completedCount })}
             </Text>
             <Text className="font-mono text-[9.5px] font-bold text-slate-300">
               {completionPct}%
@@ -392,7 +426,7 @@ export function HealthQuestionnaireSection() {
             const dotColor = it.status ? STATUS_STYLE[it.status].color : '#475569';
             return (
               <View
-                key={it.label}
+                key={it.id}
                 style={{
                   backgroundColor: 'rgba(255, 255, 255, 0.06)',
                   borderColor: 'rgba(148, 163, 184, 0.2)',
@@ -413,37 +447,37 @@ export function HealthQuestionnaireSection() {
       </View>
 
       {/* 1. Azúcar en sangre */}
-      <View className="mb-2.5 rounded-2xl border border-trauma-line bg-white p-3.5 shadow-xs">
+      <View className="mb-2.5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-sky-50">
-              <Droplets size={15} color="#0284c7" />
+            <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950">
+              <Droplets size={15} color={colors.accentDeep} />
             </View>
             <View>
-              <Text className="font-mono text-xs font-bold text-slate-800">
-                Azúcar en sangre
+              <Text className="font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                {t('body.health.bloodSugar')}
               </Text>
-              <Text className="font-mono text-[9px] text-slate-400">Meta: 70–139 mg/dL</Text>
+              <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.health.bloodSugarGoal')}</Text>
             </View>
           </View>
           <View className="flex-row items-center gap-1.5">
             <StatusPill status={evaluation.sGlucose} />
             <Pressable onPress={() => setOpenHelp(openHelp === 'glucose' ? null : 'glucose')}>
-              <HelpCircle size={15} color="#94a3b8" />
+              <HelpCircle size={15} color={colors.textSubtle} />
             </Pressable>
           </View>
         </View>
 
-        <View className="mt-2.5 flex-row items-center rounded-xl border border-slate-200 bg-[#f7f7f7] px-3 py-2">
+        <View className="mt-2.5 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-3 py-2">
           <TextInput
             value={glucoseText}
             onChangeText={setGlucoseText}
             keyboardType="numeric"
-            placeholder="Ej. 95"
-            placeholderTextColor="#94a3b8"
-            className="flex-1 font-mono text-xs font-bold text-slate-800"
+            placeholder={t('body.health.glucosePh')}
+            placeholderTextColor={colors.textSubtle}
+            className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
           />
-          <Text className="font-mono text-[10px] font-bold text-slate-400">mg/dL</Text>
+          <Text className="font-mono text-[10px] font-bold text-slate-400 dark:text-trauma-nightSubtle">mg/dL</Text>
         </View>
 
         <View className="mt-2 flex-row gap-1.5">
@@ -455,10 +489,10 @@ export function HealthQuestionnaireSection() {
                 onPress={() => setGlucoseText(val)}
                 className={`flex-1 items-center rounded-lg border py-1 ${
                   active
-                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-                    : 'border-slate-200 bg-[#f7f7f7]'
+                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
+                    : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
                 }`}>
-                <Text className="font-mono text-[9.5px] font-bold text-slate-700">{val}</Text>
+                <Text className="font-mono text-[9.5px] font-bold text-slate-700 dark:text-trauma-nightInk">{val}</Text>
               </Pressable>
             );
           })}
@@ -466,54 +500,54 @@ export function HealthQuestionnaireSection() {
         <MetricRangeBar value={glucose} min={40} max={200} status={evaluation.sGlucose} />
         {renderHelp(
           'glucose',
-          'Mide con glucómetro capilar. En ayunas lo normal es 70–99 mg/dL. Valores extremos indican riesgo nutricional o metabólico.'
+          t('body.health.glucoseHelp')
         )}
       </View>
 
       {/* 2. Presión arterial */}
-      <View className="mb-2.5 rounded-2xl border border-trauma-line bg-white p-3.5 shadow-xs">
+      <View className="mb-2.5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-rose-50">
+            <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-950">
               <Activity size={15} color="#ef4444" />
             </View>
             <View>
-              <Text className="font-mono text-xs font-bold text-slate-800">
-                Presión arterial
+              <Text className="font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                {t('body.health.bp')}
               </Text>
-              <Text className="font-mono text-[9px] text-slate-400">Meta: 90-120 / 60-80 mmHg</Text>
+              <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.health.bpGoal')}</Text>
             </View>
           </View>
           <View className="flex-row items-center gap-1.5">
             <StatusPill status={evaluation.sBp} />
             <Pressable onPress={() => setOpenHelp(openHelp === 'bp' ? null : 'bp')}>
-              <HelpCircle size={15} color="#94a3b8" />
+              <HelpCircle size={15} color={colors.textSubtle} />
             </Pressable>
           </View>
         </View>
 
         <View className="mt-2.5 flex-row gap-2">
-          <View className="flex-1 flex-row items-center rounded-xl border border-slate-200 bg-[#f7f7f7] px-3 py-2">
+          <View className="flex-1 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-3 py-2">
             <TextInput
               value={sysText}
               onChangeText={setSysText}
               keyboardType="numeric"
-              placeholder="Sis (120)"
-              placeholderTextColor="#94a3b8"
-              className="flex-1 font-mono text-xs font-bold text-slate-800"
+              placeholder={t('body.health.sysPh')}
+              placeholderTextColor={colors.textSubtle}
+              className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
             />
-            <Text className="font-mono text-[9.5px] text-slate-400">mmHg</Text>
+            <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">mmHg</Text>
           </View>
-          <View className="flex-1 flex-row items-center rounded-xl border border-slate-200 bg-[#f7f7f7] px-3 py-2">
+          <View className="flex-1 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-3 py-2">
             <TextInput
               value={diaText}
               onChangeText={setDiaText}
               keyboardType="numeric"
-              placeholder="Dia (80)"
-              placeholderTextColor="#94a3b8"
-              className="flex-1 font-mono text-xs font-bold text-slate-800"
+              placeholder={t('body.health.diaPh')}
+              placeholderTextColor={colors.textSubtle}
+              className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
             />
-            <Text className="font-mono text-[9.5px] text-slate-400">mmHg</Text>
+            <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">mmHg</Text>
           </View>
         </View>
 
@@ -533,10 +567,10 @@ export function HealthQuestionnaireSection() {
                 }}
                 className={`flex-1 items-center rounded-lg border py-1 ${
                   active
-                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-                    : 'border-slate-200 bg-[#f7f7f7]'
+                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
+                    : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
                 }`}>
-                <Text className="font-mono text-[9.5px] font-bold text-slate-700">
+                <Text className="font-mono text-[9.5px] font-bold text-slate-700 dark:text-trauma-nightInk">
                   {preset.s}/{preset.d}
                 </Text>
               </Pressable>
@@ -546,34 +580,34 @@ export function HealthQuestionnaireSection() {
         <MetricRangeBar value={sys} min={70} max={160} status={evaluation.sBp} />
         {renderHelp(
           'bp',
-          'Mide en reposo a la altura del corazón. En 0g los fluidos migran al torso; vigila cifras >=140/90 o <90/60 mmHg.'
+          t('body.health.bpHelp')
         )}
       </View>
 
       {/* 3. Temperatura y Sueño */}
       <View className="mb-2.5 flex-row gap-2.5">
-        <View className="flex-1 rounded-2xl border border-trauma-line bg-white p-3.5 shadow-xs">
+        <View className="flex-1 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
-              <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-amber-50">
-                <Thermometer size={14} color="#d97706" />
+              <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950">
+                <Thermometer size={14} color={colors.warning} />
               </View>
-              <Text className="font-mono text-[11px] font-bold text-slate-800">Temp.</Text>
+              <Text className="font-mono text-[11px] font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.health.temp')}</Text>
             </View>
             <Pressable onPress={() => setOpenHelp(openHelp === 'temp' ? null : 'temp')}>
-              <HelpCircle size={14} color="#94a3b8" />
+              <HelpCircle size={14} color={colors.textSubtle} />
             </Pressable>
           </View>
-          <View className="mt-2 flex-row items-center rounded-xl border border-slate-200 bg-[#f7f7f7] px-2.5 py-2">
+          <View className="mt-2 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-2.5 py-2">
             <TextInput
               value={tempText}
               onChangeText={setTempText}
               keyboardType="decimal-pad"
               placeholder="36.6"
-              placeholderTextColor="#94a3b8"
-              className="flex-1 font-mono text-xs font-bold text-slate-800"
+              placeholderTextColor={colors.textSubtle}
+              className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
             />
-            <Text className="font-mono text-[10px] text-slate-400">°C</Text>
+            <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">°C</Text>
           </View>
           <View className="mt-1.5 flex-row gap-1">
             {['36.5', '36.8'].map((v) => (
@@ -582,10 +616,10 @@ export function HealthQuestionnaireSection() {
                 onPress={() => setTempText(v)}
                 className={`flex-1 items-center rounded-md border py-0.5 ${
                   tempText.trim() === v
-                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-                    : 'border-slate-200 bg-[#f7f7f7]'
+                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
+                    : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
                 }`}>
-                <Text className="font-mono text-[9px] font-bold text-slate-700">{v}°</Text>
+                <Text className="font-mono text-[9px] font-bold text-slate-700 dark:text-trauma-nightInk">{v}°</Text>
               </Pressable>
             ))}
           </View>
@@ -595,28 +629,28 @@ export function HealthQuestionnaireSection() {
           </View>
         </View>
 
-        <View className="flex-1 rounded-2xl border border-trauma-line bg-white p-3.5 shadow-xs">
+        <View className="flex-1 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
-              <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-indigo-50">
+              <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950">
                 <Moon size={14} color="#4f46e5" />
               </View>
-              <Text className="font-mono text-[11px] font-bold text-slate-800">Sueño</Text>
+              <Text className="font-mono text-[11px] font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.health.sleep')}</Text>
             </View>
             <Pressable onPress={() => setOpenHelp(openHelp === 'sleep' ? null : 'sleep')}>
-              <HelpCircle size={14} color="#94a3b8" />
+              <HelpCircle size={14} color={colors.textSubtle} />
             </Pressable>
           </View>
-          <View className="mt-2 flex-row items-center rounded-xl border border-slate-200 bg-[#f7f7f7] px-2.5 py-2">
+          <View className="mt-2 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-2.5 py-2">
             <TextInput
               value={sleepText}
               onChangeText={setSleepText}
               keyboardType="decimal-pad"
               placeholder="7.5"
-              placeholderTextColor="#94a3b8"
-              className="flex-1 font-mono text-xs font-bold text-slate-800"
+              placeholderTextColor={colors.textSubtle}
+              className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
             />
-            <Text className="font-mono text-[10px] text-slate-400">hrs</Text>
+            <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.health.hrs')}</Text>
           </View>
           <View className="mt-1.5 flex-row gap-1">
             {['6.5', '7.5', '8'].map((v) => (
@@ -625,10 +659,10 @@ export function HealthQuestionnaireSection() {
                 onPress={() => setSleepText(v)}
                 className={`flex-1 items-center rounded-md border py-0.5 ${
                   sleepText.trim() === v
-                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-                    : 'border-slate-200 bg-[#f7f7f7]'
+                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
+                    : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
                 }`}>
-                <Text className="font-mono text-[9px] font-bold text-slate-700">{v}h</Text>
+                <Text className="font-mono text-[9px] font-bold text-slate-700 dark:text-trauma-nightInk">{v}h</Text>
               </Pressable>
             ))}
           </View>
@@ -641,34 +675,34 @@ export function HealthQuestionnaireSection() {
 
       {renderHelp(
         'temp',
-        'Temperatura normal: 36.0–37.4 °C. >=38.1 °C puede indicar infección en ambiente cerrado o sobrecalentamiento.'
+        t('body.health.tempHelp')
       )}
       {renderHelp(
         'sleep',
-        'Meta recomendada: 7–8.5 hrs diarias. Sin ciclo solar natural, dormir <7 hrs afecta memoria, ánimo e inmunidad.'
+        t('body.health.sleepHelp')
       )}
 
       {/* 4. Estado de ánimo y salud conductual */}
-      <View className="mb-2.5 rounded-2xl border border-trauma-line bg-white p-3.5 shadow-xs">
+      <View className="mb-2.5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-emerald-50">
-              <Smile size={15} color="#059669" />
+            <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950">
+              <Smile size={15} color={colors.success} />
             </View>
             <View>
-              <Text className="font-mono text-xs font-bold text-slate-800">Estado de ánimo</Text>
-              <Text className="font-mono text-[9px] text-slate-400">Salud conductual diaria</Text>
+              <Text className="font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.health.moodTitle')}</Text>
+              <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.health.moodSub')}</Text>
             </View>
           </View>
           <Pressable onPress={() => setOpenHelp(openHelp === 'mood' ? null : 'mood')}>
-            <HelpCircle size={15} color="#94a3b8" />
+            <HelpCircle size={15} color={colors.textSubtle} />
           </Pressable>
         </View>
 
         <View className="mt-2.5 flex-row gap-1.5">
           {MOOD_OPTIONS.map((opt) => {
             const active = mood === opt.value;
-            const st = STATUS_STYLE[opt.status];
+            const st = statusStyle(opt.status, colors, scheme);
             return (
               <Pressable
                 key={opt.value}
@@ -679,28 +713,28 @@ export function HealthQuestionnaireSection() {
                     : undefined
                 }
                 className={`flex-1 items-center rounded-xl py-2 ${
-                  active ? '' : 'border border-slate-200 bg-[#f7f7f7]'
+                  active ? '' : 'border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
                 }`}>
                 <Text
                   style={active ? { color: st.color } : undefined}
-                  className={`font-mono text-[9.5px] font-bold ${active ? '' : 'text-slate-600'}`}
+                  className={`font-mono text-[9.5px] font-bold ${active ? '' : 'text-slate-600 dark:text-trauma-nightMuted'}`}
                   numberOfLines={1}>
-                  {opt.label}
+                  {t(opt.labelKey)}
                 </Text>
-                <Text className="mt-0.5 font-mono text-[8px] text-slate-400">{opt.tag}</Text>
+                <Text className="mt-0.5 font-mono text-[8px] text-slate-400 dark:text-trauma-nightSubtle">{opt.tag}</Text>
               </Pressable>
             );
           })}
         </View>
         {renderHelp(
           'mood',
-          'El aislamiento y confinamiento prolongado elevan el riesgo conductual. Registra tu estado para detectar fatiga a tiempo.'
+          t('body.health.moodHelp')
         )}
       </View>
 
       {/* 5. Síntomas frecuentes y notas */}
-      <View className="mb-3 rounded-2xl border border-trauma-line bg-white p-3.5 shadow-xs">
-        <Text className="font-mono text-xs font-bold text-slate-800">Síntomas en misión</Text>
+      <View className="mb-3 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
+        <Text className="font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.health.symptoms')}</Text>
         <View className="mt-2 flex-row flex-wrap gap-1.5">
           {SYMPTOM_CHIPS.map((sym) => {
             const active = symptoms.includes(sym);
@@ -710,14 +744,14 @@ export function HealthQuestionnaireSection() {
                 onPress={() => toggleSymptom(sym)}
                 className={`rounded-xl border px-2.5 py-1.5 ${
                   active
-                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-                    : 'border-slate-200 bg-[#f7f7f7]'
+                    ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
+                    : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
                 }`}>
                 <Text
                   className={`font-mono text-[10px] font-bold ${
-                    active ? 'text-trauma-ink' : 'text-slate-600'
+                    active ? 'text-trauma-ink dark:text-trauma-nightInk' : 'text-slate-600 dark:text-trauma-nightMuted'
                   }`}>
-                  {sym}
+                  {SYMPTOM_LABEL_KEYS[sym] ? t(SYMPTOM_LABEL_KEYS[sym]) : sym}
                 </Text>
               </Pressable>
             );
@@ -725,27 +759,30 @@ export function HealthQuestionnaireSection() {
         </View>
 
         {(vitals.heartRate !== null || vitals.spo2 !== null) && (
-          <View className="mt-2.5 flex-row gap-2 rounded-xl border border-slate-200 bg-[#f7f7f7] px-3 py-2">
-            <Text className="font-mono text-[10px] text-slate-500">
-              Reloj: {vitals.heartRate !== null ? `${vitals.heartRate} Lpm` : '--'}{' '}
-              {vitals.spo2 !== null ? `· SpO2 ${vitals.spo2}%` : ''}
+          <View className="mt-2.5 flex-row gap-2 rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-3 py-2">
+            <Text className="font-mono text-[10px] text-slate-500 dark:text-trauma-nightMuted">
+              {t('body.health.watchLine', {
+                value: `${vitals.heartRate !== null ? `${vitals.heartRate} ${t('body.health.bpm')}` : '--'} ${
+                  vitals.spo2 !== null ? `· SpO2 ${vitals.spo2}%` : ''
+                }`,
+              })}
             </Text>
           </View>
         )}
 
-        <View className="mt-2.5 rounded-xl border border-slate-200 bg-[#f7f7f7] px-3 py-2">
+        <View className="mt-2.5 rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-3 py-2">
           <TextInput
             value={notes}
             onChangeText={setNotes}
-            placeholder="Nota clínica adicional (opcional)..."
-            placeholderTextColor="#94a3b8"
-            className="font-mono text-[11px] text-slate-700"
+            placeholder={t('body.health.notePlaceholder')}
+            placeholderTextColor={colors.textSubtle}
+            className="font-mono text-[11px] text-slate-700 dark:text-trauma-nightInk"
           />
         </View>
         <View className="mt-2">
           <DictationButton
-            label="Dictar nota"
-            onText={(t) => setNotes((prev) => (prev ? `${prev} ${t}` : t))}
+            label={t('body.health.dictate')}
+            onText={(text) => setNotes((prev) => (prev ? `${prev} ${text}` : text))}
           />
         </View>
       </View>
@@ -763,9 +800,9 @@ export function HealthQuestionnaireSection() {
         <Text
           style={{ color: overallCfg.color }}
           className="font-mono text-[10px] font-extrabold uppercase">
-          Guía recomendada · {overallCfg.label}
+          {t('body.health.guide', { status: t(overallCfg.labelKey) })}
         </Text>
-        <Text className="mt-1 font-mono text-[11px] leading-4 text-slate-700">
+        <Text className="mt-1 font-mono text-[11px] leading-4 text-slate-700 dark:text-trauma-nightInk">
           {evaluation.recommendation}
         </Text>
       </View>
@@ -773,51 +810,65 @@ export function HealthQuestionnaireSection() {
       {/* Botón guardar / actualizar hoy */}
       <Pressable
         onPress={handleSave}
-        className="flex-row items-center justify-center rounded-2xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-3.5 shadow-xs active:opacity-80">
-        <Check size={15} color="#0f172a" strokeWidth={2.5} />
-        <Text className="ml-1.5 font-mono text-xs font-extrabold text-trauma-ink">
+        className="flex-row items-center justify-center rounded-2xl border border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt py-3.5 shadow-xs active:opacity-80">
+        <Check size={15} color={iconInk} strokeWidth={2.5} />
+        <Text className="ml-1.5 font-mono text-xs font-extrabold text-trauma-ink dark:text-trauma-nightInk">
           {savedBanner
-            ? 'Cuestionario de hoy actualizado'
+            ? t('body.health.saved')
             : todayCheck
-              ? 'Actualizar cuestionario de hoy'
-              : 'Guardar cuestionario de hoy'}
+              ? t('body.health.update')
+              : t('body.health.save')}
         </Text>
       </Pressable>
 
       {/* Historial de evaluaciones recientes */}
       {healthChecks.length > 0 && (
         <View className="mt-5">
-          <Text className="mb-2 font-mono text-xs font-bold text-trauma-ink">
-            Historial diario ({healthChecks.length})
+          <Text className="mb-2 font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
+            {t('body.health.history', { count: healthChecks.length })}
           </Text>
           <View className="gap-2">
             {healthChecks.slice(0, 5).map((item: DailyHealthCheck) => {
-              const st = STATUS_STYLE[item.overallStatus];
+              const st = statusStyle(item.overallStatus, colors, scheme);
               return (
                 <View
                   key={item.id}
-                  className="rounded-2xl border border-trauma-line bg-white p-3 shadow-xs">
+                  className="rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3 shadow-xs">
                   <View className="flex-row items-center justify-between">
-                    <Text className="font-mono text-[10px] font-bold text-slate-500">
-                      {item.dateIso === todayIso ? `Hoy (${item.recordedAt})` : item.recordedAt}
+                    <Text className="font-mono text-[10px] font-bold text-slate-500 dark:text-trauma-nightMuted">
+                      {item.dateIso === todayIso
+                        ? t('body.health.todayAt', { time: item.recordedAt })
+                        : item.recordedAt}
                     </Text>
                     <View
                       style={{ backgroundColor: st.bg, borderColor: st.border, borderWidth: 1 }}
                       className="rounded-lg px-2 py-0.5">
                       <Text style={{ color: st.color }} className="font-mono text-[9px] font-bold">
-                        {st.label}
+                        {t(st.labelKey)}
                       </Text>
                     </View>
                   </View>
-                  <Text className="mt-1 font-mono text-[11px] font-bold text-slate-800">
-                    {item.bloodSugarMgDl !== null ? `Glucosa ${item.bloodSugarMgDl} · ` : ''}
-                    {item.systolicBp !== null && item.diastolicBp !== null
-                      ? `PA ${item.systolicBp}/${item.diastolicBp} · `
-                      : ''}
-                    {item.temperatureC !== null ? `${item.temperatureC}°C · ` : ''}
-                    {item.sleepHours !== null ? `Sueño ${item.sleepHours}h` : 'Check conductual'}
+                  <Text className="mt-1 font-mono text-[11px] font-bold text-slate-800 dark:text-trauma-nightInk">
+                    {[
+                      item.bloodSugarMgDl !== null
+                        ? t('body.health.histGlucose', { value: item.bloodSugarMgDl })
+                        : null,
+                      item.systolicBp !== null && item.diastolicBp !== null
+                        ? t('body.health.histBp', { sys: item.systolicBp, dia: item.diastolicBp })
+                        : null,
+                      item.temperatureC !== null
+                        ? `${formatNumber(item.temperatureC, locale, { maximumFractionDigits: 1 })}°C`
+                        : null,
+                      item.sleepHours !== null
+                        ? t('body.health.histSleep', {
+                            value: formatNumber(item.sleepHours, locale, { maximumFractionDigits: 1 }),
+                          })
+                        : t('body.health.histBehavior'),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Text>
-                  <Text className="mt-0.5 font-mono text-[10px] text-slate-500">
+                  <Text className="mt-0.5 font-mono text-[10px] text-slate-500 dark:text-trauma-nightMuted">
                     {item.recommendation}
                   </Text>
                 </View>
