@@ -1,0 +1,32 @@
+[
+  {
+    "id": "nasa-hazards",
+    "title": "5 Hazards of Human Spaceflight",
+    "publisher": "NASA",
+    "url": "https://www.nasa.gov/hrp/hazards/"
+  },
+  {
+    "id": "nasa-risks",
+    "title": "Risks of Human Spaceflight",
+    "publisher": "NASA",
+    "url": "https://www.nasa.gov/hrp/risks/"
+  },
+  {
+    "id": "nasa-research",
+    "title": "Ongoing HRP Research in Space",
+    "publisher": "NASA",
+    "url": "https://www.nasa.gov/hrp/ongoing-hrp-research/"
+  },
+  {
+    "id": "csa-radiation",
+    "title": "Monitoring Radiation for Astronaut Health",
+    "publisher": "Canadian Space Agency",
+    "url": "https://www.asc-csa.gc.ca/eng/news/articles/2026/2026-02-26-monitoring-radiation-astronaut-health.asp"
+  },
+  {
+    "id": "csa-science",
+    "title": "Why Do We Conduct Science Experiments in Space?",
+    "publisher": "Canadian Space Agency",
+    "url": "https://www.asc-csa.gc.ca/eng/iss/science/why-do-we-conduct-science-experiments-in-space.asp"
+  }
+]

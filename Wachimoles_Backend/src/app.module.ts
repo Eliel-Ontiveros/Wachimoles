@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthController } from "./health.controller";
 import { validateEnvironment } from "./validate-environment";
+import { RagModule } from "./rag/rag.module";
 
 @Module({
   imports: [
@@ -10,7 +11,8 @@ import { validateEnvironment } from "./validate-environment";
       isGlobal: true,
       validate: validateEnvironment
     }),
-    DashboardModule
+    DashboardModule,
+    RagModule
   ],
   controllers: [HealthController]
 })
