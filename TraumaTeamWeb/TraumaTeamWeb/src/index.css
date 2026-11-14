@@ -217,15 +217,16 @@ h3 {
 
 .brand-wordmark {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 500;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-  color: var(--text-main);
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
 }
 
-.brand-heavy {
-  font-weight: 800;
+.brand-wordmark-img {
+  display: block;
+  inline-size: 192px;
+  max-inline-size: 100%;
+  block-size: auto;
 }
 
 .control-pill {

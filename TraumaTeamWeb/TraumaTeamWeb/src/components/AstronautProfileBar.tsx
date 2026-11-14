@@ -79,7 +79,13 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
       <div className="topbar-brand">
         <img src={brandLogo} alt="Logo TraumaTeam" className="brand-logo-img" />
         <h1 className="brand-wordmark">
-          <span className="brand-heavy">Trauma</span>Team
+          <img
+            src={`${import.meta.env.BASE_URL}TraumaTeamText.svg`}
+            alt="TraumaTeam"
+            className="brand-wordmark-img"
+            width={342.6}
+            height={27.64}
+          />
         </h1>
       </div>
 
