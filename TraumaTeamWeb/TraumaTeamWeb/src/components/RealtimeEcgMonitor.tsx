@@ -29,9 +29,16 @@ const MISSION_STARS = [
 ];
 
 const LOCATION_LABELS: Record<string, string> = {
-  tierra: 'Tierra',
-  luna: 'Luna',
-  marte: 'Marte',
+  tierra: 'Earth',
+  earth: 'Earth',
+  luna: 'Moon',
+  moon: 'Moon',
+  marte: 'Mars',
+  mars: 'Mars',
+  nave: 'In Spaceship (Orbit)',
+  spaceship: 'In Spaceship (Orbit)',
+  estacion: 'Space Station (ISS)',
+  station: 'Space Station (ISS)',
 };
 
 function buildBeatPath(cycles: number): string {

@@ -1031,14 +1031,15 @@ export async function fetchAstronautLocationFromBackend(): Promise<{
       if (response && response.ok) {
         const data: unknown = await response.json();
         if (isRecord(data)) {
-          const entorno = (data.entorno ?? data.environment) as EnvironmentType;
-          if (
-            entorno === 'tierra' ||
-            entorno === 'nave' ||
-            entorno === 'estacion' ||
-            entorno === 'luna' ||
-            entorno === 'marte'
-          ) {
+          const raw = String(data.entorno ?? data.environment ?? '').toLowerCase().trim();
+          let entorno: EnvironmentType | null = null;
+          if (raw === 'tierra' || raw === 'earth') entorno = 'tierra';
+          else if (raw === 'nave' || raw === 'spaceship' || raw === 'ship') entorno = 'nave';
+          else if (raw === 'estacion' || raw === 'station') entorno = 'estacion';
+          else if (raw === 'luna' || raw === 'moon') entorno = 'luna';
+          else if (raw === 'marte' || raw === 'mars') entorno = 'marte';
+
+          if (entorno) {
             return {
               entorno,
               label: typeof data.etiqueta === 'string' ? data.etiqueta : (data.label as string) || entorno,

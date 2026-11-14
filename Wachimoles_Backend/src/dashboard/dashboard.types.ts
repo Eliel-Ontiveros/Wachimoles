@@ -109,9 +109,20 @@ export type CategoriaMision =
   | "checkin"
   | "injury_check";
 
-export type DificultadMision = "baja" | "media" | "alta";
+export type DificultadMision =
+  | "low"
+  | "medium"
+  | "high"
+  | "baja"
+  | "media"
+  | "alta";
 
 export type EntornoMision =
+  | "earth"
+  | "spaceship"
+  | "station"
+  | "moon"
+  | "mars"
   | "tierra"
   | "nave"
   | "estacion"
@@ -119,7 +130,15 @@ export type EntornoMision =
   | "marte"
   | "all";
 
-export type UbicacionEspacial = "tierra" | "estacion" | "luna" | "marte";
+export type UbicacionEspacial =
+  | "earth"
+  | "station"
+  | "moon"
+  | "mars"
+  | "tierra"
+  | "estacion"
+  | "luna"
+  | "marte";
 
 export type EstadoMision = "scheduled" | "in_transit" | "arrived";
 
@@ -162,7 +181,7 @@ export interface EstadoMisionAstronauta {
   diasTotales: number;
   diaActual: number;
   porcentajeProgresoRelativo: number;
-  entornoActual: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  entornoActual: UbicacionEntorno;
   estado: EstadoMision;
   llegadaAnticipada: boolean;
   creadoEn: string;
@@ -176,12 +195,22 @@ export interface EstadoMisionAstronauta {
   totalDays?: number;
   currentDay?: number;
   relativeProgressPct?: number;
-  currentEnvironment?: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  currentEnvironment?: UbicacionEntorno;
   status?: EstadoMision;
   arrivedEarly?: boolean;
 }
 
-export type UbicacionEntorno = "tierra" | "nave" | "estacion" | "luna" | "marte";
+export type UbicacionEntorno =
+  | "earth"
+  | "spaceship"
+  | "station"
+  | "moon"
+  | "mars"
+  | "tierra"
+  | "nave"
+  | "estacion"
+  | "luna"
+  | "marte";
 
 export interface UbicacionAstronauta {
   usuarioId: string;

@@ -704,19 +704,21 @@ export async function fetchAstronautLocationFromBackend(): Promise<AstronautLoca
     if (!res.ok) return null;
     const data: unknown = await res.json();
     if (isRecord(data)) {
-      const entorno = (data.entorno ?? data.environment) as
+      const raw = String(data.entorno ?? data.environment ?? '').toLowerCase().trim();
+      let entorno:
         | 'tierra'
         | 'nave'
         | 'estacion'
         | 'luna'
-        | 'marte';
-      if (
-        entorno === 'tierra' ||
-        entorno === 'nave' ||
-        entorno === 'estacion' ||
-        entorno === 'luna' ||
-        entorno === 'marte'
-      ) {
+        | 'marte'
+        | null = null;
+      if (raw === 'tierra' || raw === 'earth') entorno = 'tierra';
+      else if (raw === 'nave' || raw === 'spaceship' || raw === 'ship') entorno = 'nave';
+      else if (raw === 'estacion' || raw === 'station') entorno = 'estacion';
+      else if (raw === 'luna' || raw === 'moon') entorno = 'luna';
+      else if (raw === 'marte' || raw === 'mars') entorno = 'marte';
+
+      if (entorno) {
         return {
           entorno,
           environment: entorno,

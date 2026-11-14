@@ -32,8 +32,10 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
     it("obtiene el catálogo de misiones", async () => {
       const misiones = await missionsController.obtenerCatalogoMisiones({});
       expect(misiones.length).toBeGreaterThan(5);
-      expect(misiones.some((m) => m.categoria === "steps" && m.dificultad === "baja")).toBe(true);
-      expect(misiones.some((m) => m.categoria === "steps" && m.dificultad === "alta")).toBe(true);
+      expect(misiones.some((m) => m.categoria === "steps" && (m.dificultad === "low" || m.dificultad === "baja"))).toBe(true);
+      expect(misiones.some((m) => m.categoria === "steps" && (m.dificultad === "high" || m.dificultad === "alta"))).toBe(true);
+      expect(misiones.some((m) => m.id === "mars-load-high")).toBe(true);
+      expect(misiones.some((m) => m.id === "moon-steps-low")).toBe(true);
     });
 
     it("rota misiones del día con diferentes dificultades de pasos (menos pasos vs más pasos)", async () => {
@@ -45,7 +47,7 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
       });
       const misionPasosBaja = misionesDiaBaja.find((m) => m.categoria === "steps");
       expect(misionPasosBaja).toBeDefined();
-      expect(misionPasosBaja?.dificultad).toBe("baja");
+      expect(["low", "baja"]).toContain(misionPasosBaja?.dificultad);
       expect(misionPasosBaja?.valorObjetivo).toBeLessThan(5000);
 
       // Día con dificultad alta (más pasos)
@@ -56,7 +58,7 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
       });
       const misionPasosAlta = misionesDiaAlta.find((m) => m.categoria === "steps");
       expect(misionPasosAlta).toBeDefined();
-      expect(misionPasosAlta?.dificultad).toBe("alta");
+      expect(["high", "alta"]).toContain(misionPasosAlta?.dificultad);
       expect(misionPasosAlta?.valorObjetivo).toBeGreaterThan(9000);
 
       // En nave usa caminadora
@@ -209,8 +211,8 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
 
       expect(resultado.entorno).toBe("marte");
       expect(resultado.environment).toBe("marte");
-      expect(resultado.etiqueta).toBe("Superficie de Marte");
-      expect(resultado.gravedadEtiqueta).toBe("0.38g Gravedad Marciana");
+      expect(resultado.etiqueta).toBe("Mars Surface");
+      expect(resultado.gravedadEtiqueta).toBe("0.38g Martian Gravity");
       expect(resultado.usuarioId).toBe(mockUserId);
       expect(mockFetch).toHaveBeenCalled();
       mockFetch.mockRestore();
@@ -235,8 +237,8 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
 
       expect(resultado.entorno).toBe("luna");
       expect(resultado.environment).toBe("luna");
-      expect(resultado.etiqueta).toBe("Base Lunar");
-      expect(resultado.gravedadEtiqueta).toBe("0.16g Gravedad Lunar");
+      expect(resultado.etiqueta).toBe("Lunar Base");
+      expect(resultado.gravedadEtiqueta).toBe("0.16g Lunar Gravity");
       expect(mockFetch).toHaveBeenCalled();
       mockFetch.mockRestore();
     });
