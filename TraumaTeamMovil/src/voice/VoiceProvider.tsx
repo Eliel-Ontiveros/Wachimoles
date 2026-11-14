@@ -11,8 +11,15 @@ import type { MessageKey } from '@/i18n/messages';
 import { interpretWithLlm } from '@/services/voice-api';
 
 import { haptic } from './haptics';
-import { parseCommand, type ParseResult, type VoiceIntent } from './parser';
-import { VoiceContext, type BodyIntent, type VoiceFeedback } from './voice-context';
+import { parseCommand, zoneNameFor, type ParseResult, type VoiceIntent } from './parser';
+import {
+  VoiceContext,
+  type AlertsIntent,
+  type BodyIntent,
+  type HealthIntent,
+  type VitalsIntent,
+  type VoiceFeedback,
+} from './voice-context';
 import { WarpTransition, type WarpTrip } from './WarpTransition';
 
 const LISTEN_TIMEOUT_MS = 12000;
@@ -47,6 +54,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [feedback, setFeedback] = useState<VoiceFeedback | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [bodyIntent, setBodyIntent] = useState<BodyIntent | null>(null);
+  const [healthIntent, setHealthIntent] = useState<HealthIntent | null>(null);
+  const [vitalsIntent, setVitalsIntent] = useState<VitalsIntent | null>(null);
+  const [alertsIntent, setAlertsIntent] = useState<AlertsIntent | null>(null);
   const [trip, setTrip] = useState<WarpTrip | null>(null);
   const [voiceId, setVoiceId] = useState<string | undefined>(undefined);
   const [level] = useState(() => new Animated.Value(0));
@@ -138,6 +148,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setBodyIntent({ nonce: nonce.current, ...partial });
   }, []);
 
+  const pushHealthIntent = useCallback((fields: HealthIntent['fields']) => {
+    nonce.current += 1;
+    setHealthIntent({ nonce: nonce.current, fields });
+  }, []);
+  const pushVitalsIntent = useCallback((metric: VitalsIntent['metric']) => {
+    nonce.current += 1;
+    setVitalsIntent({ nonce: nonce.current, metric });
+  }, []);
+  const pushAlertsIntent = useCallback(() => {
+    nonce.current += 1;
+    setAlertsIntent({ nonce: nonce.current });
+  }, []);
+
   const execute = useCallback(
     (intent: VoiceIntent) => {
       const m = missionRef.current;
@@ -171,6 +194,86 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
             router.navigate('/explore');
           });
           return;
+        case 'register-observation': {
+          const name = intent.muscleName ?? zoneNameFor(intent.muscleId);
+          const { type: _type, muscleId, muscleName: _name, ...prefill } = intent;
+          report({ kind: 'success', text: t('action.registerObservation', { name }) }, true);
+          warpTo(name, () => {
+            pushBodyIntent({ tab: 'body', muscleId, action: 'register', prefill });
+            router.navigate('/explore');
+          });
+          return;
+        }
+        case 'zone-detail':
+        case 'zone-photos': {
+          const name = intent.muscleName ?? zoneNameFor(intent.muscleId);
+          const action = intent.type === 'zone-detail' ? 'detail' : 'photos';
+          report(
+            { kind: 'success', text: t(action === 'detail' ? 'action.zoneDetail' : 'action.zonePhotos', { name }) },
+            true
+          );
+          warpTo(name, () => {
+            pushBodyIntent({ tab: 'body', muscleId: intent.muscleId, action });
+            router.navigate('/explore');
+          });
+          return;
+        }
+        case 'fill-health-check': {
+          const { type: _type, ...fields } = intent;
+          report({ kind: 'success', text: t('action.healthFill') }, true);
+          warpTo(t('tab.health'), () => {
+            pushHealthIntent(fields);
+            pushBodyIntent({ tab: 'health' });
+            router.navigate('/explore');
+          });
+          return;
+        }
+        case 'vital-history': {
+          const metric = t(`metric.${intent.metric}` as MessageKey);
+          report({ kind: 'success', text: t('action.vitalHistory', { metric }) }, true);
+          warpTo(t('route./'), () => {
+            pushVitalsIntent(intent.metric);
+            router.navigate('/');
+          });
+          return;
+        }
+        case 'dismiss-alert':
+          if (m.activeToasterAlert) {
+            m.dismissToaster();
+            report({ kind: 'success', text: t('action.alertDismissed') }, true);
+          } else {
+            report({ kind: 'info', text: t('action.noAlertToDismiss') }, true);
+          }
+          return;
+        case 'set-environment': {
+          const env = t(`env.${intent.environment}` as MessageKey);
+          m.setEnvironment(intent.environment);
+          report({ kind: 'success', text: t('action.environment', { env }) }, true);
+          return;
+        }
+        case 'open-mission-setup':
+          report({ kind: 'success', text: t('action.missionSetup') }, true);
+          m.openMissionSetup();
+          setPanelOpen(false);
+          return;
+        case 'arrive-early':
+          m.arriveEarly();
+          report({ kind: 'success', text: t('action.arriveEarly') }, true);
+          return;
+        case 'complete-mission': {
+          const mission = m.missions.find((x) => x.id === intent.missionId);
+          if (!mission) {
+            report({ kind: 'error', text: t('action.missionUnavailable') }, true);
+            return;
+          }
+          if (mission.completed) {
+            report({ kind: 'info', text: t('action.missionAlreadyDone', { title: mission.title }) }, true);
+            return;
+          }
+          m.toggleMission(mission.id);
+          report({ kind: 'success', text: t('action.missionDone', { title: mission.title }) }, true);
+          return;
+        }
         case 'open-menu':
           setPanelOpen(false);
           drawer.open();
@@ -182,6 +285,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           return;
         case 'open-alerts':
           report({ kind: 'info', text: t('action.alerts', { count: m.unreadAlertCount }) }, true);
+          setPanelOpen(false);
+          pushAlertsIntent();
           return;
         case 'ack-alerts':
           m.acknowledgeAllAlerts();
@@ -209,7 +314,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           return;
       }
     },
-    [drawer, pushBodyIntent, report, t, warpTo]
+    [drawer, pushAlertsIntent, pushBodyIntent, pushHealthIntent, pushVitalsIntent, report, t, warpTo]
   );
 
   const failureText = useCallback(
@@ -377,6 +482,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const consumeHealthIntent = useCallback(
+    (n: number) => setHealthIntent((cur) => (cur && cur.nonce === n ? null : cur)),
+    []
+  );
+  const consumeVitalsIntent = useCallback(
+    (n: number) => setVitalsIntent((cur) => (cur && cur.nonce === n ? null : cur)),
+    []
+  );
+  const consumeAlertsIntent = useCallback(
+    (n: number) => setAlertsIntent((cur) => (cur && cur.nonce === n ? null : cur)),
+    []
+  );
+
   const openPanel = useCallback(() => setPanelOpen(true), []);
   const closePanel = useCallback(() => {
     stop();
@@ -401,8 +519,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       runText,
       bodyIntent,
       consumeBodyIntent,
+      healthIntent,
+      consumeHealthIntent,
+      vitalsIntent,
+      consumeVitalsIntent,
+      alertsIntent,
+      consumeAlertsIntent,
     }),
-    [supported, listening, thinking, level, mode, transcript, feedback, panelOpen, openPanel, closePanel, startCommand, startDictation, stop, runText, bodyIntent, consumeBodyIntent]
+    [supported, listening, thinking, level, mode, transcript, feedback, panelOpen, openPanel, closePanel, startCommand, startDictation, stop, runText, bodyIntent, consumeBodyIntent, healthIntent, consumeHealthIntent, vitalsIntent, consumeVitalsIntent, alertsIntent, consumeAlertsIntent]
   );
 
   return (

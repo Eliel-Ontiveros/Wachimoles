@@ -38,6 +38,7 @@ import {
 import { InjuryTimelapseModal } from './InjuryTimelapseModal';
 import { HealthQuestionnaireSection } from './HealthQuestionnaireSection';
 import { useMission } from './mission-context';
+import type { ObservationPrefill } from '@/voice/parser';
 import { useVoice } from '@/voice/voice-context';
 import {
   getBodyConditionsFromBackend,
@@ -419,16 +420,32 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
     };
   }, []);
 
-  // Comandos de voz: cambiar de pestaña y/o seleccionar una zona del cuerpo
-  useEffect(() => {
-    if (!bodyIntent) return;
+  // Comandos de voz: se aplican durante el render (sin setState en efectos) y se consumen una sola vez.
+  const [handledVoiceNonce, setHandledVoiceNonce] = useState(0);
+  const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>(undefined);
+  if (bodyIntent && bodyIntent.nonce !== handledVoiceNonce) {
+    setHandledVoiceNonce(bodyIntent.nonce);
     if (bodyIntent.tab) setTab(bodyIntent.tab);
-    if (bodyIntent.muscleId) {
-      const target = muscles.find((m) => m.id === bodyIntent.muscleId);
-      if (target) setSelectedName(target.name);
+    const target = bodyIntent.muscleId ? muscles.find((m) => m.id === bodyIntent.muscleId) : undefined;
+    if (target) {
+      setSelectedName(target.name);
+      const hasProblem = target.status !== 'normal' && Boolean(target.observation);
+      if (bodyIntent.action === 'register') {
+        // Si ya hay un problema guardado, el mismo formulario funciona como edición.
+        setObservationPrefill(bodyIntent.prefill);
+        setObservationModalOpen(true);
+      } else if (bodyIntent.action === 'detail' && hasProblem) {
+        setDetailMuscle(target);
+        setDetailModalOpen(true);
+      } else if (bodyIntent.action === 'photos') {
+        setTimelapseMuscle(target);
+        setTimelapseOpen(true);
+      }
     }
-    consumeBodyIntent(bodyIntent.nonce);
-  }, [bodyIntent, consumeBodyIntent, muscles]);
+  }
+  useEffect(() => {
+    if (bodyIntent) consumeBodyIntent(bodyIntent.nonce);
+  }, [bodyIntent, consumeBodyIntent]);
 
   const selectedMuscle =
     muscles.find((m) => m.name.toLowerCase() === selectedName.toLowerCase()) || muscles[0];
@@ -755,7 +772,11 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
         visible={observationModalOpen}
         muscle={selectedMuscle}
         snapshotUri={zoneSnapshots[selectedMuscle.id]}
-        onClose={() => setObservationModalOpen(false)}
+        prefill={observationPrefill}
+        onClose={() => {
+          setObservationModalOpen(false);
+          setObservationPrefill(undefined);
+        }}
         onSave={handleSaveObservation}
       />
     </View>

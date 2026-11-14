@@ -29,6 +29,13 @@ interface RegisterObservationModalProps {
   visible: boolean;
   muscle: MuscleData;
   snapshotUri?: string;
+  /** Valores sugeridos (p. ej. por voz) que se aplican al abrir; el usuario revisa y guarda. */
+  prefill?: {
+    painIntensity?: number;
+    swelling?: boolean;
+    functionalLimitation?: boolean;
+    notes?: string;
+  };
   onClose: () => void;
   onSave: (muscleId: string, observation: MuscleObservation | null) => void;
 }
@@ -179,6 +186,7 @@ export function RegisterObservationModal({
   visible,
   muscle,
   snapshotUri,
+  prefill,
   onClose,
   onSave,
 }: RegisterObservationModalProps) {
@@ -205,8 +213,14 @@ export function RegisterObservationModal({
         setFunctionalLimitation(false);
         setNotes('');
       }
+      if (prefill) {
+        if (prefill.painIntensity !== undefined) setPainIntensity(prefill.painIntensity);
+        if (prefill.swelling !== undefined) setSwelling(prefill.swelling);
+        if (prefill.functionalLimitation !== undefined) setFunctionalLimitation(prefill.functionalLimitation);
+        if (prefill.notes !== undefined) setNotes(prefill.notes);
+      }
     }
-  }, [visible, muscle]);
+  }, [visible, muscle, prefill]);
 
   const updatePainFromTouch = (locationX: number) => {
     if (sliderWidth <= 0) return;

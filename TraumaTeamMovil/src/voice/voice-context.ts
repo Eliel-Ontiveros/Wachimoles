@@ -1,12 +1,23 @@
 import { createContext, useContext } from 'react';
 import type { Animated } from 'react-native';
 
-import type { BodyTab } from './parser';
+import type { BodyTab, HealthPrefill, ObservationPrefill, VitalMetric } from './parser';
 
 export type VoiceFeedback = { kind: 'success' | 'error' | 'info'; text: string };
 
 /** Intención pendiente para la pantalla corporal (se consume al montarse). */
-export type BodyIntent = { nonce: number; tab?: BodyTab; muscleId?: string };
+export type BodyIntent = {
+  nonce: number;
+  tab?: BodyTab;
+  muscleId?: string;
+  /** Qué hacer con la zona: abrir el formulario de registro, el detalle o las fotos. */
+  action?: 'register' | 'detail' | 'photos';
+  /** Valores sugeridos para el formulario; el usuario revisa y guarda (S2). */
+  prefill?: ObservationPrefill;
+};
+export type HealthIntent = { nonce: number; fields: HealthPrefill };
+export type VitalsIntent = { nonce: number; metric: VitalMetric };
+export type AlertsIntent = { nonce: number };
 
 export type VoiceCtx = {
   /** El dispositivo/navegador puede reconocer voz. */
@@ -31,6 +42,15 @@ export type VoiceCtx = {
   runText: (text: string) => void;
   bodyIntent: BodyIntent | null;
   consumeBodyIntent: (nonce: number) => void;
+  /** Campos del cuestionario diario dictados por voz (se rellenan, no se guardan). */
+  healthIntent: HealthIntent | null;
+  consumeHealthIntent: (nonce: number) => void;
+  /** Abre el historial de una métrica en el monitor vital. */
+  vitalsIntent: VitalsIntent | null;
+  consumeVitalsIntent: (nonce: number) => void;
+  /** Abre la campana de alertas. */
+  alertsIntent: AlertsIntent | null;
+  consumeAlertsIntent: (nonce: number) => void;
 };
 
 export const VoiceContext = createContext<VoiceCtx | null>(null);

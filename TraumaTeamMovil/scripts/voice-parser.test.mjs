@@ -65,3 +65,72 @@ test('natural phrasings for vitals', () => {
     assert.equal(intent(s).route, '/', s);
   }
 });
+
+test('S1: register an observation by voice', () => {
+  const i = intent('Quiero registrar una molestia en el hombro izquierdo');
+  assert.equal(i.type, 'register-observation');
+  assert.equal(i.muscleId, 'deltoides_izq');
+  assert.notEqual(parseCommand('anotar dolor en la rodilla derecha').intent?.type, 'register-observation');
+  const k = intent('registrar una lesión en el bíceps derecho dolor 6 hinchado');
+  assert.deepEqual([k.type, k.muscleId, k.painIntensity, k.swelling], ['register-observation', 'biceps_der', 6, true]);
+  assert.equal(intent('register a strong pain in the left calf').painIntensity, 8);
+  assert.equal(intent('registrar molestia leve en el cuello').painIntensity, 3);
+  assert.equal(parseCommand('registrar una molestia en el hombro').reason, 'ambiguous');
+});
+
+test('zone detail and photos', () => {
+  assert.deepEqual(
+    [intent('detalles del bíceps derecho').type, intent('detalles del bíceps derecho').muscleId],
+    ['zone-detail', 'biceps_der']
+  );
+  assert.equal(intent('fotos del cuello').type, 'zone-photos');
+  assert.equal(intent('fotos del cuello').muscleId, 'cuello');
+});
+
+test('environment, mission setup, arrive early', () => {
+  assert.equal(intent('cambia el entorno a marte').environment, 'marte');
+  assert.equal(intent('cambia el entorno a la estación').environment, 'nave');
+  assert.equal(intent('change environment to moon').environment, 'luna');
+  assert.equal(intent('cambia el entorno a la tierra').environment, 'tierra');
+  assert.equal(intent('configurar misión').type, 'open-mission-setup');
+  assert.equal(intent('llegamos antes').type, 'arrive-early');
+  assert.equal(intent('llegada anticipada').type, 'arrive-early');
+});
+
+test('complete mission', () => {
+  assert.equal(intent('completa la misión de cardio').missionId, 'env-tierra-cardio');
+  assert.equal(intent('completa la misión de respiración').missionId, 'env-marte-resp');
+  assert.equal(intent('completa la misión de equilibrio').missionId, 'env-luna-balance');
+  assert.equal(intent('completa la misión de estiramiento').missionId, 'env-nave-stretch');
+  assert.equal(intent('completa la misión de carga').missionId, 'env-marte-load');
+  assert.equal(intent('complete the core mission').missionId, 'env-tierra-core');
+  assert.equal(intent('completa la misión del chequeo').missionId, 'daily-checkin');
+});
+
+test('vital history', () => {
+  assert.equal(intent('historial de pulso').metric, 'heart_rate');
+  assert.equal(intent('historial de oxígeno').metric, 'spo2');
+  assert.equal(intent('historial de estrés').metric, 'stress');
+  assert.equal(intent('historial de sueño').metric, 'sleep');
+  assert.equal(intent('historial de pulso').type, 'vital-history');
+});
+
+test('fill health check', () => {
+  assert.deepEqual(
+    [intent('mi glucosa es 110').type, intent('mi glucosa es 110').bloodSugarMgDl],
+    ['fill-health-check', 110]
+  );
+  const bp = intent('presión 120 80');
+  assert.deepEqual([bp.systolicBp, bp.diastolicBp], [120, 80]);
+  assert.equal(intent('temperatura 36.5').temperatureC, 36.5);
+  assert.equal(intent('dormí 7 horas').sleepHours, 7);
+  assert.equal(intent('me siento cansado').mood, 3);
+  const sym = intent('tengo mareo y fatiga');
+  assert.deepEqual(sym.symptoms, ['Mareo 0g', 'Fatiga']);
+  assert.equal(intent('como me siento').type, 'start-checkin');
+});
+
+test('dismiss alert vs open alerts', () => {
+  assert.equal(intent('cerrar alerta').type, 'dismiss-alert');
+  assert.equal(intent('ver mis alertas').type, 'open-alerts');
+});

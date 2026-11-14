@@ -17,8 +17,9 @@ Branch feat/voice-commands. Voice (local parser + DeepSeek fallback) must reach 
 
 ## Tasks
 - T1 S3,S4 backend intent whitelist + prompt — worker — done (backend commit "feat(voice): whitelist every app action for the LLM")
-- T2 S1-S3 app parser + UI channels + components — worker — commit pending
+- T2 S1-S3 app parser + UI channels + components — worker — done (commit "feat(voice): reach every app action by voice")
 
 ## Log
 - L1 "no tiene bien implementadas todas las funciones" (screenshot: "Quiero registrar una molestia en el hombro izquierdo" → "La IA no pudo procesar la frase").
 - L2 Backend on :3010 runs latest code; failure was a non-503 HTTP error from /voice/interpret. Added DeepSeek status logging (commit after b061d78).
+- L3 T1 fa00278 (28 backend tests). T2: 17 parser tests, tsc/eslint voice clean, web export ok; not exercised by hand. VitalMonitorView lint 19→20 (set-state-in-effect for opening history).
