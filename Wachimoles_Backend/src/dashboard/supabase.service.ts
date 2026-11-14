@@ -33,11 +33,23 @@ import {
   EstadoMisionAstronauta,
   UbicacionEntorno,
   UbicacionAstronauta,
-  SupabaseAstronautLocationRow
+  SupabaseAstronautLocationRow,
+  MisionDiariaProgreso,
+  ResumenDiaMisiones,
+  RachaAstronauta,
+  RespuestaProgresoMisiones,
+  SupabaseDailyMissionCompletionRow,
+  SupabaseDailyMissionDayRow,
+  SupabaseAstronautStreakRow
 } from "./dashboard.types";
 import { SaveDailyHealthCheckDto } from "./daily-health-checks.dto";
 import { SaveBodyConditionDto } from "./body-conditions.dto";
-import { ConsultarMisionesQueryDto } from "./missions.dto";
+import {
+  ConsultarMisionesQueryDto,
+  SincronizarProgresoMisionesDto,
+  ActualizarItemMisionDto,
+  ItemProgresoMisionDto
+} from "./missions.dto";
 import {
   GuardarEstadoMisionDto,
   LlegadaAnticipadaDto,
@@ -377,666 +389,804 @@ function mapAstronautMissionState(
   };
 }
 
+export function normalizarEntorno(entorno?: string): "earth" | "spaceship" | "station" | "moon" | "mars" {
+  const e = (entorno || "").toLowerCase().trim();
+  if (e === "tierra" || e === "earth") return "earth";
+  if (e === "nave" || e === "spaceship" || e === "ship") return "spaceship";
+  if (e === "estacion" || e === "station") return "station";
+  if (e === "luna" || e === "moon") return "moon";
+  if (e === "marte" || e === "mars") return "mars";
+  return "earth";
+}
+
+export function normalizarDificultad(dif?: string): "low" | "medium" | "high" {
+  const d = (dif || "").toLowerCase().trim();
+  if (d === "baja" || d === "low") return "low";
+  if (d === "media" || d === "medium") return "medium";
+  if (d === "alta" || d === "high") return "high";
+  return "low";
+}
+
+export function entornosEquivalentes(entorno: string): string[] {
+  const norm = normalizarEntorno(entorno);
+  switch (norm) {
+    case "earth": return ["earth", "tierra"];
+    case "spaceship": return ["spaceship", "nave", "ship"];
+    case "station": return ["station", "estacion"];
+    case "moon": return ["moon", "luna"];
+    case "mars": return ["mars", "marte"];
+  }
+}
+
+export function dificultadesEquivalentes(dif: string): string[] {
+  const norm = normalizarDificultad(dif);
+  switch (norm) {
+    case "low": return ["low", "baja"];
+    case "medium": return ["medium", "media"];
+    case "high": return ["high", "alta"];
+  }
+}
+
 const CONFIG_ENTORNOS: Record<
-  UbicacionEntorno,
+  string,
   { etiqueta: string; gravedadEtiqueta: string }
 > = {
+  // English keys
+  earth: {
+    etiqueta: "On Earth (Base)",
+    gravedadEtiqueta: "1.0g Earth Gravity"
+  },
+  spaceship: {
+    etiqueta: "In Spaceship (Orbit)",
+    gravedadEtiqueta: "0g Microgravity"
+  },
+  station: {
+    etiqueta: "Space Station (ISS)",
+    gravedadEtiqueta: "0g Microgravity"
+  },
+  moon: {
+    etiqueta: "Lunar Base",
+    gravedadEtiqueta: "0.16g Lunar Gravity"
+  },
+  mars: {
+    etiqueta: "Mars Surface",
+    gravedadEtiqueta: "0.38g Martian Gravity"
+  },
+  // Spanish aliases
+  tierra: {
+    etiqueta: "On Earth (Base)",
+    gravedadEtiqueta: "1.0g Earth Gravity"
+  },
   nave: {
-    etiqueta: "En la Nave (Órbita)",
-    gravedadEtiqueta: "0g Microgravedad"
+    etiqueta: "In Spaceship (Orbit)",
+    gravedadEtiqueta: "0g Microgravity"
   },
   estacion: {
-    etiqueta: "Estación Espacial (EEI)",
-    gravedadEtiqueta: "0g Microgravedad"
+    etiqueta: "Space Station (ISS)",
+    gravedadEtiqueta: "0g Microgravity"
   },
   luna: {
-    etiqueta: "Base Lunar",
-    gravedadEtiqueta: "0.16g Gravedad Lunar"
+    etiqueta: "Lunar Base",
+    gravedadEtiqueta: "0.16g Lunar Gravity"
   },
   marte: {
-    etiqueta: "Superficie de Marte",
-    gravedadEtiqueta: "0.38g Gravedad Marciana"
-  },
-  tierra: {
-    etiqueta: "En la Tierra (Base)",
-    gravedadEtiqueta: "1.0g Gravedad Terrestre"
+    etiqueta: "Mars Surface",
+    gravedadEtiqueta: "0.38g Martian Gravity"
   }
 };
 
 function mapAstronautLocation(
   row: SupabaseAstronautLocationRow
 ): UbicacionAstronauta {
-  const entorno = (row.entorno || "tierra") as UbicacionEntorno;
-  const config = CONFIG_ENTORNOS[entorno] ?? CONFIG_ENTORNOS.tierra;
+  const rawEntorno = (row.entorno || "earth") as UbicacionEntorno;
+  const config = CONFIG_ENTORNOS[rawEntorno] ?? CONFIG_ENTORNOS.earth;
   const ahoraIso = new Date().toISOString();
   const actualizadoEn = row.actualizado_en ?? ahoraIso;
 
   return {
     usuarioId: row.user_id,
-    entorno,
+    entorno: rawEntorno,
     etiqueta: config.etiqueta,
     gravedadEtiqueta: config.gravedadEtiqueta,
     actualizadoEn,
     userId: row.user_id,
-    environment: entorno,
+    environment: rawEntorno,
     label: config.etiqueta,
     gravityLabel: config.gravedadEtiqueta,
     updatedAt: actualizadoEn
   };
 }
 
+function calcularDiferenciaDias(fechaReciente: string, fechaAnterior: string): number {
+  const d1 = new Date(fechaReciente + "T00:00:00Z").getTime();
+  const d2 = new Date(fechaAnterior + "T00:00:00Z").getTime();
+  return Math.round((d1 - d2) / 86400000);
+}
+
+function mapAstronautStreak(
+  row: SupabaseAstronautStreakRow,
+  fechaHoy?: string
+): RachaAstronauta {
+  const ahoraIso = new Date().toISOString();
+  const hoy = fechaHoy ?? ahoraIso.slice(0, 10);
+  const rachaActual = Math.max(0, Number(row.racha_actual || 0));
+  const rachaMaxima = Math.max(rachaActual, Number(row.racha_maxima || 0));
+  const totalDias = Math.max(0, Number(row.total_dias_completados || 0));
+  const ultimaFecha = row.ultima_fecha_completada ?? null;
+  const todasCompletadasHoy = ultimaFecha === hoy;
+  const actualizadoEn = row.actualizado_en ?? ahoraIso;
+
+  return {
+    usuarioId: row.user_id,
+    rachaActual,
+    rachaMaxima,
+    totalDiasCompletados: totalDias,
+    ultimaFechaCompletada: ultimaFecha,
+    todasCompletadasHoy,
+    actualizadoEn,
+    userId: row.user_id,
+    currentStreak: rachaActual,
+    maxStreak: rachaMaxima,
+    totalCompletedDays: totalDias,
+    lastCompletedDate: ultimaFecha,
+    allCompletedToday: todasCompletadasHoy,
+    updatedAt: actualizadoEn
+  };
+}
+
+function mapDailyMissionCompletion(
+  row: SupabaseDailyMissionCompletionRow
+): MisionDiariaProgreso {
+  const valorActual = Number(row.valor_actual || 0);
+  const valorObjetivo = Number(row.valor_objetivo || 1);
+  const completada = Boolean(row.completada);
+
+  return {
+    misionId: row.mision_id,
+    completada,
+    valorActual,
+    valorObjetivo,
+    actualizadoEn: row.actualizado_en,
+    missionId: row.mision_id,
+    completed: completada,
+    currentValue: valorActual,
+    targetValue: valorObjetivo
+  };
+}
+
+function mapDailyMissionDay(
+  row: SupabaseDailyMissionDayRow
+): ResumenDiaMisiones {
+  const total = Number(row.total_misiones || 0);
+  const completadas = Number(row.misiones_completadas || 0);
+  const todas = Boolean(row.todas_completadas);
+  const punto = Boolean(row.punto_racha_otorgado);
+
+  return {
+    fecha: row.fecha,
+    totalMisiones: total,
+    misionesCompletadas: completadas,
+    todasCompletadas: todas,
+    puntoRachaOtorgado: punto,
+    actualizadoEn: row.actualizado_en,
+    date: row.fecha,
+    totalMissions: total,
+    completedMissions: completadas,
+    allCompleted: todas,
+    streakPointAwarded: punto
+  };
+}
+
 const MISIONES_SEMILLA_POR_DEFECTO: MisionCatalogo[] = [
   {
-    id: "checkin-diario",
-    titulo: "Check-in médico diario",
-    descripcion: "Confirmar estado general, signos y cuestionario para mantener la racha de salud.",
+    id: "daily-checkin",
+    titulo: "Daily medical check-in",
+    descripcion: "Confirm overall physical condition, vital signs, and daily questionnaire to sustain health streak.",
     categoria: "checkin",
     valorObjetivo: 1,
     unidad: "check",
     entorno: "all",
-    dificultad: "baja",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Check-in médico diario",
-    description: "Confirmar estado general, signos y cuestionario para mantener la racha de salud.",
+    title: "Daily medical check-in",
+    description: "Confirm overall physical condition, vital signs, and daily questionnaire to sustain health streak.",
     category: "checkin",
     targetValue: 1,
     unit: "check",
     environment: "all",
-    difficulty: "baja"
+    difficulty: "low"
   },
   {
-    id: "control-lesiones",
-    titulo: "Inspección fotográfica de zonas de dolor",
-    descripcion: "Tomar registro visual de inflamación muscular o piel.",
+    id: "injury-check",
+    titulo: "Pain area photographic inspection",
+    descripcion: "Capture visual log of muscle inflammation, bruising, or skin condition.",
     categoria: "injury_check",
     valorObjetivo: 1,
     unidad: "check",
     entorno: "all",
-    dificultad: "media",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Inspección fotográfica de zonas de dolor",
-    description: "Tomar registro visual de inflamación muscular o piel.",
+    title: "Pain area photographic inspection",
+    description: "Capture visual log of muscle inflammation, bruising, or skin condition.",
     category: "injury_check",
     targetValue: 1,
     unit: "check",
     environment: "all",
-    difficulty: "media"
+    difficulty: "medium"
   },
   {
-    id: "tierra-pasos-baja",
-    titulo: "Caminata ligera de acondicionamiento",
-    descripcion: "Día suave: marcha regenerativa y reactivación cardiovascular básica.",
+    id: "earth-steps-low",
+    titulo: "Light conditioning walk",
+    descripcion: "Gentle day: regenerative walking pace and basic cardiovascular reactivation.",
     categoria: "steps",
     valorObjetivo: 3500,
-    unidad: "pasos",
-    entorno: "tierra",
-    dificultad: "baja",
+    unidad: "steps",
+    entorno: "earth",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Caminata ligera de acondicionamiento",
-    description: "Día suave: marcha regenerativa y reactivación cardiovascular básica.",
+    title: "Light conditioning walk",
+    description: "Gentle day: regenerative walking pace and basic cardiovascular reactivation.",
     category: "steps",
     targetValue: 3500,
-    unit: "pasos",
-    environment: "tierra",
-    difficulty: "baja"
+    unit: "steps",
+    environment: "earth",
+    difficulty: "low"
   },
   {
-    id: "tierra-pasos-media",
-    titulo: "Meta estándar de pasos en base",
-    descripcion: "Día moderado: mantenimiento de tono muscular y circulación bajo gravedad terrestre.",
+    id: "earth-steps-medium",
+    titulo: "Base standard step goal",
+    descripcion: "Moderate day: maintain muscle tone and systemic circulation under 1.0g.",
     categoria: "steps",
     valorObjetivo: 7000,
-    unidad: "pasos",
-    entorno: "tierra",
-    dificultad: "media",
+    unidad: "steps",
+    entorno: "earth",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Meta estándar de pasos en base",
-    description: "Día moderado: mantenimiento de tono muscular y circulación bajo gravedad terrestre.",
+    title: "Base standard step goal",
+    description: "Moderate day: maintain muscle tone and systemic circulation under 1.0g.",
     category: "steps",
     targetValue: 7000,
-    unit: "pasos",
-    environment: "tierra",
-    difficulty: "media"
+    unit: "steps",
+    environment: "earth",
+    difficulty: "medium"
   },
   {
-    id: "tierra-pasos-alta",
-    titulo: "Marcha de alta resistencia terrestre",
-    descripcion: "Día intenso: preparación física de alta demanda y capacidad pulmonar.",
+    id: "earth-steps-high",
+    titulo: "High-resistance Earth march",
+    descripcion: "Intense day: high-demand cardiovascular conditioning and aerobic threshold.",
     categoria: "steps",
     valorObjetivo: 11000,
-    unidad: "pasos",
-    entorno: "tierra",
-    dificultad: "alta",
+    unidad: "steps",
+    entorno: "earth",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Marcha de alta resistencia terrestre",
-    description: "Día intenso: preparación física de alta demanda y capacidad pulmonar.",
+    title: "High-resistance Earth march",
+    description: "Intense day: high-demand cardiovascular conditioning and aerobic threshold.",
     category: "steps",
     targetValue: 11000,
-    unit: "pasos",
-    environment: "tierra",
-    difficulty: "alta"
+    unit: "steps",
+    environment: "earth",
+    difficulty: "high"
   },
   {
-    id: "tierra-core-baja",
-    titulo: "Movilidad articular y estiramiento core",
-    descripcion: "Rutina suave para descargar columna y flexibilidad.",
+    id: "earth-core-low",
+    titulo: "Joint mobility & core stretching",
+    descripcion: "Gentle routine for spinal decompression and axial flexibility.",
     categoria: "exercise",
     valorObjetivo: 15,
     unidad: "min",
-    entorno: "tierra",
-    dificultad: "baja",
+    entorno: "earth",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Movilidad articular y estiramiento core",
-    description: "Rutina suave para descargar columna y flexibilidad.",
+    title: "Joint mobility & core stretching",
+    description: "Gentle routine for spinal decompression and axial flexibility.",
     category: "exercise",
     targetValue: 15,
     unit: "min",
-    environment: "tierra",
-    difficulty: "baja"
+    environment: "earth",
+    difficulty: "low"
   },
   {
-    id: "tierra-cardio-media",
-    titulo: "Acondicionamiento aeróbico 1g",
-    descripcion: "Entrenamiento cardiovascular moderado para resistencia muscular.",
+    id: "earth-cardio-medium",
+    titulo: "1.0g aerobic conditioning",
+    descripcion: "Moderate cardiovascular routine for muscular endurance and VO2 maintenance.",
     categoria: "exercise",
     valorObjetivo: 30,
     unidad: "min",
-    entorno: "tierra",
-    dificultad: "media",
+    entorno: "earth",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Acondicionamiento aeróbico 1g",
-    description: "Entrenamiento cardiovascular moderado para resistencia muscular.",
+    title: "1.0g aerobic conditioning",
+    description: "Moderate cardiovascular routine for muscular endurance and VO2 maintenance.",
     category: "exercise",
     targetValue: 30,
     unit: "min",
-    environment: "tierra",
-    difficulty: "media"
+    environment: "earth",
+    difficulty: "medium"
   },
   {
-    id: "tierra-fuerza-alta",
-    titulo: "Entrenamiento de fuerza y carga máxima",
-    descripcion: "Sesión exigente de fuerza funcional para readaptación motora.",
+    id: "earth-strength-high",
+    titulo: "Maximum load strength training",
+    descripcion: "Demanding functional strength session for muscular power and motor readaptation.",
     categoria: "exercise",
     valorObjetivo: 45,
     unidad: "min",
-    entorno: "tierra",
-    dificultad: "alta",
+    entorno: "earth",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Entrenamiento de fuerza y carga máxima",
-    description: "Sesión exigente de fuerza funcional para readaptación motora.",
+    title: "Maximum load strength training",
+    description: "Demanding functional strength session for muscular power and motor readaptation.",
     category: "exercise",
     targetValue: 45,
     unit: "min",
-    environment: "tierra",
-    difficulty: "alta"
+    environment: "earth",
+    difficulty: "high"
   },
   {
-    id: "nave-treadmill-baja",
-    titulo: "Caminadora T2 en 0g: marcha suave",
-    descripcion: "Día suave: sesión ligera con sujeción elástica para prevenir trombosis.",
+    id: "spaceship-treadmill-low",
+    titulo: "T2 Treadmill in 0g: gentle stride",
+    descripcion: "Gentle day: light session with harness bungee loading to prevent deep vein thrombosis.",
     categoria: "treadmill",
     valorObjetivo: 2500,
-    unidad: "pasos",
-    entorno: "nave",
-    dificultad: "baja",
+    unidad: "steps",
+    entorno: "spaceship",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Caminadora T2 en 0g: marcha suave",
-    description: "Día suave: sesión ligera con sujeción elástica para prevenir trombosis.",
+    title: "T2 Treadmill in 0g: gentle stride",
+    description: "Gentle day: light session with harness bungee loading to prevent deep vein thrombosis.",
     category: "treadmill",
     targetValue: 2500,
-    unit: "pasos",
-    environment: "nave",
-    difficulty: "baja"
+    unit: "steps",
+    environment: "spaceship",
+    difficulty: "low"
   },
   {
-    id: "nave-treadmill-media",
-    titulo: "Caminadora T2 en 0g: carga estándar",
-    descripcion: "Día moderado: impacto controlado contra arnés para frenar desmineralización.",
+    id: "spaceship-treadmill-medium",
+    titulo: "T2 Treadmill in 0g: standard loading",
+    descripcion: "Moderate day: controlled impact against bungee harness to curb bone demineralization.",
     categoria: "treadmill",
     valorObjetivo: 4500,
-    unidad: "pasos",
-    entorno: "nave",
-    dificultad: "media",
+    unidad: "steps",
+    entorno: "spaceship",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Caminadora T2 en 0g: carga estándar",
-    description: "Día moderado: impacto controlado contra arnés para frenar desmineralización.",
+    title: "T2 Treadmill in 0g: standard loading",
+    description: "Moderate day: controlled impact against bungee harness to curb bone demineralization.",
     category: "treadmill",
     targetValue: 4500,
-    unit: "pasos",
-    environment: "nave",
-    difficulty: "media"
+    unit: "steps",
+    environment: "spaceship",
+    difficulty: "medium"
   },
   {
-    id: "nave-treadmill-alta",
-    titulo: "Caminadora T2 en 0g: simulación extrema",
-    descripcion: "Día exigente: cadencia rápida para exigir sistema cardiovascular y huesos largos.",
+    id: "spaceship-treadmill-high",
+    titulo: "T2 Treadmill in 0g: high-load simulation",
+    descripcion: "Demanding day: rapid cadence to challenge cardiovascular system and cortical bone density.",
     categoria: "treadmill",
     valorObjetivo: 7500,
-    unidad: "pasos",
-    entorno: "nave",
-    dificultad: "alta",
+    unidad: "steps",
+    entorno: "spaceship",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Caminadora T2 en 0g: simulación extrema",
-    description: "Día exigente: cadencia rápida para exigir sistema cardiovascular y huesos largos.",
+    title: "T2 Treadmill in 0g: high-load simulation",
+    description: "Demanding day: rapid cadence to challenge cardiovascular system and cortical bone density.",
     category: "treadmill",
     targetValue: 7500,
-    unit: "pasos",
-    environment: "nave",
-    difficulty: "alta"
+    unit: "steps",
+    environment: "spaceship",
+    difficulty: "high"
   },
   {
-    id: "nave-stretch-baja",
-    titulo: "Descompresión espinal en cabina",
-    descripcion: "Estiramiento suave lumbar y cervical para elongación 0g.",
+    id: "spaceship-stretch-low",
+    titulo: "Cabin spinal decompression",
+    descripcion: "Gentle lumbar and cervical stretching to manage 0g spinal elongation.",
     categoria: "exercise",
     valorObjetivo: 10,
     unidad: "min",
-    entorno: "nave",
-    dificultad: "baja",
+    entorno: "spaceship",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Descompresión espinal en cabina",
-    description: "Estiramiento suave lumbar y cervical para elongación 0g.",
+    title: "Cabin spinal decompression",
+    description: "Gentle lumbar and cervical stretching to manage 0g spinal elongation.",
     category: "exercise",
     targetValue: 10,
     unit: "min",
-    environment: "nave",
-    difficulty: "baja"
+    environment: "spaceship",
+    difficulty: "low"
   },
   {
-    id: "nave-ared-media",
-    titulo: "Rutina resistiva ARED moderada",
-    descripcion: "Ejercicios de fuerza contra resistencia de vacío para cuádriceps y espalda.",
+    id: "spaceship-ared-medium",
+    titulo: "Moderate ARED resistive routine",
+    descripcion: "Piston-driven vacuum resistance exercises targeting quadriceps and posterior chain.",
     categoria: "exercise",
     valorObjetivo: 25,
     unidad: "min",
-    entorno: "nave",
-    dificultad: "media",
+    entorno: "spaceship",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Rutina resistiva ARED moderada",
-    description: "Ejercicios de fuerza contra resistencia de vacío para cuádriceps y espalda.",
+    title: "Moderate ARED resistive routine",
+    description: "Piston-driven vacuum resistance exercises targeting quadriceps and posterior chain.",
     category: "exercise",
     targetValue: 25,
     unit: "min",
-    environment: "nave",
-    difficulty: "media"
+    environment: "spaceship",
+    difficulty: "medium"
   },
   {
-    id: "nave-ared-alta",
-    titulo: "Fuerza intensiva ARED contra atrofia severa",
-    descripcion: "Protocolo de hipertrofia y compresión axial profunda en ingravidez.",
+    id: "spaceship-ared-high",
+    titulo: "Intensive ARED resistance protocol",
+    descripcion: "High-load hypertrophy and axial loading protocol against severe microgravity atrophy.",
     categoria: "exercise",
     valorObjetivo: 40,
     unidad: "min",
-    entorno: "nave",
-    dificultad: "alta",
+    entorno: "spaceship",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Fuerza intensiva ARED contra atrofia severa",
-    description: "Protocolo de hipertrofia y compresión axial profunda en ingravidez.",
+    title: "Intensive ARED resistance protocol",
+    description: "High-load hypertrophy and axial loading protocol against severe microgravity atrophy.",
     category: "exercise",
     targetValue: 40,
     unit: "min",
-    environment: "nave",
-    difficulty: "alta"
+    environment: "spaceship",
+    difficulty: "high"
   },
   {
-    id: "estacion-treadmill-baja",
-    titulo: "Caminadora T2 en EEI: trote ligero",
-    descripcion: "Sesión breve de amortiguación en módulo de servicio.",
+    id: "station-treadmill-low",
+    titulo: "ISS T2 Treadmill: recovery jog",
+    descripcion: "Brief vibration-isolated session in service module for limb perfusion.",
     categoria: "treadmill",
     valorObjetivo: 3000,
-    unidad: "pasos",
-    entorno: "estacion",
-    dificultad: "baja",
+    unidad: "steps",
+    entorno: "station",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Caminadora T2 en EEI: trote ligero",
-    description: "Sesión breve de amortiguación en módulo de servicio.",
+    title: "ISS T2 Treadmill: recovery jog",
+    description: "Brief vibration-isolated session in service module for limb perfusion.",
     category: "treadmill",
     targetValue: 3000,
-    unit: "pasos",
-    environment: "estacion",
-    difficulty: "baja"
+    unit: "steps",
+    environment: "station",
+    difficulty: "low"
   },
   {
-    id: "estacion-treadmill-media",
-    titulo: "Caminadora T2 en EEI: entrenamiento orbital",
-    descripcion: "Protocolo diario para mantener gasto calórico y estabilidad en 0g.",
+    id: "station-treadmill-medium",
+    titulo: "ISS T2 Treadmill: orbital standard",
+    descripcion: "Daily protocol to preserve caloric expenditure and postural stability in 0g.",
     categoria: "treadmill",
     valorObjetivo: 5000,
-    unidad: "pasos",
-    entorno: "estacion",
-    dificultad: "media",
+    unidad: "steps",
+    entorno: "station",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Caminadora T2 en EEI: entrenamiento orbital",
-    description: "Protocolo diario para mantener gasto calórico y estabilidad en 0g.",
+    title: "ISS T2 Treadmill: orbital standard",
+    description: "Daily protocol to preserve caloric expenditure and postural stability in 0g.",
     category: "treadmill",
     targetValue: 5000,
-    unit: "pasos",
-    environment: "estacion",
-    difficulty: "media"
+    unit: "steps",
+    environment: "station",
+    difficulty: "medium"
   },
   {
-    id: "estacion-treadmill-alta",
-    titulo: "Caminadora T2 en EEI: protocolo intensivo",
-    descripcion: "Día de alta carga motriz con resistencia incrementada.",
+    id: "station-treadmill-high",
+    titulo: "ISS T2 Treadmill: intensive protocol",
+    descripcion: "High-speed interval training with elevated harness resistance.",
     categoria: "treadmill",
     valorObjetivo: 8000,
-    unidad: "pasos",
-    entorno: "estacion",
-    dificultad: "alta",
+    unidad: "steps",
+    entorno: "station",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Caminadora T2 en EEI: protocolo intensivo",
-    description: "Día de alta carga motriz con resistencia incrementada.",
+    title: "ISS T2 Treadmill: intensive protocol",
+    description: "High-speed interval training with elevated harness resistance.",
     category: "treadmill",
     targetValue: 8000,
-    unit: "pasos",
-    environment: "estacion",
-    difficulty: "alta"
+    unit: "steps",
+    environment: "station",
+    difficulty: "high"
   },
   {
-    id: "estacion-sans-baja",
-    titulo: "Control cefálico y pausa visual SANS",
-    descripcion: "Relajación ocular y alivio de presión intracraneal en microgravedad.",
+    id: "station-sans-low",
+    titulo: "Cephalic control & SANS visual pause",
+    descripcion: "Optic nerve relaxation and intracranial fluid pressure relief in microgravity.",
     categoria: "exercise",
     valorObjetivo: 15,
     unidad: "min",
-    entorno: "estacion",
-    dificultad: "baja",
+    entorno: "station",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Control cefálico y pausa visual SANS",
-    description: "Relajación ocular y alivio de presión intracraneal en microgravedad.",
+    title: "Cephalic control & SANS visual pause",
+    description: "Optic nerve relaxation and intracranial fluid pressure relief in microgravity.",
     category: "exercise",
     targetValue: 15,
     unit: "min",
-    environment: "estacion",
-    difficulty: "baja"
+    environment: "station",
+    difficulty: "low"
   },
   {
-    id: "estacion-ared-media",
-    titulo: "Resistencia ARED en módulo orbital",
-    descripcion: "Compresión ósea en tren inferior y zona escapular.",
+    id: "station-ared-medium",
+    titulo: "Orbital module ARED resistance",
+    descripcion: "Targeted skeletal compression on lower extremities and scapular girdle.",
     categoria: "exercise",
     valorObjetivo: 25,
     unidad: "min",
-    entorno: "estacion",
-    dificultad: "media",
+    entorno: "station",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Resistencia ARED en módulo orbital",
-    description: "Compresión ósea en tren inferior y zona escapular.",
+    title: "Orbital module ARED resistance",
+    description: "Targeted skeletal compression on lower extremities and scapular girdle.",
     category: "exercise",
     targetValue: 25,
     unit: "min",
-    environment: "estacion",
-    difficulty: "media"
+    environment: "station",
+    difficulty: "medium"
   },
   {
-    id: "estacion-fuerza-alta",
-    titulo: "Carga máxima ARED y trabajo isométrico",
-    descripcion: "Entrenamiento estricto para simular gravedad terrestre en masa muscular.",
+    id: "station-fuerza-alta",
+    titulo: "Peak ARED loading & isometric work",
+    descripcion: "Strict protocol simulating terrestrial 1g forces on core muscle groups.",
     categoria: "exercise",
     valorObjetivo: 45,
     unidad: "min",
-    entorno: "estacion",
-    dificultad: "alta",
+    entorno: "station",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Carga máxima ARED y trabajo isométrico",
-    description: "Entrenamiento estricto para simular gravedad terrestre en masa muscular.",
+    title: "Peak ARED loading & isometric work",
+    description: "Strict protocol simulating terrestrial 1g forces on core muscle groups.",
     category: "exercise",
     targetValue: 45,
     unit: "min",
-    environment: "estacion",
-    difficulty: "alta"
+    environment: "station",
+    difficulty: "high"
   },
   {
-    id: "luna-pasos-baja",
-    titulo: "Patrulla corta en regolito lunar",
-    descripcion: "Día suave: caminata de reconocimiento en entorno de baja tracción.",
+    id: "moon-steps-low",
+    titulo: "Short patrol on lunar regolith",
+    descripcion: "Gentle day: scouting walk in reduced 0.16g traction terrain.",
     categoria: "steps",
     valorObjetivo: 4000,
-    unidad: "pasos",
-    entorno: "luna",
-    dificultad: "baja",
+    unidad: "steps",
+    entorno: "moon",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Patrulla corta en regolito lunar",
-    description: "Día suave: caminata de reconocimiento en entorno de baja tracción.",
+    title: "Short patrol on lunar regolith",
+    description: "Gentle day: scouting walk in reduced 0.16g traction terrain.",
     category: "steps",
     targetValue: 4000,
-    unit: "pasos",
-    environment: "luna",
-    difficulty: "baja"
+    unit: "steps",
+    environment: "moon",
+    difficulty: "low"
   },
   {
-    id: "luna-pasos-media",
-    titulo: "Marcha de exploración lunar estándar",
-    descripcion: "Día moderado: desplazamiento entre domos y plataformas de carga.",
+    id: "moon-steps-medium",
+    titulo: "Standard lunar exploration march",
+    descripcion: "Moderate day: traverse between surface domes and cargo logistics modules.",
     categoria: "steps",
     valorObjetivo: 6500,
-    unidad: "pasos",
-    entorno: "luna",
-    dificultad: "media",
+    unidad: "steps",
+    entorno: "moon",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Marcha de exploración lunar estándar",
-    description: "Día moderado: desplazamiento entre domos y plataformas de carga.",
+    title: "Standard lunar exploration march",
+    description: "Moderate day: traverse between surface domes and cargo logistics modules.",
     category: "steps",
     targetValue: 6500,
-    unit: "pasos",
-    environment: "luna",
-    difficulty: "media"
+    unit: "steps",
+    environment: "moon",
+    difficulty: "medium"
   },
   {
-    id: "luna-pasos-alta",
-    titulo: "Travesía prolongada de superficie lunar",
-    descripcion: "Día intenso: navegación a pie de cráter con traje presurizado.",
+    id: "moon-steps-high",
+    titulo: "Extended lunar surface expedition",
+    descripcion: "Intense day: crater navigation under pressurized spacesuit mass.",
     categoria: "steps",
     valorObjetivo: 9500,
-    unidad: "pasos",
-    entorno: "luna",
-    dificultad: "alta",
+    unidad: "steps",
+    entorno: "moon",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Travesía prolongada de superficie lunar",
-    description: "Día intenso: navegación a pie de cráter con traje presurizado.",
+    title: "Extended lunar surface expedition",
+    description: "Intense day: crater navigation under pressurized spacesuit mass.",
     category: "steps",
     targetValue: 9500,
-    unit: "pasos",
-    environment: "luna",
-    difficulty: "alta"
+    unit: "steps",
+    environment: "moon",
+    difficulty: "high"
   },
   {
-    id: "luna-balance-baja",
-    titulo: "Control postural y estabilidad de tobillo",
-    descripcion: "Recuperación de propiocepción en 0.16g tras caminata con botas EVA.",
+    id: "moon-balance-low",
+    titulo: "Postural control & ankle stability",
+    descripcion: "Proprioception recovery in 0.16g following EVA boot traverse.",
     categoria: "exercise",
     valorObjetivo: 15,
     unidad: "min",
-    entorno: "luna",
-    dificultad: "baja",
+    entorno: "moon",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Control postural y estabilidad de tobillo",
-    description: "Recuperación de propiocepción en 0.16g tras caminata con botas EVA.",
+    title: "Postural control & ankle stability",
+    description: "Proprioception recovery in 0.16g following EVA boot traverse.",
     category: "exercise",
     targetValue: 15,
     unit: "min",
-    environment: "luna",
-    difficulty: "baja"
+    environment: "moon",
+    difficulty: "low"
   },
   {
-    id: "luna-eva-media",
-    titulo: "Movilidad y descarga articular post-EVA",
-    descripcion: "Alivio de tendones patelares y deltoides por peso del traje espacial.",
+    id: "moon-eva-media",
+    titulo: "Post-EVA joint mobility & relief",
+    descripcion: "Tendon and deltoid decompression after rigid spacesuit load bearing.",
     categoria: "exercise",
     valorObjetivo: 25,
     unidad: "min",
-    entorno: "luna",
-    dificultad: "media",
+    entorno: "moon",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Movilidad y descarga articular post-EVA",
-    description: "Alivio de tendones patelares y deltoides por peso del traje espacial.",
+    title: "Post-EVA joint mobility & relief",
+    description: "Tendon and deltoid decompression after rigid spacesuit load bearing.",
     category: "exercise",
     targetValue: 25,
     unit: "min",
-    environment: "luna",
-    difficulty: "media"
+    environment: "moon",
+    difficulty: "medium"
   },
   {
-    id: "luna-carga-alta",
-    titulo: "Fuerza funcional con gravedad reducida",
-    descripcion: "Sentadillas de potencia y estabilidad lumbar contra regolito.",
+    id: "moon-load-high",
+    titulo: "Functional strength in low gravity",
+    descripcion: "Power squats and lumbar stabilization against loose lunar regolith.",
     categoria: "exercise",
     valorObjetivo: 40,
     unidad: "min",
-    entorno: "luna",
-    dificultad: "alta",
+    entorno: "moon",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Fuerza funcional con gravedad reducida",
-    description: "Sentadillas de potencia y estabilidad lumbar contra regolito.",
+    title: "Functional strength in low gravity",
+    description: "Power squats and lumbar stabilization against loose lunar regolith.",
     category: "exercise",
     targetValue: 40,
     unit: "min",
-    environment: "luna",
-    difficulty: "alta"
+    environment: "moon",
+    difficulty: "high"
   },
   {
-    id: "marte-pasos-baja",
-    titulo: "Aclimatación en hábitat marciano",
-    descripcion: "Día suave: ronda interior y ajuste a la gravedad de 0.38g.",
+    id: "mars-steps-low",
+    titulo: "Martian habitat acclimatization",
+    descripcion: "Gentle day: interior rounds and biological adjustment to 0.38g.",
     categoria: "steps",
     valorObjetivo: 5000,
-    unidad: "pasos",
-    entorno: "marte",
-    dificultad: "baja",
+    unidad: "steps",
+    entorno: "mars",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Aclimatación en hábitat marciano",
-    description: "Día suave: ronda interior y ajuste a la gravedad de 0.38g.",
+    title: "Martian habitat acclimatization",
+    description: "Gentle day: interior rounds and biological adjustment to 0.38g.",
     category: "steps",
     targetValue: 5000,
-    unit: "pasos",
-    environment: "marte",
-    difficulty: "baja"
+    unit: "steps",
+    environment: "mars",
+    difficulty: "low"
   },
   {
-    id: "marte-pasos-media",
-    titulo: "Ruta de recolección en superficie marciana",
-    descripcion: "Día moderado: expedición geológica y paso constante sobre dunas.",
+    id: "mars-steps-medium",
+    titulo: "Martian surface sample survey",
+    descripcion: "Moderate day: geological field trek with steady cadence over dune fields.",
     categoria: "steps",
     valorObjetivo: 8500,
-    unidad: "pasos",
-    entorno: "marte",
-    dificultad: "media",
+    unidad: "steps",
+    entorno: "mars",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Ruta de recolección en superficie marciana",
-    description: "Día moderado: expedición geológica y paso constante sobre dunas.",
+    title: "Martian surface sample survey",
+    description: "Moderate day: geological field trek with steady cadence over dune fields.",
     category: "steps",
     targetValue: 8500,
-    unit: "pasos",
-    environment: "marte",
-    difficulty: "media"
+    unit: "steps",
+    environment: "mars",
+    difficulty: "medium"
   },
   {
-    id: "marte-pasos-alta",
-    titulo: "Marcha extrema en terreno rocoso marciano",
-    descripcion: "Día de alta exigencia física en suelo hostil y pendiente pronunciada.",
+    id: "mars-steps-high",
+    titulo: "Extreme trek on rocky Martian terrain",
+    descripcion: "High-demand trek across steep crater inclines and basaltic terrain.",
     categoria: "steps",
     valorObjetivo: 12000,
-    unidad: "pasos",
-    entorno: "marte",
-    dificultad: "alta",
+    unidad: "steps",
+    entorno: "mars",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Marcha extrema en terreno rocoso marciano",
-    description: "Día de alta exigencia física en suelo hostil y pendiente pronunciada.",
+    title: "Extreme trek on rocky Martian terrain",
+    description: "High-demand trek across steep crater inclines and basaltic terrain.",
     category: "steps",
     targetValue: 12000,
-    unit: "pasos",
-    environment: "marte",
-    difficulty: "alta"
+    unit: "steps",
+    environment: "mars",
+    difficulty: "high"
   },
   {
-    id: "marte-resp-baja",
-    titulo: "Respiración diafragmática y revisión SpO2",
-    descripcion: "Desaturación de polvo y ventilación guiada en esclusa.",
+    id: "mars-breathing-low",
+    titulo: "Diaphragmatic breathing & SpO2 check",
+    descripcion: "Airway clearing and guided airlock pulmonary ventilation routine.",
     categoria: "exercise",
     valorObjetivo: 15,
     unidad: "min",
-    entorno: "marte",
-    dificultad: "baja",
+    entorno: "mars",
+    dificultad: "low",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Respiración diafragmática y revisión SpO2",
-    description: "Desaturación de polvo y ventilación guiada en esclusa.",
+    title: "Diaphragmatic breathing & SpO2 check",
+    description: "Airway clearing and guided airlock pulmonary ventilation routine.",
     category: "exercise",
     targetValue: 15,
     unit: "min",
-    environment: "marte",
-    difficulty: "baja"
+    environment: "mars",
+    difficulty: "low"
   },
   {
-    id: "marte-load-media",
-    titulo: "Entrenamiento de carga en 0.38g",
-    descripcion: "Fortalecimiento de erectores espinales y cuádriceps para gravedad marciana.",
+    id: "mars-load-medium",
+    titulo: "0.38g load-bearing conditioning",
+    descripcion: "Erector spinae and quadriceps reinforcement for Martian gravity field.",
     categoria: "exercise",
     valorObjetivo: 30,
     unidad: "min",
-    entorno: "marte",
-    dificultad: "media",
+    entorno: "mars",
+    dificultad: "medium",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Entrenamiento de carga en 0.38g",
-    description: "Fortalecimiento de erectores espinales y cuádriceps para gravedad marciana.",
+    title: "0.38g load-bearing conditioning",
+    description: "Erector spinae and quadriceps reinforcement for Martian gravity field.",
     category: "exercise",
     targetValue: 30,
     unit: "min",
-    environment: "marte",
-    difficulty: "media"
+    environment: "mars",
+    difficulty: "medium"
   },
   {
-    id: "marte-load-alta",
-    titulo: "Sobrecarga muscular y resistencia extrema",
-    descripcion: "Protocolo avanzado de potencia y soporte de carga pesada.",
+    id: "mars-load-high",
+    titulo: "Extreme muscular overload & power",
+    descripcion: "Advanced power protocol for heavy equipment portage on rough terrain.",
     categoria: "exercise",
     valorObjetivo: 45,
     unidad: "min",
-    entorno: "marte",
-    dificultad: "alta",
+    entorno: "mars",
+    dificultad: "high",
     activa: true,
     creadoEn: "2026-11-14T00:00:00.000Z",
-    title: "Sobrecarga muscular y resistencia extrema",
-    description: "Protocolo avanzado de potencia y soporte de carga pesada.",
+    title: "Extreme muscular overload & power",
+    description: "Advanced power protocol for heavy equipment portage on rough terrain.",
     category: "exercise",
     targetValue: 45,
     unit: "min",
-    environment: "marte",
-    difficulty: "alta"
+    environment: "mars",
+    difficulty: "high"
   }
-];
-
-@Injectable()
+];@Injectable()
 export class SupabaseService {
   private readonly logger = new Logger(SupabaseService.name);
   private readonly supabaseUrl: string;
@@ -1665,11 +1815,20 @@ export class SupabaseService {
       "id,titulo,descripcion,categoria,valor_objetivo,unidad,entorno,dificultad,activa,creado_en"
     );
     url.searchParams.set("activa", "eq.true");
-    if (dificultad) {
-      url.searchParams.set("dificultad", `eq.${dificultad}`);
+
+    const equivEntorno = entorno && entorno !== "all" ? entornosEquivalentes(entorno) : [];
+    const equivDificultad = dificultad ? dificultadesEquivalentes(dificultad) : [];
+
+    if (equivDificultad.length > 0) {
+      if (equivDificultad.length === 1) {
+        url.searchParams.set("dificultad", `eq.${equivDificultad[0]}`);
+      } else {
+        url.searchParams.set("dificultad", `in.(${equivDificultad.join(",")})`);
+      }
     }
-    if (entorno && entorno !== "all") {
-      url.searchParams.set("or", `(entorno.eq.${entorno},entorno.eq.all)`);
+    if (equivEntorno.length > 0) {
+      const orConditions = equivEntorno.map((e) => `entorno.eq.${e}`).concat("entorno.eq.all");
+      url.searchParams.set("or", `(${orConditions.join(",")})`);
     }
 
     try {
@@ -1691,12 +1850,14 @@ export class SupabaseService {
 
     let filtradas = MISIONES_SEMILLA_POR_DEFECTO.filter((m) => m.activa);
     if (entorno && entorno !== "all") {
+      const equivs = entornosEquivalentes(entorno);
       filtradas = filtradas.filter(
-        (m) => m.entorno === entorno || m.entorno === "all"
+        (m) => equivs.includes(m.entorno) || m.entorno === "all"
       );
     }
     if (dificultad) {
-      filtradas = filtradas.filter((m) => m.dificultad === dificultad);
+      const equivs = dificultadesEquivalentes(dificultad);
+      filtradas = filtradas.filter((m) => equivs.includes(m.dificultad));
     }
     return filtradas;
   }
@@ -1705,22 +1866,27 @@ export class SupabaseService {
     usuarioId: string,
     query: ConsultarMisionesQueryDto
   ): Promise<MisionDiariaRotada[]> {
-    const entorno = (query.entorno || "nave") as EntornoMision;
-    const catalogo = await this.obtenerCatalogoMisiones(entorno);
+    const rawEntorno = query.environment || query.entorno || "spaceship";
+    const entornoNorm = normalizarEntorno(rawEntorno);
+    const equivs = entornosEquivalentes(entornoNorm);
+    const catalogo = await this.obtenerCatalogoMisiones(entornoNorm);
 
-    const fechaReferencia = query.fecha || new Date().toISOString().slice(0, 10);
+    const fechaReferencia = query.date || query.fecha || new Date().toISOString().slice(0, 10);
     const partesFecha = fechaReferencia.split("-").map(Number);
     const diaNum =
       partesFecha.length === 3 && !partesFecha.some(isNaN)
         ? Math.floor(
-            new Date(partesFecha[0], partesFecha[1] - 1, partesFecha[2]).getTime() /
-              86400000
-          )
+          new Date(partesFecha[0], partesFecha[1] - 1, partesFecha[2]).getTime() /
+          86400000
+        )
         : Math.floor(Date.now() / 86400000);
 
-    const cicloDificultades: DificultadMision[] = ["baja", "media", "alta"];
-    const dificultadRotativa =
-      query.dificultad || cicloDificultades[Math.abs(diaNum) % 3];
+    const cicloDificultades: DificultadMision[] = ["low", "medium", "high"];
+    const rawDificultad = query.difficulty || query.dificultad;
+    const dificultadRotativa = rawDificultad
+      ? normalizarDificultad(rawDificultad)
+      : cicloDificultades[Math.abs(diaNum) % 3];
+    const dificultadEquivs = dificultadesEquivalentes(dificultadRotativa);
 
     // 1. Misión de Check-in
     const checkinMision =
@@ -1729,14 +1895,14 @@ export class SupabaseService {
 
     // 2. Misión de Pasos o Caminadora según entorno y dificultad rotada
     const categoriaActividad =
-      entorno === "nave" || entorno === "estacion" ? "treadmill" : "steps";
+      entornoNorm === "spaceship" || entornoNorm === "station" ? "treadmill" : "steps";
     const candidatasPasos = catalogo.filter(
       (m) =>
         m.categoria === categoriaActividad &&
-        (m.entorno === entorno || m.entorno === "all")
+        (equivs.includes(m.entorno) || m.entorno === "all")
     );
     const misionPasos =
-      candidatasPasos.find((m) => m.dificultad === dificultadRotativa) ||
+      candidatasPasos.find((m) => dificultadEquivs.includes(m.dificultad)) ||
       candidatasPasos[0] ||
       catalogo.find((m) => m.categoria === categoriaActividad) ||
       catalogo[2];
@@ -1745,7 +1911,7 @@ export class SupabaseService {
     const candidatasEjercicio = catalogo.filter(
       (m) =>
         m.categoria === "exercise" &&
-        (m.entorno === entorno || m.entorno === "all")
+        (equivs.includes(m.entorno) || m.entorno === "all")
     );
     const ejerciciosSeleccionados: MisionCatalogo[] = [];
     if (candidatasEjercicio.length > 0) {
@@ -1763,10 +1929,11 @@ export class SupabaseService {
       ...ejerciciosSeleccionados
     ];
 
-    const pasosActuales = Number(query.pasosActuales || 0);
+    const pasosActuales = Number(query.currentSteps ?? query.pasosActuales ?? 0);
     const checkinRealizado =
       query.checkinRealizado === true || query.checkinRealizado === "true";
     const caminadoraActiva =
+      query.caminadoraActiva === true || query.caminadoraActiva === "true";
       query.caminadoraActiva === true || query.caminadoraActiva === "true";
 
     return misionesSeleccionadas.map((m) => {
@@ -1844,8 +2011,8 @@ export class SupabaseService {
       dto.porcentajeProgresoRelativo !== undefined
         ? Number(dto.porcentajeProgresoRelativo)
         : dto.relativeProgressPct !== undefined
-        ? Number(dto.relativeProgressPct)
-        : Math.min(
+          ? Number(dto.relativeProgressPct)
+          : Math.min(
             100,
             Math.round((diaActual / Math.max(0.01, diasTotales)) * 10000) / 100
           );
@@ -1856,8 +2023,8 @@ export class SupabaseService {
       (diaActual >= diasTotales
         ? "arrived"
         : diaActual === 0
-        ? "scheduled"
-        : "in_transit");
+          ? "scheduled"
+          : "in_transit");
 
     const entornoActual =
       dto.entornoActual ??
@@ -2190,5 +2357,376 @@ export class SupabaseService {
     } catch {
       // Ignorar fallas secundarias al actualizar astronaut_mission_states
     }
+  }
+
+  private getDailyMissionCompletionsUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/daily_mission_completions`);
+  }
+
+  private getDailyMissionDaysUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/daily_mission_days`);
+  }
+
+  private getAstronautStreaksUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/astronaut_streaks`);
+  }
+
+  async obtenerRachaAstronauta(usuarioId: string): Promise<RachaAstronauta> {
+    const url = this.getAstronautStreaksUrl();
+    url.searchParams.set("select", "*");
+    url.searchParams.set("user_id", `eq.${usuarioId}`);
+    url.searchParams.set("limit", "1");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        { method: "GET" },
+        "astronaut streak"
+      );
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return mapAstronautStreak(rows[0] as SupabaseAstronautStreakRow);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo obtener la racha en Supabase para el usuario ${usuarioId}`,
+        err
+      );
+    }
+
+    const ahoraIso = new Date().toISOString();
+    return {
+      usuarioId,
+      rachaActual: 0,
+      rachaMaxima: 0,
+      totalDiasCompletados: 0,
+      ultimaFechaCompletada: null,
+      todasCompletadasHoy: false,
+      actualizadoEn: ahoraIso,
+      userId: usuarioId,
+      currentStreak: 0,
+      maxStreak: 0,
+      totalCompletedDays: 0,
+      lastCompletedDate: null,
+      allCompletedToday: false,
+      updatedAt: ahoraIso
+    };
+  }
+
+  async obtenerProgresoMisionesDelDia(
+    usuarioId: string,
+    fecha?: string
+  ): Promise<{
+    resumen: ResumenDiaMisiones | null;
+    misiones: MisionDiariaProgreso[];
+    racha: RachaAstronauta;
+  }> {
+    const fechaConsulta = fecha ?? new Date().toISOString().slice(0, 10);
+    const racha = await this.obtenerRachaAstronauta(usuarioId);
+
+    let resumen: ResumenDiaMisiones | null = null;
+    const misiones: MisionDiariaProgreso[] = [];
+
+    // 1. Consultar resumen del día
+    try {
+      const urlDia = this.getDailyMissionDaysUrl();
+      urlDia.searchParams.set("select", "*");
+      urlDia.searchParams.set("user_id", `eq.${usuarioId}`);
+      urlDia.searchParams.set("fecha", `eq.${fechaConsulta}`);
+      urlDia.searchParams.set("limit", "1");
+
+      const resDia = await this.requestSupabaseTable(
+        urlDia,
+        { method: "GET" },
+        "daily mission day summary"
+      );
+      const rowsDia = (await resDia.json()) as unknown;
+      if (Array.isArray(rowsDia) && rowsDia.length > 0) {
+        resumen = mapDailyMissionDay(rowsDia[0] as SupabaseDailyMissionDayRow);
+      }
+    } catch (err) {
+      this.logger.warn("No se pudo obtener el resumen del día de misiones", err);
+    }
+
+    // 2. Consultar misiones completadas del día
+    try {
+      const urlMisiones = this.getDailyMissionCompletionsUrl();
+      urlMisiones.searchParams.set("select", "*");
+      urlMisiones.searchParams.set("user_id", `eq.${usuarioId}`);
+      urlMisiones.searchParams.set("fecha", `eq.${fechaConsulta}`);
+
+      const resMisiones = await this.requestSupabaseTable(
+        urlMisiones,
+        { method: "GET" },
+        "daily mission completions"
+      );
+      const rowsMisiones = (await resMisiones.json()) as unknown;
+      if (Array.isArray(rowsMisiones)) {
+        for (const row of rowsMisiones) {
+          misiones.push(
+            mapDailyMissionCompletion(row as SupabaseDailyMissionCompletionRow)
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn("No se pudieron obtener las misiones completadas", err);
+    }
+
+    return { resumen, misiones, racha };
+  }
+
+  async sincronizarProgresoMisionesDiarias(
+    usuarioId: string,
+    dto: SincronizarProgresoMisionesDto
+  ): Promise<RespuestaProgresoMisiones> {
+    const ahoraIso = new Date().toISOString();
+    const fecha = dto.fecha ?? ahoraIso.slice(0, 10);
+    const misionesInput = dto.misiones ?? [];
+
+    const totalMisiones = misionesInput.length;
+    const misionesCompletadas = misionesInput.filter((m) => m.completada ?? m.completed).length;
+    const todasCompletadas =
+      totalMisiones > 0 && misionesCompletadas >= totalMisiones;
+
+    // 1. Guardar o actualizar misiones individuales en daily_mission_completions
+    for (const item of misionesInput) {
+      const misionId = item.misionId ?? item.missionId ?? "";
+      const completada = Boolean(item.completada ?? item.completed);
+      const valorActual = item.valorActual ?? item.currentValue ?? (completada ? 1 : 0);
+      const valorObjetivo = item.valorObjetivo ?? item.targetValue ?? 1;
+
+      const payloadMision = {
+        user_id: usuarioId,
+        fecha,
+        mision_id: misionId,
+        completada,
+        valor_actual: valorActual,
+        valor_objetivo: valorObjetivo,
+        actualizado_en: ahoraIso
+      };
+
+      try {
+        const urlItem = this.getDailyMissionCompletionsUrl();
+        urlItem.searchParams.set("on_conflict", "user_id,fecha,mision_id");
+        await this.requestSupabaseTable(
+          urlItem,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            },
+            body: JSON.stringify(payloadMision)
+          },
+          "upsert daily mission completion"
+        );
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo guardar la misión ${misionId} en Supabase`,
+          err
+        );
+      }
+    }
+
+    // 2. Obtener estado previo del día para ver si ya se había otorgado el punto de racha
+    let puntoRachaOtorgadoPreviamente = false;
+    try {
+      const urlDiaCheck = this.getDailyMissionDaysUrl();
+      urlDiaCheck.searchParams.set("select", "punto_racha_otorgado");
+      urlDiaCheck.searchParams.set("user_id", `eq.${usuarioId}`);
+      urlDiaCheck.searchParams.set("fecha", `eq.${fecha}`);
+      urlDiaCheck.searchParams.set("limit", "1");
+
+      const resCheck = await this.requestSupabaseTable(
+        urlDiaCheck,
+        { method: "GET" },
+        "check daily mission day streak point"
+      );
+      const rows = (await resCheck.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        puntoRachaOtorgadoPreviamente = Boolean(
+          (rows[0] as { punto_racha_otorgado?: boolean }).punto_racha_otorgado
+        );
+      }
+    } catch {
+      // Ignorar fallo de lectura previa
+    }
+
+    // 3. Evaluar y actualizar racha si todas las tareas del día están completadas
+    let rachaActualizada = await this.obtenerRachaAstronauta(usuarioId);
+    let nuevoPuntoOtorgado = false;
+
+    if (todasCompletadas && !puntoRachaOtorgadoPreviamente) {
+      nuevoPuntoOtorgado = true;
+      const ultimaFecha = rachaActualizada.ultimaFechaCompletada;
+
+      let nuevaRacha = 1;
+      if (ultimaFecha) {
+        const diffDias = calcularDiferenciaDias(fecha, ultimaFecha);
+        if (diffDias === 0) {
+          nuevaRacha = rachaActualizada.rachaActual;
+        } else if (diffDias === 1) {
+          nuevaRacha = rachaActualizada.rachaActual + 1;
+        } else {
+          nuevaRacha = 1;
+        }
+      }
+
+      const nuevaRachaMaxima = Math.max(
+        rachaActualizada.rachaMaxima,
+        nuevaRacha
+      );
+      const nuevoTotalDias = rachaActualizada.totalDiasCompletados + 1;
+
+      const payloadRacha = {
+        user_id: usuarioId,
+        racha_actual: nuevaRacha,
+        racha_maxima: nuevaRachaMaxima,
+        total_dias_completados: nuevoTotalDias,
+        ultima_fecha_completada: fecha,
+        actualizado_en: ahoraIso
+      };
+
+      try {
+        const urlRacha = this.getAstronautStreaksUrl();
+        urlRacha.searchParams.set("on_conflict", "user_id");
+        await this.requestSupabaseTable(
+          urlRacha,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            },
+            body: JSON.stringify(payloadRacha)
+          },
+          "upsert astronaut streak"
+        );
+      } catch (err) {
+        this.logger.warn("No se pudo guardar la racha en Supabase", err);
+      }
+
+      rachaActualizada = {
+        usuarioId,
+        rachaActual: nuevaRacha,
+        rachaMaxima: nuevaRachaMaxima,
+        totalDiasCompletados: nuevoTotalDias,
+        ultimaFechaCompletada: fecha,
+        todasCompletadasHoy: true,
+        actualizadoEn: ahoraIso,
+        userId: usuarioId,
+        currentStreak: nuevaRacha,
+        maxStreak: nuevaRachaMaxima,
+        totalCompletedDays: nuevoTotalDias,
+        lastCompletedDate: fecha,
+        allCompletedToday: true,
+        updatedAt: ahoraIso
+      };
+    }
+
+    const puntoRachaFinal = puntoRachaOtorgadoPreviamente || nuevoPuntoOtorgado;
+
+    // 4. Guardar o actualizar daily_mission_days
+    const payloadDia = {
+      user_id: usuarioId,
+      fecha,
+      total_misiones: totalMisiones,
+      misiones_completadas: misionesCompletadas,
+      todas_completadas: todasCompletadas,
+      punto_racha_otorgado: puntoRachaFinal,
+      actualizado_en: ahoraIso
+    };
+
+    try {
+      const urlDia = this.getDailyMissionDaysUrl();
+      urlDia.searchParams.set("on_conflict", "user_id,fecha");
+      await this.requestSupabaseTable(
+        urlDia,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal"
+          },
+          body: JSON.stringify(payloadDia)
+        },
+        "upsert daily mission days summary"
+      );
+    } catch (err) {
+      this.logger.warn("No se pudo guardar el día en Supabase", err);
+    }
+
+    const misionesMapeadas: MisionDiariaProgreso[] = misionesInput.map((m) => {
+      const mid = m.misionId ?? m.missionId ?? "";
+      const done = Boolean(m.completada ?? m.completed);
+      const cur = m.valorActual ?? m.currentValue ?? (done ? 1 : 0);
+      const tgt = m.valorObjetivo ?? m.targetValue ?? 1;
+      return {
+        misionId: mid,
+        completada: done,
+        valorActual: cur,
+        valorObjetivo: tgt,
+        actualizadoEn: ahoraIso,
+        missionId: mid,
+        completed: done,
+        currentValue: cur,
+        targetValue: tgt
+      };
+    });
+
+    return {
+      fecha,
+      totalMisiones,
+      misionesCompletadas,
+      todasCompletadas,
+      puntoRachaOtorgado: puntoRachaFinal,
+      racha: rachaActualizada,
+      misiones: misionesMapeadas
+    };
+  }
+
+  async actualizarItemMisionDiaria(
+    usuarioId: string,
+    misionId: string,
+    dto: ActualizarItemMisionDto
+  ): Promise<RespuestaProgresoMisiones> {
+    const fecha = dto.fecha ?? new Date().toISOString().slice(0, 10);
+    const estadoPrevio = await this.obtenerProgresoMisionesDelDia(
+      usuarioId,
+      fecha
+    );
+
+    const misionesMap = new Map<
+      string,
+      { completada: boolean; valorActual: number; valorObjetivo: number }
+    >();
+    for (const m of estadoPrevio.misiones) {
+      misionesMap.set(m.misionId, {
+        completada: m.completada,
+        valorActual: m.valorActual,
+        valorObjetivo: m.valorObjetivo
+      });
+    }
+
+    misionesMap.set(misionId, {
+      completada: dto.completada,
+      valorActual: dto.valorActual ?? (dto.completada ? 1 : 0),
+      valorObjetivo: dto.valorObjetivo ?? 1
+    });
+
+    const listaMisiones: ItemProgresoMisionDto[] = [];
+    for (const [id, vals] of misionesMap.entries()) {
+      listaMisiones.push({
+        misionId: id,
+        completada: vals.completada,
+        valorActual: vals.valorActual,
+        valorObjetivo: vals.valorObjetivo
+      });
+    }
+
+    return this.sincronizarProgresoMisionesDiarias(usuarioId, {
+      fecha,
+      misiones: listaMisiones
+    });
   }
 }

@@ -14,6 +14,7 @@ import {
   SpaceLocation,
 } from '../types/mission';
 import { Platform } from 'react-native';
+import { MESSAGES, translate, type Locale, type MessageKey } from '../i18n/messages';
 
 // Servicio preparado para conectar misiones, entorno y fotos de lesiones con el backend
 
@@ -590,35 +591,60 @@ export const ENVIRONMENTS: Record<EnvironmentType, EnvironmentConfig> = {
   },
 };
 
+/** Textos visibles de un entorno (los `label` de ENVIRONMENTS son el respaldo en español). */
+export function getEnvironmentText(locale: Locale, id: EnvironmentType) {
+  const tr = (field: string) => translate(locale, `missions.env.${id}.${field}` as MessageKey);
+  return {
+    label: tr('label'),
+    shortLabel: tr('short'),
+    gravityLabel: tr('gravity'),
+    destinationLabel: tr('dest'),
+    routineSummary: tr('routine'),
+  };
+}
+
+/** Nombres visibles de una ubicación espacial. */
+export function getLocationText(locale: Locale, id: SpaceLocation) {
+  return {
+    label: translate(locale, `missions.loc.${id}.label` as MessageKey),
+    shortLabel: translate(locale, `missions.loc.${id}.short` as MessageKey),
+  };
+}
+
 export function getMissionsForEnvironment(
   env: EnvironmentType,
   currentSteps: number,
   checkedInToday: boolean,
-  treadmillActive = false
+  treadmillActive = false,
+  locale: Locale = 'es'
 ): DailyMission[] {
   const goal = ENVIRONMENTS[env].dailyStepsGoal;
+  const tx = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, `missions.mission.${key}` as MessageKey, params);
+  const unit = (u: 'min' | 'pasos' | 'check') =>
+    translate(locale, `missions.unit.${u}` as MessageKey);
 
   const envRoutines: Record<EnvironmentType, DailyMission[]> = {
     tierra: [
       {
         id: 'env-tierra-cardio',
-        title: 'Acondicionamiento aeróbico 1g',
-        description: 'Preparación cardiovascular pre-misión o readaptación en Tierra',
+        title: tx('env-tierra-cardio.title'),
+        description: tx('env-tierra-cardio.desc'),
         category: 'exercise',
         targetValue: 30,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'tierra',
       },
       {
         id: 'env-tierra-core',
-        title: 'Estabilidad vertebral y core',
-        description: 'Fortalecimiento postural bajo gravedad terrestre',
+        title: tx('env-tierra-core.title'),
+        description: tx('env-tierra-core.desc'),
         category: 'exercise',
         targetValue: 15,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'tierra',
       },
@@ -626,23 +652,23 @@ export function getMissionsForEnvironment(
     nave: [
       {
         id: 'env-nave-ared',
-        title: 'Rutina resistiva ARED',
-        description: 'Ejercicios de fuerza para evitar atrofia en 0g',
+        title: tx('env-nave-ared.title'),
+        description: tx('env-nave-ared.desc'),
         category: 'exercise',
         targetValue: 25,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'nave',
       },
       {
         id: 'env-nave-stretch',
-        title: 'Descompresión espinal',
-        description: 'Estiramiento lumbar y cervical en cabina',
+        title: tx('env-nave-stretch.title'),
+        description: tx('env-nave-stretch.desc'),
         category: 'exercise',
         targetValue: 10,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'nave',
       },
@@ -650,23 +676,23 @@ export function getMissionsForEnvironment(
     estacion: [
       {
         id: 'env-estacion-ared',
-        title: 'Resistencia ARED en EEI',
-        description: 'Carga axial y tonificación muscular en estación orbital',
+        title: tx('env-estacion-ared.title'),
+        description: tx('env-estacion-ared.desc'),
         category: 'exercise',
         targetValue: 25,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'estacion',
       },
       {
         id: 'env-estacion-sans',
-        title: 'Control cefálico y postura 0g',
-        description: 'Pausa visual y movilidad cervical en módulos orbitales',
+        title: tx('env-estacion-sans.title'),
+        description: tx('env-estacion-sans.desc'),
         category: 'exercise',
         targetValue: 10,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'estacion',
       },
@@ -674,23 +700,23 @@ export function getMissionsForEnvironment(
     luna: [
       {
         id: 'env-luna-eva',
-        title: 'Movilidad post-EVA',
-        description: 'Descarga de rodillas y hombros tras caminata lunar',
+        title: tx('env-luna-eva.title'),
+        description: tx('env-luna-eva.desc'),
         category: 'exercise',
         targetValue: 20,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'luna',
       },
       {
         id: 'env-luna-balance',
-        title: 'Control postural 0.16g',
-        description: 'Ejercicios de equilibrio y tobillo',
+        title: tx('env-luna-balance.title'),
+        description: tx('env-luna-balance.desc'),
         category: 'exercise',
         targetValue: 15,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'luna',
       },
@@ -698,23 +724,23 @@ export function getMissionsForEnvironment(
     marte: [
       {
         id: 'env-marte-load',
-        title: 'Entrenamiento de carga 0.38g',
-        description: 'Fortalecimiento de cuádriceps y zona dorsal',
+        title: tx('env-marte-load.title'),
+        description: tx('env-marte-load.desc'),
         category: 'exercise',
         targetValue: 30,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'marte',
       },
       {
         id: 'env-marte-resp',
-        title: 'Control respiratorio y polvo',
-        description: 'Revisión de SpO2 y respiración guiada post-hábitat',
+        title: tx('env-marte-resp.title'),
+        description: tx('env-marte-resp.desc'),
         category: 'exercise',
         targetValue: 10,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'marte',
       },
@@ -725,25 +751,23 @@ export function getMissionsForEnvironment(
     env === 'nave' || env === 'estacion'
       ? {
         id: 'treadmill-steps',
-        title: treadmillActive ? 'Rutina de caminadora T2' : 'Caminadora 0g (Opcional)',
-        description: treadmillActive
-          ? 'Contando pasos desde el reloj durante la rutina'
-          : 'En 0g no hay pasos; actívala si usas caminadora',
+        title: tx(treadmillActive ? 'treadmill-on.title' : 'treadmill-off.title'),
+        description: tx(treadmillActive ? 'treadmill-on.desc' : 'treadmill-off.desc'),
         category: 'treadmill',
         targetValue: goal,
         currentValue: treadmillActive ? currentSteps : 0,
-        unit: 'pasos',
+        unit: unit('pasos'),
         completed: treadmillActive && currentSteps >= goal,
         environment: env,
       }
       : {
         id: 'daily-steps',
-        title: `Meta de pasos (${ENVIRONMENTS[env].shortLabel})`,
-        description: 'Lectura automática desde el smartwatch',
+        title: tx('daily-steps.title', { place: getEnvironmentText(locale, env).shortLabel }),
+        description: tx('daily-steps.desc'),
         category: 'steps',
         targetValue: goal,
         currentValue: currentSteps,
-        unit: 'pasos',
+        unit: unit('pasos'),
         completed: currentSteps >= goal,
         environment: env,
       };
@@ -751,12 +775,12 @@ export function getMissionsForEnvironment(
   return [
     {
       id: 'daily-checkin',
-      title: 'Check-in médico diario',
-      description: 'Confirmar estado general para mantener tu racha',
+      title: tx('daily-checkin.title'),
+      description: tx('daily-checkin.desc'),
       category: 'checkin',
       targetValue: 1,
       currentValue: checkedInToday ? 1 : 0,
-      unit: 'check',
+      unit: unit('check'),
       completed: checkedInToday,
       environment: 'all',
     },
@@ -765,17 +789,46 @@ export function getMissionsForEnvironment(
   ];
 }
 
+/**
+ * Re-traduce al idioma activo una misión recibida del backend cuando su id es una de las
+ * misiones conocidas de la app; los ids desconocidos conservan el texto del backend.
+ */
+export function localizeMission(
+  m: DailyMission,
+  locale: Locale,
+  env: EnvironmentType,
+  treadmillActive: boolean
+): DailyMission {
+  const has = (key: string) => key in MESSAGES.es;
+  const baseId =
+    m.id === 'treadmill-steps' ? (treadmillActive ? 'treadmill-on' : 'treadmill-off') : m.id;
+  const titleKey = `missions.mission.${baseId}.title`;
+  const descKey = `missions.mission.${baseId}.desc`;
+  const unitKey = `missions.unit.${m.unit}`;
+  return {
+    ...m,
+    title: has(titleKey)
+      ? translate(locale, titleKey as MessageKey, {
+          place: getEnvironmentText(locale, env).shortLabel,
+        })
+      : m.title,
+    description: has(descKey) ? translate(locale, descKey as MessageKey) : m.description,
+    unit: has(unitKey) ? translate(locale, unitKey as MessageKey) : m.unit,
+  };
+}
+
 // Endpoint para consultar misiones rotadas y aleatorias con dificultad desde el backend
 export async function fetchDailyMissionsFromBackend(
   env: EnvironmentType,
   currentSteps = 0,
   checkedInToday = false,
   treadmillActive = false,
-  dateIso?: string
+  dateIso?: string,
+  locale: Locale = 'es'
 ): Promise<DailyMission[]> {
   const authHeadersList = getMobileFallbackAuthHeaders();
   if (!canUseBackend(authHeadersList)) {
-    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
   }
 
   const queryParams = new URLSearchParams({
@@ -800,17 +853,17 @@ export async function fetchDailyMissionsFromBackend(
     }
 
     if (!response || !response.ok) {
-      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
     }
 
     const data: unknown = await response.json();
     if (!Array.isArray(data)) {
-      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
     }
 
     return data.map((item: any) => ({
       id: String(item.id),
-      title: String(item.title || item.titulo || 'Misión diaria'),
+      title: String(item.title || item.titulo || translate(locale, 'missions.mission.fallback.title')),
       description: String(item.description || item.descripcion || ''),
       category: item.category || item.categoria || 'exercise',
       targetValue: Number(item.targetValue ?? item.valorObjetivo ?? 1),
@@ -820,7 +873,7 @@ export async function fetchDailyMissionsFromBackend(
       environment: item.environment || item.entorno || env,
     }));
   } catch {
-    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
   }
 }
 
@@ -1174,8 +1227,15 @@ export async function fetchAstronautLocationFromBackend(): Promise<{
         if (!rawText.trim()) continue;
         const data: unknown = JSON.parse(rawText);
         if (isRecord(data)) {
-          const entorno = data.entorno ?? data.environment;
-          if (isEnvironmentType(entorno)) {
+          const raw = String(data.entorno ?? data.environment ?? '').toLowerCase().trim();
+          let entorno: EnvironmentType | null = null;
+          if (raw === 'tierra' || raw === 'earth') entorno = 'tierra';
+          else if (raw === 'nave' || raw === 'spaceship' || raw === 'ship') entorno = 'nave';
+          else if (raw === 'estacion' || raw === 'station') entorno = 'estacion';
+          else if (raw === 'luna' || raw === 'moon') entorno = 'luna';
+          else if (raw === 'marte' || raw === 'mars') entorno = 'marte';
+
+          if (entorno) {
             return {
               entorno,
               label: typeof data.etiqueta === 'string' ? data.etiqueta : (data.label as string) || entorno,
@@ -1605,4 +1665,192 @@ export async function syncHealthCheckToBackend(
     return { synced: false };
   }
 }
+
+export interface AstronautStreak {
+  rachaActual: number;
+  rachaMaxima: number;
+  totalDiasCompletados: number;
+  ultimaFechaCompletada: string | null;
+  todasCompletadasHoy: boolean;
+}
+
+export interface DailyMissionProgressResponse {
+  fecha: string;
+  totalMisiones: number;
+  misionesCompletadas: number;
+  todasCompletadas: boolean;
+  puntoRachaOtorgado: boolean;
+  racha: AstronautStreak;
+  misiones: Array<{
+    misionId: string;
+    completada: boolean;
+    valorActual: number;
+    valorObjetivo: number;
+  }>;
+}
+
+// Consulta la racha acumulada del astronauta desde la base de datos
+export async function fetchAstronautStreakFromBackend(): Promise<AstronautStreak | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const path = '/dashboard/missions/streak';
+  try {
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'GET',
+        headers: { ...headers, Accept: 'application/json' },
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (response && response.ok) {
+      const data: unknown = await response.json();
+      if (isRecord(data)) {
+        return {
+          rachaActual: Number(data.rachaActual ?? data.currentStreak ?? 0),
+          rachaMaxima: Number(data.rachaMaxima ?? data.maxStreak ?? 0),
+          totalDiasCompletados: Number(data.totalDiasCompletados ?? data.totalCompletedDays ?? 0),
+          ultimaFechaCompletada: (data.ultimaFechaCompletada as string) ?? (data.lastCompletedDate as string) ?? null,
+          todasCompletadasHoy: Boolean(data.todasCompletadasHoy ?? data.allCompletedToday),
+        };
+      }
+    }
+  } catch {
+    // Si no hay red, opera localmente
+  }
+  return null;
+}
+
+// Consulta el cumplimiento de misiones del día desde el backend
+export async function fetchDailyMissionProgressFromBackend(
+  fecha?: string
+): Promise<{
+  misiones: Record<string, boolean>;
+  todasCompletadas: boolean;
+  racha: AstronautStreak;
+} | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const queryFecha = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+  const path = `/dashboard/missions/daily/progress${queryFecha}`;
+  try {
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'GET',
+        headers: { ...headers, Accept: 'application/json' },
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (response && response.ok) {
+      const data: unknown = await response.json();
+      if (isRecord(data)) {
+        const misionesMap: Record<string, boolean> = {};
+        if (Array.isArray(data.misiones)) {
+          for (const m of data.misiones) {
+            if (isRecord(m) && typeof m.misionId === 'string') {
+              misionesMap[m.misionId] = Boolean(m.completada ?? m.completed);
+            }
+          }
+        }
+        const rachaRaw = isRecord(data.racha) ? data.racha : {};
+        const racha: AstronautStreak = {
+          rachaActual: Number(rachaRaw.rachaActual ?? rachaRaw.currentStreak ?? 0),
+          rachaMaxima: Number(rachaRaw.rachaMaxima ?? rachaRaw.maxStreak ?? 0),
+          totalDiasCompletados: Number(rachaRaw.totalDiasCompletados ?? rachaRaw.totalCompletedDays ?? 0),
+          ultimaFechaCompletada: (rachaRaw.ultimaFechaCompletada as string) ?? null,
+          todasCompletadasHoy: Boolean(rachaRaw.todasCompletadasHoy),
+        };
+        const resumen = isRecord(data.resumen) ? data.resumen : null;
+        return {
+          misiones: misionesMap,
+          todasCompletadas: Boolean(resumen?.todasCompletadas ?? resumen?.allCompleted),
+          racha,
+        };
+      }
+    }
+  } catch {
+    // Si no hay red, continúa
+  }
+  return null;
+}
+
+// Sincroniza el cumplimiento de todas las misiones del día y actualiza la racha en la base de datos
+export async function syncDailyMissionsProgressToBackend(
+  misiones: DailyMission[],
+  fecha?: string
+): Promise<DailyMissionProgressResponse | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const payload = {
+    fecha: fecha || getTodayIsoDate(),
+    misiones: misiones.map((m) => ({
+      misionId: m.id,
+      completada: m.completed,
+      valorActual: m.currentValue,
+      valorObjetivo: m.targetValue,
+    })),
+  };
+
+  const path = '/dashboard/missions/daily/progress';
+  try {
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'PUT',
+        headers: {
+          ...baseHeaders,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (response && response.ok) {
+      const data: unknown = await response.json();
+      if (isRecord(data)) {
+        const rachaRaw = isRecord(data.racha) ? data.racha : {};
+        return {
+          fecha: (data.fecha as string) || payload.fecha,
+          totalMisiones: Number(data.totalMisiones || 0),
+          misionesCompletadas: Number(data.misionesCompletadas || 0),
+          todasCompletadas: Boolean(data.todasCompletadas),
+          puntoRachaOtorgado: Boolean(data.puntoRachaOtorgado),
+          racha: {
+            rachaActual: Number(rachaRaw.rachaActual ?? rachaRaw.currentStreak ?? 0),
+            rachaMaxima: Number(rachaRaw.rachaMaxima ?? rachaRaw.maxStreak ?? 0),
+            totalDiasCompletados: Number(rachaRaw.totalDiasCompletados ?? rachaRaw.totalCompletedDays ?? 0),
+            ultimaFechaCompletada: (rachaRaw.ultimaFechaCompletada as string) ?? null,
+            todasCompletadasHoy: Boolean(rachaRaw.todasCompletadasHoy),
+          },
+          misiones: Array.isArray(data.misiones)
+            ? data.misiones.map((item: any) => ({
+                misionId: item.misionId,
+                completada: Boolean(item.completada),
+                valorActual: Number(item.valorActual || 0),
+                valorObjetivo: Number(item.valorObjetivo || 1),
+              }))
+            : [],
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[mission-api] No se pudo sincronizar el progreso de misiones con el backend:', err);
+  }
+  return null;
+}
+
 

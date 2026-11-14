@@ -2,7 +2,11 @@ import type { EnvironmentType, MuscleData } from '../types/dashboard';
 import type { AssistantEnvironment, AssistantQuestion } from './assistant-api';
 
 const ENVIRONMENTS: Record<EnvironmentType, AssistantEnvironment> = {
-  tierra: 'earth', nave: 'spacecraft', luna: 'moon', marte: 'mars',
+  tierra: 'earth',
+  nave: 'spacecraft',
+  estacion: 'spacecraft',
+  luna: 'moon',
+  marte: 'mars',
 };
 
 export function toAssistantEnvironment(environment: EnvironmentType): AssistantEnvironment {

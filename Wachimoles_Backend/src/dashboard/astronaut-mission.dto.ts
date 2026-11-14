@@ -12,19 +12,19 @@ import { UbicacionEspacial, EstadoMision, UbicacionEntorno } from "./dashboard.t
 
 export class GuardarEstadoMisionDto {
   @IsOptional()
-  @IsIn(["tierra", "estacion", "luna", "marte"])
+  @IsIn(["earth", "station", "moon", "mars", "tierra", "estacion", "luna", "marte"])
   origen?: UbicacionEspacial;
 
   @IsOptional()
-  @IsIn(["tierra", "estacion", "luna", "marte"])
+  @IsIn(["earth", "station", "moon", "mars", "tierra", "estacion", "luna", "marte"])
   origin?: UbicacionEspacial;
 
   @IsOptional()
-  @IsIn(["tierra", "estacion", "luna", "marte"])
+  @IsIn(["earth", "station", "moon", "mars", "tierra", "estacion", "luna", "marte"])
   destino?: UbicacionEspacial;
 
   @IsOptional()
-  @IsIn(["tierra", "estacion", "luna", "marte"])
+  @IsIn(["earth", "station", "moon", "mars", "tierra", "estacion", "luna", "marte"])
   destination?: UbicacionEspacial;
 
   @IsOptional()
@@ -86,12 +86,12 @@ export class GuardarEstadoMisionDto {
   relativeProgressPct?: number;
 
   @IsOptional()
-  @IsIn(["tierra", "nave", "estacion", "luna", "marte"])
-  entornoActual?: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  @IsIn(["earth", "spaceship", "station", "moon", "mars", "tierra", "nave", "estacion", "luna", "marte"])
+  entornoActual?: UbicacionEntorno;
 
   @IsOptional()
-  @IsIn(["tierra", "nave", "estacion", "luna", "marte"])
-  currentEnvironment?: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  @IsIn(["earth", "spaceship", "station", "moon", "mars", "tierra", "nave", "estacion", "luna", "marte"])
+  currentEnvironment?: UbicacionEntorno;
 
   @IsOptional()
   @IsIn(["scheduled", "in_transit", "arrived"])
@@ -124,11 +124,11 @@ export class GuardarUbicacionAstronautaDto {
   userId?: string;
 
   @IsOptional()
-  @IsIn(["tierra", "nave", "estacion", "luna", "marte"])
+  @IsIn(["earth", "spaceship", "station", "moon", "mars", "tierra", "nave", "estacion", "luna", "marte"])
   entorno?: UbicacionEntorno;
 
   @IsOptional()
-  @IsIn(["tierra", "nave", "estacion", "luna", "marte"])
+  @IsIn(["earth", "spaceship", "station", "moon", "mars", "tierra", "nave", "estacion", "luna", "marte"])
   environment?: UbicacionEntorno;
 }
 

@@ -32,8 +32,10 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
     it("obtiene el catálogo de misiones", async () => {
       const misiones = await missionsController.obtenerCatalogoMisiones({});
       expect(misiones.length).toBeGreaterThan(5);
-      expect(misiones.some((m) => m.categoria === "steps" && m.dificultad === "baja")).toBe(true);
-      expect(misiones.some((m) => m.categoria === "steps" && m.dificultad === "alta")).toBe(true);
+      expect(misiones.some((m) => m.categoria === "steps" && (m.dificultad === "low" || m.dificultad === "baja"))).toBe(true);
+      expect(misiones.some((m) => m.categoria === "steps" && (m.dificultad === "high" || m.dificultad === "alta"))).toBe(true);
+      expect(misiones.some((m) => m.id === "mars-load-high")).toBe(true);
+      expect(misiones.some((m) => m.id === "moon-steps-low")).toBe(true);
     });
 
     it("rota misiones del día con diferentes dificultades de pasos (menos pasos vs más pasos)", async () => {
@@ -45,7 +47,7 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
       });
       const misionPasosBaja = misionesDiaBaja.find((m) => m.categoria === "steps");
       expect(misionPasosBaja).toBeDefined();
-      expect(misionPasosBaja?.dificultad).toBe("baja");
+      expect(["low", "baja"]).toContain(misionPasosBaja?.dificultad);
       expect(misionPasosBaja?.valorObjetivo).toBeLessThan(5000);
 
       // Día con dificultad alta (más pasos)
@@ -56,7 +58,7 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
       });
       const misionPasosAlta = misionesDiaAlta.find((m) => m.categoria === "steps");
       expect(misionPasosAlta).toBeDefined();
-      expect(misionPasosAlta?.dificultad).toBe("alta");
+      expect(["high", "alta"]).toContain(misionPasosAlta?.dificultad);
       expect(misionPasosAlta?.valorObjetivo).toBeGreaterThan(9000);
 
       // En nave usa caminadora
@@ -209,8 +211,8 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
 
       expect(resultado.entorno).toBe("marte");
       expect(resultado.environment).toBe("marte");
-      expect(resultado.etiqueta).toBe("Superficie de Marte");
-      expect(resultado.gravedadEtiqueta).toBe("0.38g Gravedad Marciana");
+      expect(resultado.etiqueta).toBe("Mars Surface");
+      expect(resultado.gravedadEtiqueta).toBe("0.38g Martian Gravity");
       expect(resultado.usuarioId).toBe(mockUserId);
       expect(mockFetch).toHaveBeenCalled();
       mockFetch.mockRestore();
@@ -235,9 +237,112 @@ describe("Misiones y Estado Relativo del Astronauta", () => {
 
       expect(resultado.entorno).toBe("luna");
       expect(resultado.environment).toBe("luna");
-      expect(resultado.etiqueta).toBe("Base Lunar");
-      expect(resultado.gravedadEtiqueta).toBe("0.16g Gravedad Lunar");
+      expect(resultado.etiqueta).toBe("Lunar Base");
+      expect(resultado.gravedadEtiqueta).toBe("0.16g Lunar Gravity");
       expect(mockFetch).toHaveBeenCalled();
+      mockFetch.mockRestore();
+    });
+  });
+
+  describe("Cumplimiento de Misiones Diarias y Racha Acumulada", () => {
+    it("guarda el progreso de misiones pero NO otorga racha si faltan tareas por completar", async () => {
+      // Mock para consultar racha actual (racha = 0)
+      const mockFetch = jest
+        .spyOn(global, "fetch")
+        // Lectura de racha previa
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify([
+              {
+                user_id: mockUserId,
+                racha_actual: 0,
+                racha_maxima: 0,
+                total_dias_completados: 0,
+                ultima_fecha_completada: null,
+                actualizado_en: "2026-11-14T00:00:00Z"
+              }
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        )
+        // Guardar misión 1
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+        // Guardar misión 2
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+        // Consultar estado previo del día
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+        // Guardar resumen del día
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }));
+
+      const resultado = await missionsController.sincronizarProgresoMisionesPut(mockReq, {
+        fecha: "2026-11-14",
+        misiones: [
+          { misionId: "checkin-diario", completada: true, valorActual: 1, valorObjetivo: 1 },
+          { misionId: "tierra-pasos-media", completada: false, valorActual: 3000, valorObjetivo: 7000 }
+        ]
+      });
+
+      expect(resultado.totalMisiones).toBe(2);
+      expect(resultado.misionesCompletadas).toBe(1);
+      expect(resultado.todasCompletadas).toBe(false);
+      expect(resultado.puntoRachaOtorgado).toBe(false);
+      expect(resultado.racha.rachaActual).toBe(0);
+      mockFetch.mockRestore();
+    });
+
+    it("otorga 1 punto de racha y acumula en la base de datos cuando TODAS las misiones del día se completan", async () => {
+      // Simular racha previa de 3 días donde ayer se completó
+      const mockFetch = jest
+        .spyOn(global, "fetch")
+        // Guardar misión 1
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+        // Guardar misión 2
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+        // Consultar si ya se había otorgado punto hoy (no, punto_racha_otorgado: false)
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify([{ punto_racha_otorgado: false }]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        )
+        // Consultar racha actual (racha = 3, última completada: ayer 2026-11-13)
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify([
+              {
+                user_id: mockUserId,
+                racha_actual: 3,
+                racha_maxima: 5,
+                total_dias_completados: 3,
+                ultima_fecha_completada: "2026-11-13",
+                actualizado_en: "2026-11-13T20:00:00Z"
+              }
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        )
+        // Guardar nueva racha (upsert a astronaut_streaks)
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+        // Guardar resumen del día (upsert a daily_mission_days)
+        .mockResolvedValueOnce(new Response("[]", { status: 200 }));
+
+      const resultado = await missionsController.sincronizarProgresoMisionesPut(mockReq, {
+        fecha: "2026-11-14",
+        misiones: [
+          { misionId: "checkin-diario", completada: true, valorActual: 1, valorObjetivo: 1 },
+          { misionId: "tierra-pasos-media", completada: true, valorActual: 7000, valorObjetivo: 7000 }
+        ]
+      });
+
+      expect(resultado.totalMisiones).toBe(2);
+      expect(resultado.misionesCompletadas).toBe(2);
+      expect(resultado.todasCompletadas).toBe(true);
+      expect(resultado.puntoRachaOtorgado).toBe(true);
+      // Racha previa era 3 y hoy completó todas: pasa a 4 días
+      expect(resultado.racha.rachaActual).toBe(4);
+      expect(resultado.racha.totalDiasCompletados).toBe(4);
+      expect(resultado.racha.ultimaFechaCompletada).toBe("2026-11-14");
+      expect(resultado.racha.todasCompletadasHoy).toBe(true);
       mockFetch.mockRestore();
     });
   });

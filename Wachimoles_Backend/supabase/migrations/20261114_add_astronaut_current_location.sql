@@ -5,7 +5,7 @@
 create table if not exists public.astronaut_locations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  entorno text not null check (entorno in ('tierra', 'nave', 'estacion', 'luna', 'marte')),
+  entorno text not null check (entorno in ('earth', 'spaceship', 'station', 'moon', 'mars', 'tierra', 'nave', 'estacion', 'luna', 'marte')),
   actualizado_en timestamptz not null default now(),
   constraint astronaut_locations_user_unique unique (user_id)
 );

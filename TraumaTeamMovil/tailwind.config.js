@@ -5,9 +5,6 @@ module.exports = {
   darkMode: 'class',
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
-  // The app has a single light theme (no `dark:` classes). 'class' stops NativeWind on web from
-  // throwing when something (OS theme, extensions) toggles a class on <html>.
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -21,6 +18,13 @@ module.exports = {
           cyanEdge: '#7dd3fc',
           cyanDeep: '#0284c7',
           night: '#0a0f1d',
+          // Dark ("space night") palette for `dark:` variants, mirrors src/theme/palette.ts
+          nightBg: '#05070f',
+          nightAlt: '#111a2e',
+          nightLine: '#1e293b',
+          nightInk: '#f1f5f9',
+          nightMuted: '#a3b1c6',
+          nightSubtle: '#8391a7',
         },
       },
       fontFamily: {

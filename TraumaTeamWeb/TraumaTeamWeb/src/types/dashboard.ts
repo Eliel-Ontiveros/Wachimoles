@@ -14,8 +14,8 @@ export type RiskTier = 'normal' | 'yellow' | 'orange' | 'red';
 export type HealthStatusLevel = 'normal' | 'warning' | 'critical';
 export type MoodScore = 1 | 2 | 3 | 4 | 5;
 
-export type EnvironmentType = 'tierra' | 'nave' | 'luna' | 'marte';
-export type SpaceLocation = 'tierra' | 'nave' | 'luna' | 'marte';
+export type EnvironmentType = 'tierra' | 'nave' | 'estacion' | 'luna' | 'marte';
+export type SpaceLocation = 'tierra' | 'nave' | 'estacion' | 'luna' | 'marte';
 
 export interface DashboardSample {
   id: number;

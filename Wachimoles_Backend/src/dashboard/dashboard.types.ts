@@ -109,9 +109,20 @@ export type CategoriaMision =
   | "checkin"
   | "injury_check";
 
-export type DificultadMision = "baja" | "media" | "alta";
+export type DificultadMision =
+  | "low"
+  | "medium"
+  | "high"
+  | "baja"
+  | "media"
+  | "alta";
 
 export type EntornoMision =
+  | "earth"
+  | "spaceship"
+  | "station"
+  | "moon"
+  | "mars"
   | "tierra"
   | "nave"
   | "estacion"
@@ -119,7 +130,15 @@ export type EntornoMision =
   | "marte"
   | "all";
 
-export type UbicacionEspacial = "tierra" | "estacion" | "luna" | "marte";
+export type UbicacionEspacial =
+  | "earth"
+  | "station"
+  | "moon"
+  | "mars"
+  | "tierra"
+  | "estacion"
+  | "luna"
+  | "marte";
 
 export type EstadoMision = "scheduled" | "in_transit" | "arrived";
 
@@ -162,7 +181,7 @@ export interface EstadoMisionAstronauta {
   diasTotales: number;
   diaActual: number;
   porcentajeProgresoRelativo: number;
-  entornoActual: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  entornoActual: UbicacionEntorno;
   estado: EstadoMision;
   llegadaAnticipada: boolean;
   creadoEn: string;
@@ -176,12 +195,22 @@ export interface EstadoMisionAstronauta {
   totalDays?: number;
   currentDay?: number;
   relativeProgressPct?: number;
-  currentEnvironment?: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  currentEnvironment?: UbicacionEntorno;
   status?: EstadoMision;
   arrivedEarly?: boolean;
 }
 
-export type UbicacionEntorno = "tierra" | "nave" | "estacion" | "luna" | "marte";
+export type UbicacionEntorno =
+  | "earth"
+  | "spaceship"
+  | "station"
+  | "moon"
+  | "mars"
+  | "tierra"
+  | "nave"
+  | "estacion"
+  | "luna"
+  | "marte";
 
 export interface UbicacionAstronauta {
   usuarioId: string;
@@ -203,4 +232,92 @@ export interface SupabaseAstronautLocationRow {
   entorno: UbicacionEntorno;
   actualizado_en: string;
 }
+
+export interface MisionDiariaProgreso {
+  misionId: string;
+  completada: boolean;
+  valorActual: number;
+  valorObjetivo: number;
+  actualizadoEn?: string;
+  // Campos en inglés
+  missionId?: string;
+  completed?: boolean;
+  currentValue?: number;
+  targetValue?: number;
+}
+
+export interface ResumenDiaMisiones {
+  fecha: string;
+  totalMisiones: number;
+  misionesCompletadas: number;
+  todasCompletadas: boolean;
+  puntoRachaOtorgado: boolean;
+  actualizadoEn?: string;
+  // Campos en inglés
+  date?: string;
+  totalMissions?: number;
+  completedMissions?: number;
+  allCompleted?: boolean;
+  streakPointAwarded?: boolean;
+}
+
+export interface RachaAstronauta {
+  usuarioId: string;
+  rachaActual: number;
+  rachaMaxima: number;
+  totalDiasCompletados: number;
+  ultimaFechaCompletada: string | null;
+  todasCompletadasHoy: boolean;
+  actualizadoEn: string;
+  // Campos en inglés
+  userId?: string;
+  currentStreak?: number;
+  maxStreak?: number;
+  totalCompletedDays?: number;
+  lastCompletedDate?: string | null;
+  allCompletedToday?: boolean;
+  updatedAt?: string;
+}
+
+export interface RespuestaProgresoMisiones {
+  fecha: string;
+  totalMisiones: number;
+  misionesCompletadas: number;
+  todasCompletadas: boolean;
+  puntoRachaOtorgado: boolean;
+  racha: RachaAstronauta;
+  misiones: MisionDiariaProgreso[];
+}
+
+export interface SupabaseDailyMissionCompletionRow {
+  id: string;
+  user_id: string;
+  fecha: string;
+  mision_id: string;
+  completada: boolean;
+  valor_actual: number;
+  valor_objetivo: number;
+  actualizado_en: string;
+}
+
+export interface SupabaseDailyMissionDayRow {
+  id: string;
+  user_id: string;
+  fecha: string;
+  total_misiones: number;
+  misiones_completadas: number;
+  todas_completadas: boolean;
+  punto_racha_otorgado: boolean;
+  actualizado_en: string;
+}
+
+export interface SupabaseAstronautStreakRow {
+  user_id: string;
+  racha_actual: number;
+  racha_maxima: number;
+  total_dias_completados: number;
+  ultima_fecha_completada: string | null;
+  actualizado_en: string;
+}
+
 
