@@ -2,14 +2,18 @@ import '../utils/web-interop-init';
 import '../global.css';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
-import { LogBox, Platform } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { LogBox, Platform, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 
 import { CriticalAlertToaster } from '@/components/trauma/CriticalAlertToaster';
 import { DrawerProvider } from '@/components/trauma/DrawerProvider';
 import { MissionOnboardingModal } from '@/components/trauma/MissionOnboardingModal';
 import { MissionProvider } from '@/components/trauma/MissionProvider';
 import { I18nProvider } from '@/i18n/I18nProvider';
+import { SettingsProvider } from '@/settings/SettingsProvider';
+import { useAppTheme } from '@/theme';
 import { VoiceFab } from '@/voice/VoiceButton';
 import { VoiceProvider } from '@/voice/VoiceProvider';
 import { StartupSplashAnimation } from '@/components/trauma/StartupSplashAnimation';
@@ -30,6 +34,20 @@ console.warn = (...args: unknown[]) => {
 
 SplashScreen.preventAutoHideAsync();
 
+/** Fondo raíz y barra de estado según el tema efectivo. */
+function ThemedRoot({ children }: { children: ReactNode }) {
+  const { colors, scheme } = useAppTheme();
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.bg).catch(() => {});
+  }, [colors.bg]);
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      {children}
+    </View>
+  );
+}
+
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
 
@@ -38,7 +56,9 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <SettingsProvider>
     <I18nProvider>
+      <ThemedRoot>
       <MissionProvider>
         <DrawerProvider>
           <VoiceProvider>
@@ -55,6 +75,8 @@ export default function RootLayout() {
           </VoiceProvider>
         </DrawerProvider>
       </MissionProvider>
+      </ThemedRoot>
     </I18nProvider>
+    </SettingsProvider>
   );
 }

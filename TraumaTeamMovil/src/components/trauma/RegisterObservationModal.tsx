@@ -32,7 +32,10 @@ import {
   BodyRegionCategory,
   MuscleData,
   MuscleObservation,
+  UPDATED_NOW,
+  categoryNameKey,
   getPainColorHex,
+  muscleNameKey,
 } from './BodyModelViewer';
 import { useMission } from './mission-context';
 import type { InjuryPhoto } from '../../types/mission';
@@ -41,6 +44,8 @@ import {
   parseConditionUpdates,
   serializeConditionUpdates,
 } from '../../utils/condition-updates';
+import { useI18n } from '@/i18n/I18nProvider';
+import { useAppTheme } from '@/theme';
 import { DictationButton } from '@/voice/VoiceButton';
 
 // Modal para registrar o agregar actualizaciones a la observación clínica de una zona
@@ -67,11 +72,11 @@ interface RegisterObservationModalProps {
 // Icono vectorial por categoría anatómica
 export function RegionCategoryIcon({
   category,
-  color = '#38bdf8',
+  color,
   size = 15,
 }: {
   category: BodyRegionCategory;
-  color?: string;
+  color: string;
   size?: number;
 }) {
   if (category === 'Cabeza y cuello') {
@@ -154,10 +159,11 @@ export function MinimalPainScaleBar({
   onSelectLevel?: (level: number) => void;
   compact?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <View className="w-full">
       {/* Tira continua de gradiente */}
-      <View className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+      <View className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-trauma-nightAlt">
         <Svg width="100%" height="100%">
           <Defs>
             <LinearGradient id="painGradientMinimal" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -175,15 +181,15 @@ export function MinimalPainScaleBar({
         <View className="mt-1 flex-row items-center justify-between px-0.5">
           <View className="flex-row items-center">
             <View className="h-1.5 w-1.5 rounded-full bg-[#fde047] mr-1" />
-            <Text className="font-mono text-[9px] text-slate-400">1 Leve</Text>
+            <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.pain.mild')}</Text>
           </View>
           <View className="flex-row items-center">
             <View className="h-1.5 w-1.5 rounded-full bg-[#f97316] mr-1" />
-            <Text className="font-mono text-[9px] text-slate-400">5 Moderado</Text>
+            <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.pain.moderate')}</Text>
           </View>
           <View className="flex-row items-center">
             <View className="h-1.5 w-1.5 rounded-full bg-[#991b1b] mr-1" />
-            <Text className="font-mono text-[9px] text-slate-400">10 Intenso</Text>
+            <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.pain.intense')}</Text>
           </View>
         </View>
       )}
@@ -192,7 +198,7 @@ export function MinimalPainScaleBar({
 }
 
 // Icono de limitación funcional
-function FunctionalMotionIcon({ size = 18, color = '#334155' }: { size?: number; color?: string }) {
+function FunctionalMotionIcon({ size = 18, color }: { size?: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -217,6 +223,11 @@ export function RegisterObservationModal({
   onSave,
 }: RegisterObservationModalProps) {
   const { addInjuryPhoto, injuryPhotos } = useMission();
+  const { t } = useI18n();
+  const { colors, scheme } = useAppTheme();
+  const isDark = scheme === 'dark';
+  const iconSlate = isDark ? colors.text : '#334155';
+  const iconSlate2 = isDark ? colors.textMuted : '#475569';
   const [painIntensity, setPainIntensity] = useState<number>(7);
   const [swelling, setSwelling] = useState<boolean>(true);
   const [functionalLimitation, setFunctionalLimitation] = useState<boolean>(false);
@@ -289,7 +300,7 @@ export function RegisterObservationModal({
       if (Platform.OS !== 'web') {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (!perm.granted) {
-          Alert.alert('Permiso requerido', 'Activa la cámara para adjuntar foto.');
+          Alert.alert(t('body.alert.permTitle'), t('body.register.cameraMsg'));
           return;
         }
       }
@@ -317,7 +328,7 @@ export function RegisterObservationModal({
         setCapturedPhoto(res.assets[0]);
       }
     } catch {
-      Alert.alert('Error', 'No se pudo seleccionar la imagen.');
+      Alert.alert(t('body.alert.errorTitle'), t('body.register.pickError'));
     }
   };
 
@@ -369,7 +380,7 @@ export function RegisterObservationModal({
           swelling: isCured ? false : swelling,
           functionalLimitation: isCured ? false : functionalLimitation,
           notes: serializedDescription,
-          updatedAt: 'Ahora mismo',
+          updatedAt: UPDATED_NOW,
         },
         {
           isCured,
@@ -380,8 +391,8 @@ export function RegisterObservationModal({
     } catch (error: unknown) {
       console.error('[RegisterObservationModal] Error al guardar:', error);
       Alert.alert(
-        'No se pudo guardar',
-        error instanceof Error ? error.message : 'Ocurrió un error al guardar la actualización.'
+        t('body.register.saveFailTitle'),
+        error instanceof Error ? error.message : t('body.register.saveFailMsg')
       );
     } finally {
       setIsSaving(false);
@@ -404,11 +415,11 @@ export function RegisterObservationModal({
 
   const percent = (painIntensity / 10) * 100;
   // Color gradual actual para el slider (Amarillo en 1 -> Naranja en 5 -> Rojo en 10)
-  const currentPainColor = painIntensity > 0 ? getPainColorHex(painIntensity) : '#10b981';
+  const currentPainColor = painIntensity > 0 ? getPainColorHex(painIntensity) : colors.accent;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#f4f8fb' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: isDark ? colors.bg : '#f4f8fb' }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -418,19 +429,19 @@ export function RegisterObservationModal({
               <Polygon
                 points="95,10 120,24 120,52 95,66 70,52 70,24"
                 fill="none"
-                stroke="#cbd5e1"
+                stroke={isDark ? colors.border : '#cbd5e1'}
                 strokeWidth={1.2}
               />
               <Polygon
                 points="125,55 150,69 150,97 125,111 100,97 100,69"
                 fill="none"
-                stroke="#cbd5e1"
+                stroke={isDark ? colors.border : '#cbd5e1'}
                 strokeWidth={1.2}
               />
               <Polygon
                 points="70,62 95,76 95,104 70,118 45,104 45,76"
                 fill="none"
-                stroke="#e2e8f0"
+                stroke={colors.border}
                 strokeWidth={1.2}
               />
             </Svg>
@@ -441,20 +452,20 @@ export function RegisterObservationModal({
             <View className="flex-row items-center">
               <Pressable
                 onPress={onClose}
-                accessibilityLabel="Volver"
-                className="mr-3 h-9 w-9 items-center justify-center rounded-full active:bg-slate-200">
-                <ArrowLeft size={20} color="#1e293b" strokeWidth={2.2} />
+                accessibilityLabel={t('body.register.back')}
+                className="mr-3 h-9 w-9 items-center justify-center rounded-full active:bg-slate-200 dark:active:bg-trauma-nightLine">
+                <ArrowLeft size={20} color={isDark ? colors.text : '#1e293b'} strokeWidth={2.2} />
               </Pressable>
               <View>
-                <Text className="text-lg font-bold text-slate-800">
+                <Text className="text-lg font-bold text-slate-800 dark:text-trauma-nightInk">
                   {isUpdateMode
-                    ? `Actualización #${nextUpdateNumber}`
-                    : 'Registrar observación'}
+                    ? t('body.register.updateTitle', { n: nextUpdateNumber })
+                    : t('body.register.title')}
                 </Text>
-                <Text className="font-mono text-[10px] text-slate-500">
+                <Text className="font-mono text-[10px] text-slate-500 dark:text-trauma-nightMuted">
                   {isUpdateMode
-                    ? 'Seguimiento de evolución clínica (texto y foto)'
-                    : 'Se guardará como Actualización 1 en la base de datos'}
+                    ? t('body.register.updateSubtitle')
+                    : t('body.register.createSubtitle')}
                 </Text>
               </View>
             </View>
@@ -465,7 +476,7 @@ export function RegisterObservationModal({
             contentContainerStyle={{ paddingBottom: 32 }}
             showsVerticalScrollIndicator={false}>
             {/* Tarjeta 1: Región Seleccionada (captura en vivo del modelo 3D) */}
-            <View className="mt-2 flex-row items-center rounded-3xl border border-slate-100 bg-white p-3.5 shadow-sm">
+            <View className="mt-2 flex-row items-center rounded-3xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-sm">
               <View
                 style={{
                   backgroundColor: '#060b19',
@@ -489,15 +500,17 @@ export function RegisterObservationModal({
               </View>
 
               <View className="ml-4 flex-1">
-                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  REGIÓN SELECCIONADA
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
+                  {t('body.register.region')}
                 </Text>
-                <Text className="mt-0.5 text-xl font-extrabold text-slate-800">{muscle.name}</Text>
+                <Text className="mt-0.5 text-xl font-extrabold text-slate-800 dark:text-trauma-nightInk">
+                  {t(muscleNameKey(muscle.id))}
+                </Text>
 
-                <View className="mt-2 flex-row items-center self-start rounded-full bg-slate-100 px-3 py-1">
-                  <RegionCategoryIcon category={muscle.category} color="#0284c7" size={14} />
-                  <Text className="ml-1.5 text-xs font-medium text-slate-600">
-                    {muscle.category}
+                <View className="mt-2 flex-row items-center self-start rounded-full bg-slate-100 dark:bg-trauma-nightAlt px-3 py-1">
+                  <RegionCategoryIcon category={muscle.category} color={colors.accentDeep} size={14} />
+                  <Text className="ml-1.5 text-xs font-medium text-slate-600 dark:text-trauma-nightMuted">
+                    {t(categoryNameKey(muscle.category))}
                   </Text>
                 </View>
               </View>
@@ -505,16 +518,16 @@ export function RegisterObservationModal({
 
             {/* Bitácora de actualizaciones previas cuando se agrega una nueva actualización */}
             {isUpdateMode && existingUpdates.length > 0 && (
-              <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-trauma-nightLine dark:bg-trauma-night">
                 <View className="mb-2.5 flex-row items-center justify-between">
                   <View className="flex-row items-center">
-                    <Clock size={15} color="#0284c7" strokeWidth={2.2} />
-                    <Text className="ml-1.5 text-xs font-bold text-slate-800">
-                      Historial previo ({existingUpdates.length})
+                    <Clock size={15} color={isDark ? colors.accent : '#0284c7'} strokeWidth={2.2} />
+                    <Text className="ml-1.5 text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                      {t('body.register.historyTitle', { n: existingUpdates.length })}
                     </Text>
                   </View>
-                  <Text className="font-mono text-[10px] font-bold text-sky-700">
-                    Siguiente: Actualización {nextUpdateNumber}
+                  <Text className="font-mono text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                    {t('body.register.nextUpdate', { n: nextUpdateNumber })}
                   </Text>
                 </View>
 
@@ -522,26 +535,26 @@ export function RegisterObservationModal({
                   {existingUpdates.map((item) => (
                     <View
                       key={item.updateNumber}
-                      className="flex-row items-start rounded-2xl border border-slate-100 bg-slate-50/80 p-2.5">
+                      className="flex-row items-start rounded-2xl border border-slate-100 bg-slate-50/80 p-2.5 dark:border-trauma-nightLine dark:bg-trauma-nightAlt">
                       <View className="flex-1 pr-2">
                         <View className="flex-row flex-wrap items-center gap-1.5">
-                          <View className="rounded-md bg-sky-100 px-1.5 py-0.5">
-                            <Text className="font-mono text-[9.5px] font-bold text-sky-900">
+                          <View className="rounded-md bg-sky-100 px-1.5 py-0.5 dark:bg-sky-950">
+                            <Text className="font-mono text-[9.5px] font-bold text-sky-900 dark:text-sky-200">
                               {item.title}
                             </Text>
                           </View>
                           {!!item.dateLabel && (
-                            <Text className="font-mono text-[9.5px] text-slate-400">
+                            <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
                               {item.dateLabel}
                             </Text>
                           )}
                           {item.painIntensity !== undefined && (
-                            <Text className="font-mono text-[9.5px] font-bold text-slate-600">
-                              · Dolor {item.painIntensity}/10
+                            <Text className="font-mono text-[9.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
+                              {t('body.register.painOf', { n: item.painIntensity })}
                             </Text>
                           )}
                         </View>
-                        <Text className="mt-1 text-[11.5px] leading-4 text-slate-600">
+                        <Text className="mt-1 text-[11.5px] leading-4 text-slate-600 dark:text-trauma-nightMuted">
                           {item.text}
                         </Text>
                       </View>
@@ -559,26 +572,26 @@ export function RegisterObservationModal({
             )}
 
             {/* Tarjeta 2: Intensidad del dolor (Fiel al diseño original con slider minimalista) */}
-            <View className="mt-3.5 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <View className="mt-3.5 rounded-3xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center">
-                  <Zap size={18} color="#334155" strokeWidth={2} />
-                  <Text className="ml-2 text-sm font-bold text-slate-800">
-                    Intensidad del dolor
+                  <Zap size={18} color={iconSlate} strokeWidth={2} />
+                  <Text className="ml-2 text-sm font-bold text-slate-800 dark:text-trauma-nightInk">
+                    {t('body.register.intensity')}
                   </Text>
                 </View>
                 {/* Indicador numérico pill: "7 / 10" */}
                 <View
                   className={`flex-row items-baseline rounded-xl border px-3 py-1 ${painIntensity === 0
-                      ? 'border-emerald-300 bg-emerald-50'
-                      : 'border-slate-200 bg-slate-50'
+                      ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-400/40 dark:bg-emerald-950/60'
+                      : 'border-slate-200 bg-slate-50 dark:border-trauma-nightLine dark:bg-trauma-nightAlt'
                     }`}>
                   <Text
-                    className={`text-sm font-extrabold ${painIntensity === 0 ? 'text-emerald-700' : 'text-slate-800'
+                    className={`text-sm font-extrabold ${painIntensity === 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-800 dark:text-trauma-nightInk'
                       }`}>
                     {painIntensity}
                   </Text>
-                  <Text className="text-xs text-slate-400"> / 10</Text>
+                  <Text className="text-xs text-slate-400 dark:text-trauma-nightSubtle"> / 10</Text>
                 </View>
               </View>
 
@@ -591,7 +604,7 @@ export function RegisterObservationModal({
                 onResponderGrant={(e) => updatePainFromTouch(e.nativeEvent.locationX)}
                 onResponderMove={(e) => updatePainFromTouch(e.nativeEvent.locationX)}>
                 {/* Pista de fondo */}
-                <View className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80">
+                <View className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-trauma-nightLine">
                   <View
                     style={{
                       width: `${percent}%`,
@@ -636,9 +649,9 @@ export function RegisterObservationModal({
                       <Text
                         className={`text-xs ${active
                             ? i === 0
-                              ? 'font-extrabold text-emerald-700'
-                              : 'font-extrabold text-slate-900'
-                            : 'font-medium text-slate-400'
+                              ? 'font-extrabold text-emerald-700 dark:text-emerald-300'
+                              : 'font-extrabold text-slate-900 dark:text-trauma-nightInk'
+                            : 'font-medium text-slate-400 dark:text-trauma-nightSubtle'
                           }`}>
                         {i}
                       </Text>
@@ -648,9 +661,9 @@ export function RegisterObservationModal({
               </View>
 
               {painIntensity === 0 && (
-                <View className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 px-3 py-2.5">
-                  <Text className="text-xs font-bold text-emerald-800">
-                    Mejoría total (0/10): se guardará esta actualización como curada y pasará al historial de malestares.
+                <View className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 px-3 py-2.5 dark:border-emerald-400/40 dark:bg-emerald-950/60">
+                  <Text className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                    {t('body.register.curedNote')}
                   </Text>
                 </View>
               )}
@@ -662,86 +675,94 @@ export function RegisterObservationModal({
             </View>
 
             {/* Tarjeta 3: ¿Hinchazón o inflamación? */}
-            <View className="mt-3 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+            <View className="mt-3 flex-row items-center justify-between rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night px-4 py-3 shadow-sm">
               <View className="flex-1 flex-row items-center pr-2">
-                <Layers size={18} color="#334155" strokeWidth={2} />
-                <Text className="ml-2.5 text-xs font-bold text-slate-800">
-                  ¿Hinchazón o inflamación?
+                <Layers size={18} color={iconSlate} strokeWidth={2} />
+                <Text className="ml-2.5 text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                  {t('body.register.swelling')}
                 </Text>
               </View>
-              <View className="flex-row rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+              <View className="flex-row rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt p-0.5">
                 <Pressable
                   onPress={() => setSwelling(true)}
-                  className={`rounded-lg px-5 py-1.5 ${swelling ? 'border border-[#7dd3fc] bg-[#c5eefc]' : ''
-                    }`}>
+                  className={`rounded-lg px-5 py-1.5 ${
+                    swelling ? 'border border-[#7dd3fc] bg-[#c5eefc] dark:bg-trauma-nightAlt' : ''
+                  }`}>
                   <Text
-                    className={`text-xs ${swelling ? 'font-bold text-slate-800' : 'font-medium text-slate-500'
-                      }`}>
-                    Sí
+                    className={`text-xs ${
+                      swelling ? 'font-bold text-slate-800 dark:text-trauma-nightInk' : 'font-medium text-slate-500 dark:text-trauma-nightMuted'
+                    }`}>
+                    {t('common.yes')}
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={() => setSwelling(false)}
-                  className={`rounded-lg px-5 py-1.5 ${!swelling ? 'border border-[#7dd3fc] bg-[#c5eefc]' : ''
-                    }`}>
+                  className={`rounded-lg px-5 py-1.5 ${
+                    !swelling ? 'border border-[#7dd3fc] bg-[#c5eefc] dark:bg-trauma-nightAlt' : ''
+                  }`}>
                   <Text
-                    className={`text-xs ${!swelling ? 'font-bold text-slate-800' : 'font-medium text-slate-500'
-                      }`}>
-                    No
+                    className={`text-xs ${
+                      !swelling ? 'font-bold text-slate-800 dark:text-trauma-nightInk' : 'font-medium text-slate-500 dark:text-trauma-nightMuted'
+                    }`}>
+                    {t('common.no')}
                   </Text>
                 </Pressable>
               </View>
             </View>
 
             {/* Tarjeta 4: ¿Limitación funcional? */}
-            <View className="mt-2.5 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+            <View className="mt-2.5 flex-row items-center justify-between rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night px-4 py-3 shadow-sm">
               <View className="flex-1 flex-row items-center pr-2">
-                <FunctionalMotionIcon size={18} color="#334155" />
-                <Text className="ml-2.5 text-xs font-bold text-slate-800">
-                  ¿Limitación funcional?
+                <FunctionalMotionIcon size={18} color={iconSlate} />
+                <Text className="ml-2.5 text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                  {t('body.register.limitation')}
                 </Text>
               </View>
-              <View className="flex-row rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+              <View className="flex-row rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt p-0.5">
                 <Pressable
                   onPress={() => setFunctionalLimitation(true)}
-                  className={`rounded-lg px-5 py-1.5 ${functionalLimitation ? 'border border-[#7dd3fc] bg-[#c5eefc]' : ''
-                    }`}>
+                  className={`rounded-lg px-5 py-1.5 ${
+                    functionalLimitation ? 'border border-[#7dd3fc] bg-[#c5eefc] dark:bg-trauma-nightAlt' : ''
+                  }`}>
                   <Text
-                    className={`text-xs ${functionalLimitation ? 'font-bold text-slate-800' : 'font-medium text-slate-500'
-                      }`}>
-                    Sí
+                    className={`text-xs ${
+                      functionalLimitation ? 'font-bold text-slate-800 dark:text-trauma-nightInk' : 'font-medium text-slate-500 dark:text-trauma-nightMuted'
+                    }`}>
+                    {t('common.yes')}
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={() => setFunctionalLimitation(false)}
-                  className={`rounded-lg px-5 py-1.5 ${!functionalLimitation ? 'border border-[#7dd3fc] bg-[#c5eefc]' : ''
-                    }`}>
+                  className={`rounded-lg px-5 py-1.5 ${
+                    !functionalLimitation ? 'border border-[#7dd3fc] bg-[#c5eefc] dark:bg-trauma-nightAlt' : ''
+                  }`}>
                   <Text
-                    className={`text-xs ${!functionalLimitation ? 'font-bold text-slate-800' : 'font-medium text-slate-500'
-                      }`}>
-                    No
+                    className={`text-xs ${
+                      !functionalLimitation ? 'font-bold text-slate-800 dark:text-trauma-nightInk' : 'font-medium text-slate-500 dark:text-trauma-nightMuted'
+                    }`}>
+                    {t('common.no')}
                   </Text>
                 </Pressable>
               </View>
             </View>
 
             {/* Tarjeta 5: Texto de la actualización */}
-            <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <View className="mt-3 rounded-3xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
               <View className="mb-2.5 flex-row items-center justify-between">
                 <View className="flex-row items-center">
-                  <FileText size={18} color="#334155" strokeWidth={2} />
-                  <Text className="ml-2 text-sm font-bold text-slate-800">
+                  <FileText size={18} color={iconSlate} strokeWidth={2} />
+                  <Text className="ml-2 text-sm font-bold text-slate-800 dark:text-trauma-nightInk">
                     {isUpdateMode
-                      ? `Texto · Actualización ${nextUpdateNumber}`
-                      : 'Texto · Actualización 1'}
+                      ? t('body.register.textUpdate', { n: nextUpdateNumber })
+                      : t('body.register.textUpdate', { n: 1 })}
                   </Text>
                 </View>
-                <Text className="font-mono text-[10px] text-slate-400">
-                  Se guarda en BD
+                <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">
+                  {t('body.register.savedInDb')}
                 </Text>
               </View>
 
-              <View className="rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+              <View className="rounded-2xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50/40 dark:bg-trauma-nightAlt p-3">
                 <TextInput
                   value={notes}
                   onChangeText={setNotes}
@@ -749,39 +770,41 @@ export function RegisterObservationModal({
                   maxLength={400}
                   placeholder={
                     isUpdateMode
-                      ? `Describe la evolución o cambios para la Actualización ${nextUpdateNumber}...`
-                      : `Ej. Dolor localizado en ${muscle.name.toLowerCase()} tras esfuerzo...`
+                      ? t('body.register.placeholderUpdate', { n: nextUpdateNumber })
+                      : t('body.register.placeholder', {
+                          zone: t(muscleNameKey(muscle.id)).toLowerCase(),
+                        })
                   }
-                  placeholderTextColor="#94a3b8"
-                  className="min-h-[76px] text-xs leading-5 text-slate-700"
+                  placeholderTextColor={colors.textSubtle}
+                  className="min-h-[76px] text-xs leading-5 text-slate-700 dark:text-trauma-nightInk"
                   textAlignVertical="top"
                 />
               </View>
               <View className="mt-2">
                 <DictationButton
-                  label="Dictar observación"
-                  onText={(t) => setNotes((prev) => (prev ? `${prev} ${t}` : t).slice(0, 300))}
+                  label={t('body.register.dictate')}
+                  onText={(text) => setNotes((prev) => (prev ? `${prev} ${text}` : text).slice(0, 300))}
                 />
               </View>
-              <Text className="mt-1.5 text-right text-[11px] text-slate-400">
+              <Text className="mt-1.5 text-right text-[11px] text-slate-400 dark:text-trauma-nightSubtle">
                 {notes.length} / 400
               </Text>
             </View>
 
             {/* Tarjeta 6: Foto de esta actualización */}
-            <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <View className="mt-3 rounded-3xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
               <View className="mb-2.5 flex-row items-center justify-between">
                 <View className="flex-row items-center">
-                  <Camera size={18} color="#334155" strokeWidth={2} />
-                  <Text className="ml-2 text-sm font-bold text-slate-800">
-                    {`Foto · Actualización ${nextUpdateNumber}`}
+                  <Camera size={18} color={iconSlate} strokeWidth={2} />
+                  <Text className="ml-2 text-sm font-bold text-slate-800 dark:text-trauma-nightInk">
+                    {t('body.register.photoUpdate', { n: nextUpdateNumber })}
                   </Text>
                 </View>
-                <Text className="text-[10px] text-slate-400">Opcional</Text>
+                <Text className="text-[10px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.register.optional')}</Text>
               </View>
 
               {capturedPhoto && (
-                <View className="relative mb-3 overflow-hidden rounded-2xl border border-slate-200">
+                <View className="relative mb-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-trauma-nightLine">
                   <Image
                     source={{ uri: capturedPhoto.uri }}
                     style={{ width: '100%', height: 150 }}
@@ -798,15 +821,15 @@ export function RegisterObservationModal({
               <View className="flex-row gap-2.5">
                 <Pressable
                   onPress={handleCapturePhoto}
-                  className="flex-1 flex-row items-center justify-center rounded-xl border border-[#7dd3fc] bg-[#e0f7fe] py-2.5 active:opacity-75">
-                  <Camera size={15} color="#0284c7" />
-                  <Text className="ml-1.5 text-xs font-bold text-slate-800">Tomar foto</Text>
+                  className="flex-1 flex-row items-center justify-center rounded-xl border border-[#7dd3fc] bg-[#e0f7fe] dark:bg-trauma-nightAlt py-2.5 active:opacity-75">
+                  <Camera size={15} color={colors.accentDeep} />
+                  <Text className="ml-1.5 text-xs font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.register.takePhoto')}</Text>
                 </Pressable>
                 <Pressable
                   onPress={handlePickPhoto}
-                  className="flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-2.5 active:opacity-75">
-                  <Images size={15} color="#475569" />
-                  <Text className="ml-1.5 text-xs font-bold text-slate-700">Galería</Text>
+                  className="flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt py-2.5 active:opacity-75">
+                  <Images size={15} color={iconSlate2} />
+                  <Text className="ml-1.5 text-xs font-bold text-slate-700 dark:text-trauma-nightInk">{t('body.register.gallery')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -826,12 +849,10 @@ export function RegisterObservationModal({
               )}
               <Text className="ml-2 text-sm font-bold text-white">
                 {isSaving
-                  ? 'Guardando...'
+                  ? t('body.register.saving')
                   : painIntensity === 0
-                    ? 'Guardar mejoría y mover al historial'
-                    : isUpdateMode
-                      ? `Guardar Actualización ${nextUpdateNumber}`
-                      : 'Guardar Actualización 1'}
+                    ? t('body.register.saveCured')
+                    : t('body.register.saveUpdate', { n: nextUpdateNumber })}
               </Text>
             </Pressable>
 
@@ -840,10 +861,10 @@ export function RegisterObservationModal({
               <Pressable
                 onPress={handleMarkCured}
                 disabled={isSaving}
-                className="mt-3 flex-row items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 py-3.5 active:opacity-80">
-                <Check size={16} color="#047857" strokeWidth={2.4} />
-                <Text className="ml-2 text-xs font-bold text-emerald-800">
-                  Ya no siento el síntoma (Curar y guardar historial)
+                className="mt-3 flex-row items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 py-3.5 active:opacity-80 dark:border-emerald-400/40 dark:bg-emerald-950/60">
+                <Check size={16} color={isDark ? colors.success : '#047857'} strokeWidth={2.4} />
+                <Text className="ml-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                  {t('body.register.cureBtn')}
                 </Text>
               </Pressable>
             )}
@@ -854,9 +875,9 @@ export function RegisterObservationModal({
                 onPress={handleClear}
                 disabled={isSaving}
                 className="mt-3 flex-row items-center justify-center py-2 active:opacity-70">
-                <RotateCcw size={13} color="#64748b" />
-                <Text className="ml-1.5 text-xs font-medium text-slate-500">
-                  Quitar alerta de esta zona
+                <RotateCcw size={13} color={colors.textMuted} />
+                <Text className="ml-1.5 text-xs font-medium text-slate-500 dark:text-trauma-nightMuted">
+                  {t('body.register.clear')}
                 </Text>
               </Pressable>
             )}

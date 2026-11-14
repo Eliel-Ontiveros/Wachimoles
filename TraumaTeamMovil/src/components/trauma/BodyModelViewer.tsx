@@ -1,6 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { MUSCLE_MODEL_BASE64 } from '@/assets/images/muscle-model-base64';
+import { useI18n } from '@/i18n/I18nProvider';
+import type { Locale, MessageKey } from '@/i18n/messages';
+import { formatDate } from '@/i18n/format';
 
 export type MuscleStatus = 'normal' | 'warning' | 'critical';
 
@@ -11,6 +14,35 @@ export type BodyRegionCategory =
   | 'Extremidad superior'
   | 'Cadera y pelvis'
   | 'Extremidad inferior';
+
+const CATEGORY_KEYS: Record<BodyRegionCategory, MessageKey> = {
+  'Cabeza y cuello': 'body.category.head_neck',
+  'Tronco anterior': 'body.category.trunk_front',
+  'Tronco posterior': 'body.category.trunk_back',
+  'Extremidad superior': 'body.category.upper_limb',
+  'Cadera y pelvis': 'body.category.hip_pelvis',
+  'Extremidad inferior': 'body.category.lower_limb',
+};
+
+/** Clave i18n del nombre visible de una zona (el `name` en español sigue siendo la clave interna de selección). */
+export const muscleNameKey = (id: string) => `body.muscle.${id}` as MessageKey;
+/** Clave i18n de la categoría anatómica (el valor en español es el que se envía al backend). */
+export const categoryNameKey = (category: BodyRegionCategory) => CATEGORY_KEYS[category];
+
+/** Valor de `updatedAt` para "justo ahora" (se traduce al mostrar). */
+export const UPDATED_NOW = '__now__';
+
+/** Texto localizado de `MuscleObservation.updatedAt` (centinela, fecha ISO o texto crudo del backend). */
+export function formatObservationUpdatedAt(
+  value: string,
+  locale: Locale,
+  t: (key: MessageKey) => string
+): string {
+  if (value === UPDATED_NOW) return t('body.now');
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return formatDate(date, locale, { dateStyle: 'medium', timeStyle: 'short' });
+}
 
 export interface MuscleObservation {
   painIntensity: number;
@@ -449,7 +481,23 @@ if (Platform.OS !== 'web') {
   }
 }
 
-function buildBodyViewerHtml(initialZonesJson: string, initialSelected: string): string {
+export type ViewerLabels = {
+  loading: string;
+  flip: string;
+  zoomIn: string;
+  zoomOut: string;
+  reset: string;
+  pins: string;
+};
+
+const escapeHtmlAttr = (v: string) =>
+  v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+function buildBodyViewerHtml(
+  initialZonesJson: string,
+  initialSelected: string,
+  labels: ViewerLabels
+): string {
   return `
 <!DOCTYPE html>
 <html>
@@ -642,7 +690,7 @@ function buildBodyViewerHtml(initialZonesJson: string, initialSelected: string):
 <body>
   <div id="loading">
     <div class="spinner"></div>
-    <span>CARGANDO ANATOMÍA 3D...</span>
+    <span id="loading-label">${escapeHtmlAttr(labels.loading)}</span>
   </div>
 
   <div id="canvas-container">
@@ -651,23 +699,23 @@ function buildBodyViewerHtml(initialZonesJson: string, initialSelected: string):
     <!-- Controles rápidos 3D con iconos vectoriales SVG -->
     <div id="hud-controls">
       <!-- Girar Frente / Espalda (180°) -->
-      <button id="btn-flip" class="ctrl-btn" title="Girar Frente / Espalda">
+      <button id="btn-flip" class="ctrl-btn" title="${escapeHtmlAttr(labels.flip)}">
         <svg viewBox="0 0 24 24"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h14"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H3"/></svg>
       </button>
       <!-- Acercar Zoom (+) -->
-      <button id="btn-zoom-in" class="ctrl-btn" title="Acercar">
+      <button id="btn-zoom-in" class="ctrl-btn" title="${escapeHtmlAttr(labels.zoomIn)}">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
       </button>
       <!-- Alejar Zoom (-) -->
-      <button id="btn-zoom-out" class="ctrl-btn" title="Alejar">
+      <button id="btn-zoom-out" class="ctrl-btn" title="${escapeHtmlAttr(labels.zoomOut)}">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
       </button>
       <!-- Centrar Cuerpo Completo -->
-      <button id="btn-reset" class="ctrl-btn" title="Centrar vista">
+      <button id="btn-reset" class="ctrl-btn" title="${escapeHtmlAttr(labels.reset)}">
         <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
       <!-- Mostrar / Ocultar Pines -->
-      <button id="btn-toggle-pins" class="ctrl-btn" title="Mostrar/Ocultar indicadores">
+      <button id="btn-toggle-pins" class="ctrl-btn" title="${escapeHtmlAttr(labels.pins)}">
         <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
@@ -1206,6 +1254,17 @@ function buildBodyViewerHtml(initialZonesJson: string, initialSelected: string):
         controls.enabled = !data.locked;
       }
 
+      if (data.labels) {
+        const setText = (id, v) => { const el = document.getElementById(id); if (el && v) el.textContent = v; };
+        const setTitle = (id, v) => { const el = document.getElementById(id); if (el && v) el.title = v; };
+        setText('loading-label', data.labels.loading);
+        setTitle('btn-flip', data.labels.flip);
+        setTitle('btn-zoom-in', data.labels.zoomIn);
+        setTitle('btn-zoom-out', data.labels.zoomOut);
+        setTitle('btn-reset', data.labels.reset);
+        setTitle('btn-toggle-pins', data.labels.pins);
+      }
+
       if (data.muscles && Array.isArray(data.muscles)) {
         data.muscles.forEach((m) => {
           const zn = zones.find((z) => z.id === m.id);
@@ -1315,6 +1374,18 @@ export function BodyModelViewer({
   onTouchStateChange,
   onZoneSnapshot,
 }: BodyModelViewerProps) {
+  const { t } = useI18n();
+  const labels = useMemo<ViewerLabels>(
+    () => ({
+      loading: t('body.viewer.loading'),
+      flip: t('body.viewer.flip'),
+      zoomIn: t('body.viewer.zoomIn'),
+      zoomOut: t('body.viewer.zoomOut'),
+      reset: t('body.viewer.reset'),
+      pins: t('body.viewer.pins'),
+    }),
+    [t]
+  );
   const webViewRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onZoneSnapshotRef = useRef(onZoneSnapshot);
@@ -1330,7 +1401,8 @@ export function BodyModelViewer({
           painIntensity: m.observation?.painIntensity ?? 0,
         }))
       ),
-      selectedMuscle
+      selectedMuscle,
+      labels
     )
   );
 
@@ -1351,6 +1423,7 @@ export function BodyModelViewer({
       type: 'SYNC_STATE',
       selected: selectedMuscle,
       locked: isLocked,
+      labels,
       muscles: muscles.map((m) => ({
         id: m.id,
         name: m.name,
@@ -1369,7 +1442,7 @@ export function BodyModelViewer({
         true;
       `);
     }
-  }, [selectedMuscle, isLocked, muscles]);
+  }, [selectedMuscle, isLocked, muscles, labels]);
 
   const sendSyncStateRef = useRef(sendSyncState);
   useEffect(() => {
@@ -1446,7 +1519,7 @@ export function BodyModelViewer({
           onLoad={() => sendSyncStateRef.current()}
           // Anterior claro: backgroundColor: '#f8fafc'
           style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#060b19' }}
-          title="Visor 3D de Anatomía Muscular"
+          title={t('body.viewer.title')}
         />
       </View>
     );

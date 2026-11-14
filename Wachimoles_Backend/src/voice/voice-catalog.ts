@@ -209,6 +209,24 @@ export const GLOBAL_ACTIONS: CatalogAction[] = [
     examples: [{ phrase: "descarta la alerta", intent: { type: "dismiss-alert" } }]
   },
   {
+    type: "set-theme",
+    params: "theme: system | light | dark",
+    whenToUse: "cambiar el modo de color de la app (oscuro, claro o el del sistema)",
+    examples: [
+      { phrase: "cambia a modo oscuro", intent: { type: "set-theme", theme: "dark" } },
+      { phrase: "switch to light mode", intent: { type: "set-theme", theme: "light" } }
+    ]
+  },
+  {
+    type: "set-locale",
+    params: "locale: es | en",
+    whenToUse: "cambiar el idioma de la app (español o inglés)",
+    examples: [
+      { phrase: "cambia el idioma a inglés", intent: { type: "set-locale", locale: "en" } },
+      { phrase: "change language to Spanish", intent: { type: "set-locale", locale: "es" } }
+    ]
+  },
+  {
     type: "read-vitals",
     whenToUse: "leer en voz alta sus signos vitales",
     examples: [{ phrase: "léeme mis signos vitales", intent: { type: "read-vitals" } }]

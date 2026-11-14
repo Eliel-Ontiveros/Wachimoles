@@ -13,9 +13,12 @@ import { Calendar, Check, ChevronDown, Globe, Orbit, Rocket, Satellite, X } from
 import {
   ENVIRONMENTS,
   formatRouteDays,
+  getEnvironmentText,
+  getLocationText,
   getRouteDurationSpec,
-  SPACE_LOCATIONS,
 } from '../../services/mission-api';
+import { useI18n } from '@/i18n/I18nProvider';
+import { useAppTheme } from '@/theme';
 import { EnvironmentType, SpaceLocation } from '../../types/mission';
 import { useMission } from './mission-context';
 
@@ -249,56 +252,63 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
     openMissionSetup,
   } = useMission();
   const [open, setOpen] = useState(false);
+  const { t, locale } = useI18n();
+  const { colors, scheme } = useAppTheme();
+  const dark = scheme === 'dark';
+  const slateIcon = dark ? colors.textMuted : '#475569';
+  const envText = getEnvironmentText(locale, environmentConfig.id);
 
   const options = (['nave', 'estacion', 'luna', 'marte', 'tierra'] as EnvironmentType[]).map(
     (id) => ENVIRONMENTS[id]
   );
   const inTransit = environment === 'nave';
-  const destShort = SPACE_LOCATIONS[destination].shortLabel;
+  const destShort = getLocationText(locale, destination).shortLabel;
 
   return (
     <>
       <View className="flex-row items-center gap-2">
         <Pressable
           onPress={() => setOpen(true)}
-          accessibilityLabel="Cambiar ubicación del astronauta"
-          className={`flex-1 flex-row items-center justify-between rounded-xl border border-trauma-line bg-white active:opacity-75 ${
+          accessibilityLabel={t('missions.selector.changeA11y')}
+          className={`flex-1 flex-row items-center justify-between rounded-xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night active:opacity-75 ${
             compact ? 'px-3 py-1.5' : 'px-3.5 py-2.5 shadow-xs'
           }`}>
           <View className="flex-1 flex-row items-center pr-2">
-            <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-sky-50">
-              <EnvironmentIcon env={environment} color="#0284c7" />
+            <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950">
+              <EnvironmentIcon env={environment} color={colors.accentDeep} />
             </View>
             <View className="flex-1">
-              <Text className="font-mono text-[9px] uppercase tracking-wider text-slate-400" numberOfLines={1}>
-                {inTransit ? `Rumbo a ${destShort}` : 'Ubicación actual'}
+              <Text className="font-mono text-[9px] uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle" numberOfLines={1}>
+                {inTransit
+                  ? t('missions.selector.headingTo', { dest: destShort })
+                  : t('missions.selector.current')}
               </Text>
-              <Text className="font-mono text-xs font-bold text-trauma-ink" numberOfLines={1}>
-                {environmentConfig.shortLabel}
+              <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk" numberOfLines={1}>
+                {envText.shortLabel}
               </Text>
             </View>
           </View>
 
           <View className="flex-row items-center">
-            <View className="mr-1.5 rounded-md bg-slate-100 px-1.5 py-0.5">
-              <Text className="font-mono text-[9px] font-bold text-slate-600">
-                {environmentConfig.gravityLabel.split(' ')[0]}
+            <View className="mr-1.5 rounded-md bg-slate-100 dark:bg-trauma-nightAlt px-1.5 py-0.5">
+              <Text className="font-mono text-[9px] font-bold text-slate-600 dark:text-trauma-nightMuted">
+                {envText.gravityLabel.split(' ')[0]}
               </Text>
             </View>
-            <ChevronDown size={15} color="#475569" />
+            <ChevronDown size={15} color={slateIcon} />
           </View>
         </Pressable>
 
         {/* Botón directo de Plan de Vuelo */}
         <Pressable
           onPress={openMissionSetup}
-          accessibilityLabel="Abrir plan de vuelo"
-          className={`flex-row items-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft active:opacity-75 ${
+          accessibilityLabel={t('missions.selector.planA11y')}
+          className={`flex-row items-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt active:opacity-75 ${
             compact ? 'px-3 py-2' : 'px-3.5 py-3 shadow-xs'
           }`}>
-          <Calendar size={14} color="#0f172a" />
-          <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-trauma-ink">
-            Plan de vuelo
+          <Calendar size={14} color={dark ? colors.text : '#0f172a'} />
+          <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-trauma-ink dark:text-trauma-nightInk">
+            {t('missions.plan.title')}
           </Text>
         </Pressable>
       </View>
@@ -308,27 +318,27 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
           onPress={() => setOpen(false)}
           style={{
             flex: 1,
-            backgroundColor: 'rgba(15,23,42,0.42)',
+            backgroundColor: dark ? colors.overlay : 'rgba(15,23,42,0.42)',
             justifyContent: 'center',
             paddingHorizontal: 20,
           }}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
             style={{ maxHeight: '88%' }}
-            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+            className="rounded-3xl border border-slate-200 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-5 shadow-xl">
             <View className="mb-1 flex-row items-center justify-between">
-              <Text className="font-mono text-sm font-bold text-trauma-ink">
-                Ubicación actual del astronauta
+              <Text className="font-mono text-sm font-bold text-trauma-ink dark:text-trauma-nightInk">
+                {t('missions.selector.title')}
               </Text>
               <Pressable
                 onPress={() => setOpen(false)}
-                accessibilityLabel="Cerrar selector de ubicación"
-                className="h-7 w-7 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200">
-                <X size={15} color="#475569" />
+                accessibilityLabel={t('missions.selector.closeA11y')}
+                className="h-7 w-7 items-center justify-center rounded-full bg-slate-100 dark:bg-trauma-nightAlt active:bg-slate-200">
+                <X size={15} color={slateIcon} />
               </Pressable>
             </View>
-            <Text className="mb-4 font-mono text-[10px] text-slate-400">
-              Si cambias tu ubicación a Estación EEI, Base Lunar o Marte, la misión se adelantará a la llegada.
+            <Text className="mb-4 font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">
+              {t('missions.selector.hint')}
             </Text>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
@@ -342,18 +352,21 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
                     : null;
                   const routeAvg = routeSpec ? formatRouteDays(routeSpec.promedioDias) : '';
                   const routeRange = routeSpec
-                    ? `${formatRouteDays(routeSpec.minDias)}–${formatRouteDays(routeSpec.maxDias)}d`
+                    ? t('missions.range', {
+                        min: formatRouteDays(routeSpec.minDias),
+                        max: formatRouteDays(routeSpec.maxDias),
+                      })
                     : '';
+                  const text = getEnvironmentText(locale, opt.id);
+                  const gravity = text.gravityLabel;
                   const subtitle =
                     opt.id === 'nave'
-                      ? `${opt.gravityLabel} · En tránsito / órbita`
+                      ? t('missions.sub.transit', { gravity })
                       : opt.id === 'tierra'
-                        ? `${opt.gravityLabel} · ${
-                            destination === 'tierra' && origin !== 'tierra' && routeAvg
-                              ? `Retorno ${routeAvg}d (${routeRange})`
-                              : 'Base / Readaptación'
-                          }`
-                        : `${opt.gravityLabel} · Día ${routeAvg} (${routeRange})`;
+                        ? destination === 'tierra' && origin !== 'tierra' && routeAvg
+                          ? t('missions.sub.return', { gravity, avg: routeAvg, range: routeRange })
+                          : t('missions.sub.base', { gravity })
+                        : t('missions.sub.day', { gravity, avg: routeAvg, range: routeRange });
 
                   return (
                     <Pressable
@@ -390,7 +403,7 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
                           </View>
                           <View className="flex-1">
                             <Text className="font-mono text-xs font-extrabold text-white">
-                              {opt.label}
+                              {text.label}
                             </Text>
                             <Text
                               style={{ color: theme.subtitleColor }}
@@ -405,7 +418,7 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
                             style={{ backgroundColor: 'rgba(255, 255, 255, 0.16)' }}
                             className="rounded-md px-1.5 py-0.5">
                             <Text className="font-mono text-[9px] font-bold text-white">
-                              {opt.gravityLabel.split(' ')[0]}
+                              {gravity.split(' ')[0]}
                             </Text>
                           </View>
                           {active && (
@@ -428,10 +441,10 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
                 setOpen(false);
                 openMissionSetup();
               }}
-              className="mt-4 flex-row items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-2.5 active:opacity-75">
-              <Calendar size={14} color="#0284c7" />
-              <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-slate-700">
-                Configurar salida, destino y actividad
+              className="mt-4 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt py-2.5 active:opacity-75">
+              <Calendar size={14} color={colors.accentDeep} />
+              <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-slate-700 dark:text-trauma-nightMuted">
+                {t('missions.selector.configure')}
               </Text>
             </Pressable>
           </Pressable>

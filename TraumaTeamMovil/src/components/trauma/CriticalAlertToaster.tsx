@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlertTriangle, X } from 'lucide-react-native';
+import { useI18n } from '@/i18n/I18nProvider';
+import { useAppTheme } from '@/theme';
 import { useMission } from './mission-context';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -9,6 +11,8 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 // Pop-up flotante en pantalla exclusivo para anomalías médicas graves
 export function CriticalAlertToaster() {
   const { activeToasterAlert, dismissToaster } = useMission();
+  const { t } = useI18n();
+  const { colors, scheme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const [slideAnim] = useState(() => new Animated.Value(-140));
 
@@ -42,7 +46,7 @@ export function CriticalAlertToaster() {
   if (!activeToasterAlert) return null;
 
   const isCritical = activeToasterAlert.severity === 'critical';
-  const accentColor = isCritical ? '#dc2626' : '#d97706';
+  const accentColor = isCritical ? colors.danger : colors.warning;
 
   return (
     <Animated.View
@@ -60,9 +64,9 @@ export function CriticalAlertToaster() {
           borderColor: accentColor,
           borderLeftWidth: 5,
         }}
-        className="flex-row items-start rounded-2xl border bg-white p-3.5 shadow-xl">
+        className="flex-row items-start rounded-2xl border bg-white p-3.5 shadow-xl dark:bg-trauma-night">
         <View
-          style={{ backgroundColor: isCritical ? '#fef2f2' : '#fffbeb' }}
+          style={{ backgroundColor: isCritical ? colors.dangerSoft : colors.warningSoft }}
           className="mr-3 h-9 w-9 items-center justify-center rounded-xl">
           <AlertTriangle size={18} color={accentColor} />
         </View>
@@ -72,25 +76,25 @@ export function CriticalAlertToaster() {
             <Text
               style={{ color: accentColor }}
               className="font-mono text-[10px] font-bold uppercase tracking-wider">
-              {isCritical ? 'ALERTA CRÍTICA' : 'ANOMALÍA DETECTADA'}
+              {isCritical ? t('vital.toaster.critical') : t('vital.toaster.anomaly')}
             </Text>
-            <Text className="font-mono text-xs font-extrabold text-slate-900">
+            <Text className="font-mono text-xs font-extrabold text-slate-900 dark:text-trauma-nightInk">
               {activeToasterAlert.valueLabel}
             </Text>
           </View>
-          <Text className="mt-0.5 font-mono text-xs font-bold text-slate-900">
+          <Text className="mt-0.5 font-mono text-xs font-bold text-slate-900 dark:text-trauma-nightInk">
             {activeToasterAlert.title}
           </Text>
-          <Text className="mt-0.5 font-mono text-[10px] text-slate-500">
+          <Text className="mt-0.5 font-mono text-[10px] text-slate-500 dark:text-trauma-nightMuted">
             {activeToasterAlert.message}
           </Text>
         </View>
 
         <Pressable
           onPress={dismissToaster}
-          accessibilityLabel="Cerrar alerta"
-          className="h-7 w-7 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200">
-          <X size={14} color="#475569" />
+          accessibilityLabel={t('vital.toaster.close')}
+          className="h-7 w-7 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200 dark:bg-trauma-nightAlt dark:active:bg-trauma-nightLine">
+          <X size={14} color={scheme === 'dark' ? colors.textMuted : '#475569'} />
         </Pressable>
       </View>
     </Animated.View>

@@ -62,6 +62,8 @@ export type VoiceIntent =
   | ({ type: 'fill-health-check' } & HealthPrefill)
   | { type: 'vital-history'; metric: VitalMetric }
   | { type: 'dismiss-alert' }
+  | { type: 'set-theme'; theme: 'system' | 'light' | 'dark' }
+  | { type: 'set-locale'; locale: 'es' | 'en' }
   | { type: 'toggle-treadmill' }
   | { type: 'read-vitals' }
   | { type: 'describe-screen'; screen?: Route }
@@ -214,6 +216,22 @@ export function parseCommand(raw: string): ParseResult {
     .replace(/_/g, '.')
     .replace(/\s+/g, ' ')
     .trim();
+
+  // ---- Ajustes: idioma y tema (S7)
+  const langWord = hasAny(text, ['ingles', 'english']) ? 'en' : hasAny(text, ['espanol', 'castellano', 'spanish']) ? 'es' : null;
+  if (langWord && (hasAny(text, ['idioma', 'lenguaje', 'language']) || /^(?:cambia|cambiar|pon|poner|switch|change|set)(?: (?:a|to|the app to|la app en|the app in))? (?:ingles|english|espanol|castellano|spanish)$/.test(text))) {
+    return ok({ type: 'set-locale', locale: langWord }, 0.95);
+  }
+  if (hasAny(text, ['modo', 'tema', 'mode', 'theme'])) {
+    const theme = hasAny(text, ['oscuro', 'dark', 'noche'])
+      ? 'dark'
+      : hasAny(text, ['claro', 'light', 'dia'])
+        ? 'light'
+        : hasAny(text, ['sistema', 'system', 'automatico', 'auto', 'dispositivo', 'device'])
+          ? 'system'
+          : null;
+    if (theme) return ok({ type: 'set-theme', theme }, 0.95);
+  }
 
   // ---- Acciones de la app (tienen prioridad sobre navegación y zonas)
   if (hasAny(text, ['cerrar', 'cierra', 'descarta', 'descartar', 'quita', 'quitar', 'dismiss', 'close']) && (has(text, 'alerta') || has(text, 'alert'))) {
