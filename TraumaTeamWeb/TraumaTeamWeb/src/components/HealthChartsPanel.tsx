@@ -671,9 +671,10 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                           y1={nominalMinY}
                           x2={chartGeometry.width - chartGeometry.padRight}
                           y2={nominalMinY}
-                          stroke="#10b981"
+                          stroke="#93DEFF"
+                          strokeWidth="1.4"
                           strokeDasharray="4 4"
-                          strokeOpacity="0.45"
+                          strokeOpacity="0.85"
                         />
                       )}
 
@@ -685,9 +686,10 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
                           y1={nominalMaxY}
                           x2={chartGeometry.width - chartGeometry.padRight}
                           y2={nominalMaxY}
-                          stroke="#10b981"
+                          stroke="#93DEFF"
+                          strokeWidth="1.4"
                           strokeDasharray="4 4"
-                          strokeOpacity="0.45"
+                          strokeOpacity="0.85"
                         />
                       )}
 

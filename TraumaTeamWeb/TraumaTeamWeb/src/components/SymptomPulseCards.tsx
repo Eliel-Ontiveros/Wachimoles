@@ -19,23 +19,26 @@ interface SymptomPulseCardsProps {
 
 const STATUS_META: Record<
   HealthStatusLevel,
-  { label: string; color: string; bg: string; border: string }
+  { label: string; color: string; dotColor: string; bg: string; border: string }
 > = {
   normal: {
     label: 'Óptimo',
-    color: '#059669',
-    bg: 'rgba(16, 185, 129, 0.12)',
-    border: 'rgba(16, 185, 129, 0.35)',
+    color: '#0369a1',
+    dotColor: '#93DEFF',
+    bg: 'rgba(147, 222, 255, 0.28)',
+    border: '#93DEFF',
   },
   warning: {
     label: 'Vigilar',
     color: '#d97706',
+    dotColor: '#d97706',
     bg: 'rgba(245, 158, 11, 0.14)',
     border: 'rgba(245, 158, 11, 0.45)',
   },
   critical: {
     label: 'Atención',
     color: '#dc2626',
+    dotColor: '#dc2626',
     bg: 'rgba(239, 68, 68, 0.14)',
     border: 'rgba(239, 68, 68, 0.45)',
   },
@@ -65,7 +68,12 @@ function StatusBadge({ status }: { status: HealthStatusLevel | null }) {
       className="sym-pill"
       style={{ color: meta.color, backgroundColor: meta.bg, borderColor: meta.border }}
     >
-      <i style={{ backgroundColor: meta.color }} />
+      <i
+        style={{
+          backgroundColor: meta.dotColor,
+          boxShadow: status === 'normal' ? '0 0 0 1px rgba(3, 105, 161, 0.3)' : undefined,
+        }}
+      />
       {meta.label}
     </span>
   );
@@ -188,9 +196,9 @@ function MiniWaveStrip({
 
   const titleText =
     mode === 'bilateral' && bilateralRanges
-      ? `Rojo (${bilateralRanges.lowCritical}) · Amarillo (${bilateralRanges.lowWarning}) · Verde (${bilateralRanges.normal}) · Amarillo (${bilateralRanges.highWarning}) · Rojo (${bilateralRanges.highCritical})`
+      ? `Rojo (${bilateralRanges.lowCritical}) · Amarillo (${bilateralRanges.lowWarning}) · Óptimo (${bilateralRanges.normal}) · Amarillo (${bilateralRanges.highWarning}) · Rojo (${bilateralRanges.highCritical})`
       : ranges
-        ? `Verde (${ranges.green}) · Amarillo (${ranges.yellow}) · Rojo (${ranges.red})`
+        ? `Óptimo (${ranges.green}) · Amarillo (${ranges.yellow}) · Rojo (${ranges.red})`
         : undefined;
 
   return (

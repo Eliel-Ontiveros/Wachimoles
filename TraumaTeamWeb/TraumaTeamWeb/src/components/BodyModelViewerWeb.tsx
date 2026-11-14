@@ -1,6 +1,14 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MUSCLE_MODEL_BASE64 } from '../assets/muscle-model-base64.js';
+import { getPainColorHex } from '../data/anatomy-catalog';
 import type { BodyRegionCategory, MuscleData } from '../types/dashboard';
+import {
+  ActivityIcon,
+  AlertTriangleIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  RegionCategoryIcon,
+} from './Icons';
 
 interface BodyModelViewerWebProps {
   muscles: MuscleData[];
@@ -979,9 +987,13 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
   isLocked = false,
 }) => {
   const selectId = useId();
+  const listboxId = useId();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const pickerWrapRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const onSelectRef = useRef(onSelectMuscle);
   const onZoneSnapshotRef = useRef(onZoneSnapshot);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
     onSelectRef.current = onSelectMuscle;
@@ -1055,44 +1067,245 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
     [muscles]
   );
 
+  const selectedMuscle = useMemo(
+    () => (selectedMuscleId ? muscles.find((m) => m.id === selectedMuscleId) ?? null : null),
+    [muscles, selectedMuscleId]
+  );
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!pickerWrapRef.current?.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDropdownOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+
+    const handleWindowBlur = () => setDropdownOpen(false);
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [dropdownOpen]);
+
+  const handleChooseMuscle = (muscleId: string | null) => {
+    onSelectMuscle(muscleId);
+    setDropdownOpen(false);
+  };
+
+  const selectedHasSymptom =
+    selectedMuscle !== null &&
+    selectedMuscle.status !== 'normal' &&
+    Boolean(selectedMuscle.observation);
+  const selectedPain = selectedMuscle?.observation?.painIntensity ?? 0;
+  const selectedPainColor = getPainColorHex(selectedPain);
+
   return (
     <div className="viewer3d-wrapper">
       <div className="viewer3d-dropdown-bar">
-        <div className="viewer3d-select-field">
-          <label htmlFor={selectId} className="viewer3d-select-label">
+        <div ref={pickerWrapRef} className="viewer3d-select-field">
+          <span id={selectId} className="viewer3d-select-label">
             Músculo / Zona 3D
-          </label>
-          <select
-            id={selectId}
-            name="muscle-selector"
-            className="muscle-select-dropdown"
-            value={selectedMuscleId ?? ''}
-            onChange={(e) => onSelectMuscle(e.target.value || null)}
+          </span>
+          <button
+            ref={triggerRef}
+            type="button"
+            className={`muscle-picker-trigger ${dropdownOpen ? 'is-open' : ''}`}
+            aria-labelledby={selectId}
+            aria-expanded={dropdownOpen}
+            aria-controls={listboxId}
+            onClick={() => setDropdownOpen((open) => !open)}
           >
-            <option value="">— Seleccionar músculo o zona —</option>
-            {affectedMuscles.length > 0 && (
-              <optgroup label={`Con síntomas reportados (${affectedMuscles.length})`}>
-                {affectedMuscles.map((m) => (
-                  <option key={`active-${m.id}`} value={m.id}>
-                    ● {m.name} — {m.observation?.conditionName || m.category}
-                  </option>
-                ))}
-              </optgroup>
-            )}
+            <span className="muscle-picker-trigger-left">
+              {selectedMuscle ? (
+                selectedHasSymptom ? (
+                  <span
+                    className="muscle-option-icon is-affected"
+                    style={{
+                      backgroundColor: '#060b19',
+                      borderColor: selectedPainColor,
+                      color: selectedPainColor,
+                      boxShadow: `0 0 8px -1px ${selectedPainColor}80`,
+                    }}
+                    aria-hidden="true"
+                  >
+                    <AlertTriangleIcon size={12} strokeWidth={2.3} />
+                  </span>
+                ) : (
+                  <span className="muscle-option-icon is-normal" aria-hidden="true">
+                    <RegionCategoryIcon category={selectedMuscle.category} size={12} />
+                  </span>
+                )
+              ) : (
+                <span className="muscle-option-icon is-idle" aria-hidden="true">
+                  <ActivityIcon size={12} />
+                </span>
+              )}
 
-            {groupedByCategory.map((group) => (
-              <optgroup key={group.category} label={group.category}>
-                {group.items.map((m) => {
-                  const hasSym = m.status !== 'normal' && Boolean(m.observation);
-                  return (
-                    <option key={m.id} value={m.id}>
-                      {hasSym ? `● ${m.name} (Con síntomas)` : m.name}
-                    </option>
-                  );
-                })}
-              </optgroup>
-            ))}
-          </select>
+              <span className="muscle-picker-trigger-text">
+                {selectedMuscle
+                  ? selectedMuscle.name
+                  : '— Seleccionar músculo o zona —'}
+              </span>
+            </span>
+
+            <ChevronDownIcon
+              size={15}
+              className={`muscle-picker-chevron ${dropdownOpen ? 'rotated' : ''}`}
+            />
+          </button>
+
+          {dropdownOpen && (
+            <div
+              id={listboxId}
+              role="listbox"
+              aria-labelledby={selectId}
+              className="muscle-picker-menu"
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={selectedMuscleId === null}
+                className={`muscle-picker-option ${selectedMuscleId === null ? 'is-selected' : ''}`}
+                onClick={() => handleChooseMuscle(null)}
+              >
+                <span className="muscle-option-icon is-idle" aria-hidden="true">
+                  <ActivityIcon size={12} />
+                </span>
+                <span className="muscle-option-copy">
+                  <strong>— Seleccionar músculo o zona —</strong>
+                </span>
+                {selectedMuscleId === null && (
+                  <CheckIcon size={14} className="muscle-option-check" />
+                )}
+              </button>
+
+              {affectedMuscles.length > 0 && (
+                <div className="muscle-picker-group">
+                  <div className="muscle-picker-group-label">
+                    Con síntomas reportados ({affectedMuscles.length})
+                  </div>
+                  {affectedMuscles.map((m) => {
+                    const pain = m.observation?.painIntensity ?? 0;
+                    const painColor = getPainColorHex(pain);
+                    const isSelected = selectedMuscleId === m.id;
+                    return (
+                      <button
+                        key={`active-${m.id}`}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`muscle-picker-option is-affected-row ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => handleChooseMuscle(m.id)}
+                      >
+                        <span
+                          className="muscle-option-icon is-affected"
+                          style={{
+                            backgroundColor: '#060b19',
+                            borderColor: painColor,
+                            color: painColor,
+                            boxShadow: `0 0 8px -1px ${painColor}80`,
+                          }}
+                          aria-hidden="true"
+                        >
+                          <AlertTriangleIcon size={12} strokeWidth={2.3} />
+                        </span>
+                        <span className="muscle-option-copy">
+                          <strong>{m.name}</strong>
+                          <small>{m.observation?.conditionName || m.category}</small>
+                        </span>
+                        <span
+                          className="muscle-option-pain-pill"
+                          style={{
+                            backgroundColor: '#060b19',
+                            borderColor: `${painColor}88`,
+                            color: painColor,
+                          }}
+                        >
+                          <span
+                            className="muscle-option-pain-dot"
+                            style={{ backgroundColor: painColor }}
+                          />
+                          {pain}/10
+                        </span>
+                        {isSelected && (
+                          <CheckIcon size={14} className="muscle-option-check" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {groupedByCategory.map((group) => (
+                <div key={group.category} className="muscle-picker-group">
+                  <div className="muscle-picker-group-label">{group.category}</div>
+                  {group.items.map((m) => {
+                    const hasSym = m.status !== 'normal' && Boolean(m.observation);
+                    const pain = m.observation?.painIntensity ?? 0;
+                    const painColor = getPainColorHex(pain);
+                    const isSelected = selectedMuscleId === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`muscle-picker-option ${hasSym ? 'is-affected-row' : ''} ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => handleChooseMuscle(m.id)}
+                      >
+                        {hasSym ? (
+                          <span
+                            className="muscle-option-icon is-affected"
+                            style={{
+                              backgroundColor: '#060b19',
+                              borderColor: painColor,
+                              color: painColor,
+                              boxShadow: `0 0 8px -1px ${painColor}80`,
+                            }}
+                            aria-hidden="true"
+                          >
+                            <AlertTriangleIcon size={12} strokeWidth={2.3} />
+                          </span>
+                        ) : (
+                          <span className="muscle-option-icon is-normal" aria-hidden="true">
+                            <RegionCategoryIcon category={m.category} size={12} />
+                          </span>
+                        )}
+                        <span className="muscle-option-copy">
+                          <strong>{m.name}</strong>
+                          {hasSym && <small>Con síntomas · {pain}/10</small>}
+                        </span>
+                        {hasSym && (
+                          <span
+                            className="muscle-option-pain-dot only"
+                            style={{ backgroundColor: painColor }}
+                            aria-hidden="true"
+                          />
+                        )}
+                        {isSelected && (
+                          <CheckIcon size={14} className="muscle-option-check" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <span className={`viewer3d-alert-pill ${affectedMuscles.length > 0 ? 'has-alerts' : ''}`}>

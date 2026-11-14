@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import shipSprite from '../assets/Naveee (1).svg';
 import type { AstronautProfile, VitalSignsData } from '../types/dashboard';
-import { ActivityIcon, HeartIcon, OrbitIcon } from './Icons';
+import { ActivityIcon, HeartIcon } from './Icons';
 
 interface RealtimeEcgMonitorProps {
   vitals: VitalSignsData;
@@ -30,7 +30,6 @@ const MISSION_STARS = [
 
 const LOCATION_LABELS: Record<string, string> = {
   tierra: 'Tierra',
-  nave: 'Nave orbital',
   luna: 'Luna',
   marte: 'Marte',
 };
@@ -77,9 +76,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
       <div className="mission-route-card" aria-label="Trayectoria de misión espacial">
         <div className="mission-route-head">
           <div className="mission-route-title">
-            <span className="mission-orbit-icon">
-              <OrbitIcon size={14} />
-            </span>
+
             <div>
               <strong>Misión · {astronaut.shortName}</strong>
               <span>{LOCATION_LABELS[astronaut.environment] ?? astronaut.environment} · {astronaut.gravityLabel}</span>
@@ -134,7 +131,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
           <circle cx="46" cy="44" r="16.5" fill="#0284c7" stroke="rgba(125, 211, 252, 0.4)" strokeWidth="1.2" />
           <path
             d="M38.5 36.5c3.5 1.2 4.8 4.8 2.8 7.6-1.4 1.8-3.4 3.1-3.4 5.7 3.4 2.2 7.8 3.1 11.6 2.1-1-2.9 1.4-5.8 3.4-7-1.7-4.8-6.5-8.4-14.4-8.4z"
-            fill="#34d399"
+            fill="#93DEFF"
           />
           <text x="46" y="81" textAnchor="middle" className="mission-endpoint-label">
             SALIDA · {(LOCATION_LABELS[astronaut.origin] ?? astronaut.origin).toUpperCase()}

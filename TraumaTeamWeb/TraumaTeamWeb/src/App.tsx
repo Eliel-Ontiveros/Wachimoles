@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AstronautProfileBar } from './components/AstronautProfileBar';
 import { BodyModelViewerWeb } from './components/BodyModelViewerWeb';
 import { HealthChartsPanel } from './components/HealthChartsPanel';
+import { HexagonalVaultBackground } from './components/HexagonalVaultBackground';
 import {
   ActivityIcon,
   CheckIcon,
@@ -52,7 +53,7 @@ export function App() {
   const [introFinished, setIntroFinished] = useState<boolean>(false);
   const [astronauts] = useState<AstronautProfile[]>([PRIMARY_ASTRONAUT]);
   const [selectedAstronautId, setSelectedAstronautId] = useState<string>(PRIMARY_ASTRONAUT.id);
-  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
+  const themeMode = 'light' as const;
   const [responsiveStage, setResponsiveStage] = useState<ResponsiveStage>('all');
 
   const [samples, setSamples] = useState<DashboardSample[]>([]);
@@ -63,7 +64,6 @@ export function App() {
 
   const [selectedMuscleId, setSelectedMuscleId] = useState<string | null>(null);
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   const [connectionStatus, setConnectionStatus] = useState<ConnectionEndpointStatus>({
     healthOk: false,
@@ -148,15 +148,6 @@ export function App() {
     };
   }, [performSync]);
 
-  const handleManualRefresh = async () => {
-    setIsSyncing(true);
-    try {
-      await performSync();
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   const selectedAstronaut = useMemo(
     () => astronauts.find((a) => a.id === selectedAstronautId) ?? PRIMARY_ASTRONAUT,
     [astronauts, selectedAstronautId]
@@ -217,25 +208,6 @@ export function App() {
       .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())[0];
   }, [healthChecks]);
 
-  const globalRiskLevel: 'normal' | 'warning' | 'critical' = useMemo(() => {
-    const hasRedLesion = activeLesions.some((m) => (m.observation?.painIntensity ?? 0) >= 7);
-    const hasCriticalVitals =
-      (vitals.heartRate !== null && (vitals.heartRate >= 115 || vitals.heartRate < 48)) ||
-      (vitals.spo2 !== null && vitals.spo2 < 92) ||
-      latestHealthCheck?.overallStatus === 'critical';
-
-    if (hasRedLesion || hasCriticalVitals) return 'critical';
-
-    const hasWarningVitals =
-      (vitals.heartRate !== null && vitals.heartRate >= 100) ||
-      (vitals.stress !== null && vitals.stress >= 70) ||
-      (vitals.spo2 !== null && vitals.spo2 < 95) ||
-      latestHealthCheck?.overallStatus === 'warning';
-
-    if (activeLesions.length > 0 || hasWarningVitals) return 'warning';
-    return 'normal';
-  }, [activeLesions, vitals, latestHealthCheck]);
-
   const handleSelectMuscle = useCallback((muscleId: string | null) => {
     setSelectedMuscleId(muscleId);
   }, []);
@@ -246,19 +218,15 @@ export function App() {
 
   return (
     <div className={`app-root theme-${themeMode}`}>
+      <HexagonalVaultBackground themeMode={themeMode} />
       {!introFinished && <StartupSplashAnimation onComplete={handleIntroComplete} />}
-      <AstronautProfileBar
-        astronauts={astronauts}
-        selectedAstronautId={selectedAstronautId}
-        onSelectAstronaut={(id) => setSelectedAstronautId(id)}
-        connectionStatus={connectionStatus}
-        globalRiskLevel={globalRiskLevel}
-        activeLesionsCount={activeLesions.length}
-        isSyncing={isSyncing}
-        themeMode={themeMode}
-        onToggleTheme={() => setThemeMode((t) => (t === 'light' ? 'dark' : 'light'))}
-        onManualRefresh={() => void handleManualRefresh()}
-      />
+      <div className="relative z-10 flex h-dvh flex-col overflow-hidden">
+        <AstronautProfileBar
+          astronauts={astronauts}
+          selectedAstronautId={selectedAstronautId}
+          onSelectAstronaut={(id) => setSelectedAstronautId(id)}
+          connectionStatus={connectionStatus}
+        />
 
       <div className="dashboard-shell">
         <nav className="stage-switcher-bar" aria-label="Vistas de tablet o móvil">
@@ -420,6 +388,7 @@ export function App() {
             </section>
           </div>
         </main>
+      </div>
       </div>
     </div>
   );

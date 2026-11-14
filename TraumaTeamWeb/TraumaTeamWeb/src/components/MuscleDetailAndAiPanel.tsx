@@ -283,7 +283,7 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
               style={
                 {
                   '--srb-accent':
-                    hasReport && obs ? getPainColorHex(obs.painIntensity) : '#10b981',
+                    hasReport && obs ? getPainColorHex(obs.painIntensity) : '#93DEFF',
                 } as React.CSSProperties
               }
             >
@@ -293,11 +293,11 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
                   <span
                     className="srb-title-icon"
                     style={{
-                      color: hasReport && obs ? getPainColorHex(obs.painIntensity) : '#10b981',
+                      color: hasReport && obs ? getPainColorHex(obs.painIntensity) : '#0369a1',
                       backgroundColor:
                         hasReport && obs
                           ? `${getPainColorHex(obs.painIntensity)}18`
-                          : 'rgba(16, 185, 129, 0.14)',
+                          : 'rgba(147, 222, 255, 0.3)',
                     }}
                   >
                     {hasReport ? <AlertTriangleIcon size={13} /> : <CheckIcon size={13} />}

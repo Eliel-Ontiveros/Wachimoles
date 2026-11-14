@@ -283,6 +283,21 @@ export const ChevronRightIcon: React.FC<IconProps> = ({ size = 18, strokeWidth =
   </svg>
 );
 
+export const ChevronDownIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, className }) => (
+  <svg {...baseProps(size, strokeWidth, className)}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
+export const UserPlusIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, className }) => (
+  <svg {...baseProps(size, strokeWidth, className)}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <line x1="19" x2="19" y1="8" y2="14" />
+    <line x1="22" x2="16" y1="11" y2="11" />
+  </svg>
+);
+
 export const RegionCategoryIcon: React.FC<{
   category: BodyRegionCategory;
   size?: number;
