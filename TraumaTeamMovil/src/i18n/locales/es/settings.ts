@@ -12,6 +12,8 @@ const settings = {
   'settings.themeChanged.light': 'Modo claro activado',
   'settings.themeChanged.dark': 'Modo oscuro activado',
   'settings.localeChanged': 'Idioma cambiado a español',
+  'settings.switchToDark': 'Cambiar a modo oscuro',
+  'settings.switchToLight': 'Cambiar a modo claro',
 };
 
 export default settings;

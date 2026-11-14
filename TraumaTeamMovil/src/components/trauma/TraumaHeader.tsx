@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Bell, CheckCheck, Menu, X } from 'lucide-react-native';
 
 import { useI18n } from '@/i18n/I18nProvider';
+import { ThemeToggle } from '@/settings/ThemeToggle';
 import { useAppTheme } from '@/theme';
 import { useVoice } from '@/voice/voice-context';
 
@@ -41,19 +42,22 @@ export function TraumaHeader() {
           <Text className="font-bold">Trauma</Text>Team
         </Text>
 
-        <Pressable
-          onPress={() => setAlertsOpen(true)}
-          accessibilityLabel={t('alerts.title')}
-          className="h-10 w-10 items-center justify-center rounded-xl border border-trauma-ink bg-white active:opacity-60 dark:border-trauma-nightLine dark:bg-trauma-night">
-          <Bell size={18} color={unreadAlertCount > 0 ? colors.danger : colors.text} />
-          {unreadAlertCount > 0 && (
-            <View className="absolute -right-1 -top-1 h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1">
-              <Text className="font-mono text-[9px] font-bold text-white">
-                {unreadAlertCount}
-              </Text>
-            </View>
-          )}
-        </Pressable>
+        <View className="flex-row items-center gap-2">
+          <ThemeToggle />
+          <Pressable
+            onPress={() => setAlertsOpen(true)}
+            accessibilityLabel={t('alerts.title')}
+            className="h-10 w-10 items-center justify-center rounded-xl border border-trauma-ink bg-white active:opacity-60 dark:border-trauma-nightLine dark:bg-trauma-night">
+            <Bell size={18} color={unreadAlertCount > 0 ? colors.danger : colors.text} />
+            {unreadAlertCount > 0 && (
+              <View className="absolute -right-1 -top-1 h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1">
+                <Text className="font-mono text-[9px] font-bold text-white">
+                  {unreadAlertCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {/* Tarjeta compacta de notificaciones */}
@@ -117,10 +121,14 @@ export function TraumaHeader() {
                           style={{ marginRight: 10 }}
                         />
                         <View className="flex-1 pr-2">
-                          <Text className="font-mono text-xs font-bold text-slate-900 dark:text-trauma-nightInk" numberOfLines={1}>
+                          <Text
+                            className="font-mono text-xs font-bold text-slate-900 dark:text-trauma-nightInk"
+                            numberOfLines={1}>
                             {a.title}
                           </Text>
-                          <Text className="mt-0.5 font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted" numberOfLines={1}>
+                          <Text
+                            className="mt-0.5 font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted"
+                            numberOfLines={1}>
                             {a.timestamp}
                           </Text>
                         </View>

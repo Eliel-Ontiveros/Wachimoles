@@ -14,6 +14,8 @@ const settings: Record<keyof typeof es, string> = {
   'settings.themeChanged.light': 'Light mode enabled',
   'settings.themeChanged.dark': 'Dark mode enabled',
   'settings.localeChanged': 'Language changed to English',
+  'settings.switchToDark': 'Switch to dark mode',
+  'settings.switchToLight': 'Switch to light mode',
 };
 
 export default settings;
