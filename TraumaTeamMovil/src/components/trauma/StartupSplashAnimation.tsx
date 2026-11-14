@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -6,7 +6,9 @@ import {
   Platform,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import Svg, { Polygon } from 'react-native-svg';
 import type { AnimationItem, LottiePlayer } from 'lottie-web';
 
 interface StartupSplashAnimationProps {
@@ -14,7 +16,124 @@ interface StartupSplashAnimationProps {
 }
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const DISSOLVE_DURATION_MS = 420;
+const DISSOLVE_DURATION_MS = 960;
+
+interface SplashTile {
+  key: string;
+  cx: number;
+  cy: number;
+  d: number;
+}
+
+interface HexGrid {
+  boxW: number;
+  boxH: number;
+  tilePoints: string;
+  tiles: SplashTile[];
+}
+
+function hexPoints(radius: number, cx: number, cy: number): string {
+  return Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 180) * (60 * i - 90);
+    return `${(cx + radius * Math.cos(a)).toFixed(2)},${(cy + radius * Math.sin(a)).toFixed(2)}`;
+  }).join(' ');
+}
+
+function buildHexGrid(w: number, h: number): HexGrid {
+  const safeW = Math.max(320, w);
+  const safeH = Math.max(320, h);
+  const ox = safeW / 2;
+  const oy = safeH / 2;
+  const radius = Math.max(56, Math.min(88, Math.round(Math.hypot(safeW, safeH) / 18)));
+  const hexW = Math.sqrt(3) * radius;
+  const rowStep = 1.5 * radius;
+  const boxW = hexW + 4;
+  const boxH = 2 * radius + 4;
+  const tilePoints = hexPoints(radius + 2.2, boxW / 2, boxH / 2);
+
+  const rows = Math.ceil(safeH / rowStep) + 1;
+  const cols = Math.ceil(safeW / hexW) + 1;
+  const maxD = Math.max(1, Math.hypot(Math.max(ox, safeW - ox), Math.max(oy, safeH - oy)));
+
+  const tiles: SplashTile[] = [];
+  for (let r = -1; r <= rows; r++) {
+    const offset = Math.abs(r) % 2 === 1 ? hexW / 2 : 0;
+    for (let c = -1; c <= cols; c++) {
+      const cx = c * hexW + offset;
+      const cy = r * rowStep;
+      if (cx - hexW / 2 > safeW || cx + hexW / 2 < 0 || cy - radius > safeH || cy + radius < 0) {
+        continue;
+      }
+      tiles.push({
+        key: `${r}-${c}`,
+        cx,
+        cy,
+        d: Math.min(1, Math.hypot(cx - ox, cy - oy) / maxD),
+      });
+    }
+  }
+
+  return { boxW, boxH, tilePoints, tiles };
+}
+
+const SplashHexTile = memo(function SplashHexTile({
+  tile,
+  boxW,
+  boxH,
+  tilePoints,
+  dissolveProgress,
+}: {
+  tile: SplashTile;
+  boxW: number;
+  boxH: number;
+  tilePoints: string;
+  dissolveProgress: Animated.Value;
+}) {
+  const start = tile.d * 0.48;
+  const end = Math.min(1, start + 0.52);
+  const mid = start + (end - start) * 0.45;
+
+  const scale = dissolveProgress.interpolate({
+    inputRange: [start, mid, end],
+    outputRange: [1, 0.72, 0],
+    extrapolate: 'clamp',
+  });
+  const rotate = dissolveProgress.interpolate({
+    inputRange: [start, mid, end],
+    outputRange: ['0deg', '-18deg', '-60deg'],
+    extrapolate: 'clamp',
+  });
+  const opacity = dissolveProgress.interpolate({
+    inputRange: [start, Math.min(end, start + 0.08), end],
+    outputRange: [1, 0.96, 0],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      renderToHardwareTextureAndroid
+      shouldRasterizeIOS
+      style={{
+        position: 'absolute',
+        left: tile.cx - boxW / 2,
+        top: tile.cy - boxH / 2,
+        width: boxW,
+        height: boxH,
+        opacity,
+        transform: [{ scale }, { rotate }],
+      }}>
+      <Svg width={boxW} height={boxH}>
+        <Polygon
+          points={tilePoints}
+          fill="#f8fafc"
+          stroke="#e2e8f0"
+          strokeWidth={1.5}
+        />
+      </Svg>
+    </Animated.View>
+  );
+});
 
 let NativeWebView: any = null;
 if (Platform.OS !== 'web') {
@@ -26,7 +145,7 @@ if (Platform.OS !== 'web') {
   }
 }
 
-const TRAUMATEAM_WORDMARK_PATHS: readonly { d: string; fill: string }[] = [
+export const TRAUMATEAM_WORDMARK_PATHS: readonly { d: string; fill: string }[] = [
   // Trauma (#313643)
   { fill: '#313643', d: 'M0,0h26.45v4.06h-10.71v23.58h-4.86V4.06H0V0Z' },
   {
@@ -89,35 +208,35 @@ function buildSplashHtml(animationJson: string, reduceMotion: boolean): string {
     }
     .lockup {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       width: 100%;
-      max-width: 680px;
-      padding: 0 8px;
+      max-width: 420px;
+      padding: 0 12px;
     }
     #lottie-stage {
       flex: 0 0 auto;
-      width: clamp(96px, 28vw, 220px);
+      width: clamp(148px, 46vw, 240px);
       aspect-ratio: 1596 / 1110;
       background: transparent;
-      transform: translateX(clamp(34px, 12vw, 95px));
+      transform: translateY(18px);
       transition: transform 0.72s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .lockup.is-wordmark-visible #lottie-stage {
-      transform: translateX(0);
+      transform: translateY(0);
     }
     .wordmark {
       display: block;
       flex: 0 0 auto;
-      width: clamp(148px, 46vw, 360px);
+      width: clamp(190px, 66vw, 340px);
       height: auto;
-      margin-left: clamp(-20px, -2.5vw, -8px);
+      margin-top: 6px;
       overflow: visible;
     }
     .wordmark-letter {
       opacity: 0;
-      transform: translate3d(-12px, 3px, 0) scale(0.94);
+      transform: translate3d(0, 10px, 0) scale(0.94);
       transform-box: fill-box;
       transform-origin: center;
       transition:
@@ -229,6 +348,8 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
   const [dissolveProgress] = useState(() => new Animated.Value(0));
   const [nativeHtml, setNativeHtml] = useState<string | null>(null);
   const [reduceMotionPref, setReduceMotionPref] = useState(false);
+  const { width, height } = useWindowDimensions();
+  const hexGrid = useMemo(() => buildHexGrid(width, height), [width, height]);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -259,34 +380,69 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
       }, 1450);
     };
 
-    const beginHexDissolve = (reduceMotion: boolean) => {
+    const beginHexDissolve = (reduceMotion: boolean, immediate = false) => {
       if (cancelled || hasCompletedRef.current || dissolvingStarted) return;
       dissolvingStarted = true;
       clearTimeout(safetyTimer);
+      if (wordmarkTimer !== null) {
+        clearTimeout(wordmarkTimer);
+        wordmarkTimer = null;
+      }
+      if (holdTimer !== null) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
 
       if (reduceMotion) {
-        finishTimer = setTimeout(triggerComplete, 1000);
+        finishTimer = setTimeout(triggerComplete, immediate ? 0 : 1000);
         return;
       }
 
-      holdTimer = setTimeout(() => {
+      const startDissolve = () => {
         if (cancelled || hasCompletedRef.current) return;
         setIsDissolving(true);
         finishTimer = setTimeout(triggerComplete, DISSOLVE_DURATION_MS + 60);
         Animated.timing(dissolveProgress, {
           toValue: 1,
           duration: DISSOLVE_DURATION_MS,
-          easing: Easing.out(Easing.cubic),
+          easing: Easing.linear,
           useNativeDriver: USE_NATIVE_DRIVER,
         }).start(({ finished }) => {
           if (finished) {
             triggerComplete();
           }
         });
-      }, 1000);
+      };
+
+      if (immediate) {
+        startDissolve();
+      } else {
+        holdTimer = setTimeout(startDissolve, 1000);
+      }
     };
 
     startExitRef.current = beginHexDissolve;
+
+    let currentReduceMotion = false;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      if (
+        event.key === 'Shift' ||
+        event.key === 'Control' ||
+        event.key === 'Alt' ||
+        event.key === 'Meta'
+      ) {
+        return;
+      }
+      anim?.pause();
+      beginHexDissolve(currentReduceMotion, true);
+    };
+
+    const hasWindowKeyListener =
+      typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+    if (hasWindowKeyListener) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
 
     const runSplash = async () => {
       try {
@@ -297,6 +453,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
           typeof window !== 'undefined' &&
           Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
         const prefersReduced = nativeReduced || webReduced;
+        currentReduceMotion = prefersReduced;
         if (!cancelled) {
           setReduceMotionPref(prefersReduced);
         }
@@ -379,6 +536,9 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
 
     return () => {
       cancelled = true;
+      if (hasWindowKeyListener) {
+        window.removeEventListener('keydown', handleKeyDown);
+      }
       clearTimeout(safetyTimer);
       if (wordmarkTimer !== null) {
         clearTimeout(wordmarkTimer);
@@ -405,20 +565,20 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
   };
 
   const solidBgOpacity = dissolveProgress.interpolate({
-    inputRange: [0, 1],
+    inputRange: [0, 0.19],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
   const stageOpacity = dissolveProgress.interpolate({
-    inputRange: [0, 1],
+    inputRange: [0, 0.36],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
   const stageScale = dissolveProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.96],
+    inputRange: [0, 0.4],
+    outputRange: [1, 0.92],
     extrapolate: 'clamp',
   });
 
@@ -427,7 +587,21 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
       style={styles.overlay}
       pointerEvents={isDissolving ? 'none' : 'auto'}
       accessibilityLabel="Cargando aplicación TraumaTeam">
-      {/* Fondo sólido continuo que se desvanece suavemente tras 1s de pausa */}
+      {/* Malla de hexágonos que se disuelve radialmente para revelar la app */}
+      <View style={styles.hexLayer} pointerEvents="none">
+        {hexGrid.tiles.map((tile) => (
+          <SplashHexTile
+            key={tile.key}
+            tile={tile}
+            boxW={hexGrid.boxW}
+            boxH={hexGrid.boxH}
+            tilePoints={hexGrid.tilePoints}
+            dissolveProgress={dissolveProgress}
+          />
+        ))}
+      </View>
+
+      {/* Fondo sólido continuo durante Lottie que cede suavemente al mosaico hexagonal */}
       <Animated.View
         pointerEvents="none"
         style={[styles.solidBg, { opacity: solidBgOpacity }]}
@@ -443,22 +617,20 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
           <div
             style={{
               display: 'flex',
-              flexDirection: 'row',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               width: '100%',
-              maxWidth: '680px',
+              maxWidth: '420px',
             }}>
             <div
               ref={webContainerRef}
               style={{
                 flex: '0 0 auto',
-                width: 'clamp(96px, 28vw, 220px)',
+                width: 'clamp(148px, 46vw, 240px)',
                 aspectRatio: '1596 / 1110',
                 background: 'transparent',
-                transform: wordmarkVisible
-                  ? 'translateX(0)'
-                  : 'translateX(clamp(34px, 12vw, 95px))',
+                transform: wordmarkVisible ? 'translateY(0)' : 'translateY(18px)',
                 transition: reduceMotionPref
                   ? 'none'
                   : 'transform 0.72s cubic-bezier(0.22, 1, 0.36, 1)',
@@ -470,9 +642,9 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
               style={{
                 display: 'block',
                 flex: '0 0 auto',
-                width: 'clamp(148px, 46vw, 360px)',
+                width: 'clamp(190px, 66vw, 340px)',
                 height: 'auto',
-                marginLeft: 'clamp(-20px, -2.5vw, -8px)',
+                marginTop: '6px',
                 overflow: 'visible',
               }}>
               {TRAUMATEAM_WORDMARK_PATHS.map((item, idx) => (
@@ -484,7 +656,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
                     opacity: wordmarkVisible ? 1 : 0,
                     transform: wordmarkVisible
                       ? 'translate3d(0, 0, 0) scale(1)'
-                      : 'translate3d(-12px, 3px, 0) scale(0.94)',
+                      : 'translate3d(0, 10px, 0) scale(0.94)',
                     transformBox: 'fill-box',
                     transformOrigin: 'center',
                     transition: reduceMotionPref
@@ -527,6 +699,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     overflow: 'hidden',
   },
+  hexLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 1,
+  },
   solidBg: {
     position: 'absolute',
     top: 0,
@@ -539,8 +719,8 @@ const styles = StyleSheet.create({
   stageContainer: {
     zIndex: 3,
     width: '100%',
-    maxWidth: 680,
-    aspectRatio: 2.45,
+    maxWidth: 420,
+    aspectRatio: 1.05,
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',

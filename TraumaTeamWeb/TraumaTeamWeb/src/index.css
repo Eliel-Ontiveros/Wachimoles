@@ -3545,12 +3545,9 @@ dialog.history-native-dialog::backdrop {
   overflow: hidden;
   background-color: transparent;
   pointer-events: auto;
-  opacity: 1;
-  transition: opacity 0.42s ease-out;
 }
 
 .startup-splash-screen.is-dissolving {
-  opacity: 0;
   pointer-events: none;
 }
 
@@ -3559,7 +3556,7 @@ dialog.history-native-dialog::backdrop {
   inset: 0;
   z-index: 2;
   background-color: #f8fafc;
-  transition: opacity 0.42s ease-out;
+  transition: opacity 0.18s ease-out;
   pointer-events: none;
 }
 
@@ -3575,6 +3572,7 @@ dialog.history-native-dialog::backdrop {
   block-size: 100%;
   display: block;
   pointer-events: none;
+  contain: strict;
 }
 
 .startup-splash-hex-poly {
@@ -3586,6 +3584,7 @@ dialog.history-native-dialog::backdrop {
 }
 
 .startup-splash-screen.is-dissolving .startup-splash-hex-poly {
+  will-change: transform, opacity;
   animation: splashHexDissolve 0.52s cubic-bezier(0.32, 0, 0.67, 0) var(--hex-delay, 0ms) forwards;
 }
 
@@ -3613,10 +3612,10 @@ dialog.history-native-dialog::backdrop {
   align-items: center;
   justify-content: center;
   inline-size: min(94vw, 720px);
+  will-change: transform, opacity;
   transition:
-    opacity 0.34s ease,
-    transform 0.38s ease,
-    filter 0.34s ease;
+    opacity 0.3s ease,
+    transform 0.34s ease;
   transition-behavior: allow-discrete;
 }
 
@@ -3669,8 +3668,7 @@ dialog.history-native-dialog::backdrop {
 
 .startup-splash-screen.is-dissolving .startup-splash-lockup {
   opacity: 0;
-  transform: scale(0.92);
-  filter: blur(4px);
+  transform: scale(0.94);
 }
 
 @media (prefers-reduced-motion: reduce) {

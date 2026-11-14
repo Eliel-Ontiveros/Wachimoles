@@ -21,7 +21,7 @@ function hexPoints(radius: number, cx: number, cy: number): string {
 function buildHexTiles(w: number, h: number, ox: number, oy: number): HexTile[] {
   const safeW = Math.max(320, w);
   const safeH = Math.max(320, h);
-  const radius = Math.max(44, Math.min(70, Math.round(Math.hypot(safeW, safeH) / 28)));
+  const radius = Math.max(58, Math.min(92, Math.round(Math.hypot(safeW, safeH) / 20)));
   const hexW = Math.sqrt(3) * radius;
   const rowStep = 1.5 * radius;
   const drawRadius = radius + 2.2;
@@ -84,6 +84,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
 
     let cancelled = false;
     let completed = false;
+    let dissolving = false;
     let anim: AnimationItem | null = null;
     let wordmarkTimer: number | null = null;
     let holdTimer: number | null = null;
@@ -104,11 +105,40 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
       Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
     const beginHexDissolve = () => {
-      if (cancelled || completed) return;
+      if (cancelled || completed || dissolving) return;
+      dissolving = true;
       window.clearTimeout(safetyTimer);
       setIsDissolving(true);
-      finishTimer = window.setTimeout(triggerComplete, 420);
+      finishTimer = window.setTimeout(triggerComplete, 960);
     };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      if (
+        event.key === 'Shift' ||
+        event.key === 'Control' ||
+        event.key === 'Alt' ||
+        event.key === 'Meta'
+      ) {
+        return;
+      }
+      if (wordmarkTimer !== null) {
+        window.clearTimeout(wordmarkTimer);
+        wordmarkTimer = null;
+      }
+      if (holdTimer !== null) {
+        window.clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      anim?.pause();
+      if (prefersReducedMotion) {
+        triggerComplete();
+      } else {
+        beginHexDissolve();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
 
     const scheduleWordmarkReveal = () => {
       if (cancelled || wordmarkTimer !== null) return;
@@ -194,6 +224,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
 
     return () => {
       cancelled = true;
+      window.removeEventListener('keydown', handleKeyDown);
       window.clearTimeout(safetyTimer);
       if (wordmarkTimer !== null) {
         window.clearTimeout(wordmarkTimer);

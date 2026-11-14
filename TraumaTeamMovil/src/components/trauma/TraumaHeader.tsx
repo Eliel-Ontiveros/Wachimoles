@@ -3,11 +3,13 @@ import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Bell, CheckCheck, Menu, X } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { useVoice } from '@/voice/voice-context';
 
 import { useDrawer } from './drawer-context';
 import { useMission } from './mission-context';
+import { TRAUMATEAM_WORDMARK_PATHS } from './StartupSplashAnimation';
 
 export function TraumaHeader() {
   const { open } = useDrawer();
@@ -33,9 +35,13 @@ export function TraumaHeader() {
           <Menu size={20} color="#111827" />
         </Pressable>
 
-        <Text className="font-mono text-2xl text-trauma-ink">
-          <Text className="font-bold">Trauma</Text>Team
-        </Text>
+        <View className="items-center justify-center" accessibilityLabel="TraumaTeam">
+          <Svg width={186} height={15} viewBox="0 0 342.6 27.64">
+            {TRAUMATEAM_WORDMARK_PATHS.map((item, idx) => (
+              <Path key={idx} fill={item.fill} d={item.d} />
+            ))}
+          </Svg>
+        </View>
 
         <Pressable
           onPress={() => setAlertsOpen(true)}
