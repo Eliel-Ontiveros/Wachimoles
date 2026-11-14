@@ -95,7 +95,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (!isMounted) return;
-        console.error('No se pudieron cargar los cuestionarios diarios.', error);
+        console.warn('No se pudieron cargar los cuestionarios diarios.', error);
         Alert.alert(
           'No se pudo cargar el cuestionario',
           'Revisa la conexión con el backend e inténtalo de nuevo.'

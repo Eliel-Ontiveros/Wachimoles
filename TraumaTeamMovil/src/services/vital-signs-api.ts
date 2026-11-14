@@ -2,17 +2,20 @@ import { DashboardSample, SampleMetric, VitalSignsData } from '../types/vital-si
 
 // Conexión y procesamiento de signos vitales desde el backend NestJS
 export const API_CONFIG = {
-  apiBaseUrl:
+  apiBaseUrl: (
     process.env.EXPO_PUBLIC_API_BASE_URL ||
     process.env.EXPO_PUBLIC_LOCAL_API_URL ||
-    '',
-  dashboardApiToken: process.env.EXPO_PUBLIC_DASHBOARD_API_TOKEN || '',
+    ''
+  ).trim(),
+  dashboardApiToken: (
+    process.env.EXPO_PUBLIC_DASHBOARD_API_TOKEN || ''
+  ).trim(),
 
   // Conservados para los servicios de misiones que aún usan esta configuración.
   localUrls: process.env.EXPO_PUBLIC_LOCAL_API_URL
-    ? [process.env.EXPO_PUBLIC_LOCAL_API_URL]
+    ? [process.env.EXPO_PUBLIC_LOCAL_API_URL.trim()]
     : ([] as string[]),
-  userId: process.env.EXPO_PUBLIC_USER_ID || '',
+  userId: (process.env.EXPO_PUBLIC_USER_ID || '').trim(),
 
   timeoutMs: 5000,
 };

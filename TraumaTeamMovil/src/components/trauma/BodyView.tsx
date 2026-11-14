@@ -253,8 +253,8 @@ function ProblemDetailModal({
               <View className="mt-3.5 flex-row gap-2">
                 <View
                   className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${observation.swelling
-                      ? 'border-sky-200 bg-sky-50/70'
-                      : 'border-slate-100 bg-slate-50'
+                    ? 'border-sky-200 bg-sky-50/70'
+                    : 'border-slate-100 bg-slate-50'
                     }`}>
                   <Layers
                     size={14}
@@ -271,8 +271,8 @@ function ProblemDetailModal({
 
                 <View
                   className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${observation.functionalLimitation
-                      ? 'border-sky-200 bg-sky-50/70'
-                      : 'border-slate-100 bg-slate-50'
+                    ? 'border-sky-200 bg-sky-50/70'
+                    : 'border-slate-100 bg-slate-50'
                     }`}>
                   <MotionStatusIcon
                     size={14}
@@ -405,7 +405,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
       })
       .catch((error: unknown) => {
         if (!isMounted) return;
-        console.error('No se pudieron cargar los padecimientos del cuerpo 3D.', error);
+        console.warn('No se pudieron cargar los padecimientos del cuerpo 3D.', error);
         Alert.alert(
           'No se pudieron cargar los registros',
           'Revisa la conexión con el backend e inténtalo de nuevo.'
@@ -454,11 +454,11 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
       muscleName: muscle.name,
       observation: observation
         ? {
-            painIntensity: observation.painIntensity,
-            swelling: observation.swelling,
-            functionalLimitation: observation.functionalLimitation,
-            notes: observation.notes,
-          }
+          painIntensity: observation.painIntensity,
+          swelling: observation.swelling,
+          functionalLimitation: observation.functionalLimitation,
+          notes: observation.notes,
+        }
         : null,
     }).then(({ synced }) => {
       if (!synced) {
@@ -502,11 +502,10 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
           <Pressable
             key={t.id}
             onPress={() => setTab(t.id)}
-            className={`flex-1 items-center rounded-md border px-2 py-1.5 active:opacity-70 ${
-              tab === t.id
+            className={`flex-1 items-center rounded-md border px-2 py-1.5 active:opacity-70 ${tab === t.id
                 ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
                 : 'border-trauma-ink bg-white'
-            }`}>
+              }`}>
             <Text className="font-mono text-[11px] font-bold text-trauma-ink" numberOfLines={1}>
               {t.label}
             </Text>

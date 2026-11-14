@@ -1,3 +1,45 @@
+# Dependencies
 node_modules/
-server/data/
+
+# Build & runtime outputs
 dist/
+dist-ssr/
+web-build/
+.expo/
+.cache/
+server/data/
+
+# Environment variables & secrets
+.env
+.env.*
+*.env
+!.env.example
+
+# Logs & caches
+logs/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.*
+lerna-debug.*
+*.tsbuildinfo
+.metro-health-check*
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Keys & certificates
+*.pem
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision

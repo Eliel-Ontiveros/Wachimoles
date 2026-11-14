@@ -427,29 +427,29 @@ export function getMissionsForEnvironment(
   const activityMission: DailyMission =
     env === 'nave'
       ? {
-          id: 'treadmill-steps',
-          title: treadmillActive ? 'Rutina de caminadora T2' : 'Caminadora 0g (Opcional)',
-          description: treadmillActive
-            ? 'Contando pasos desde el reloj durante la rutina'
-            : 'En 0g no hay pasos; actívala si usas caminadora',
-          category: 'treadmill',
-          targetValue: goal,
-          currentValue: treadmillActive ? currentSteps : 0,
-          unit: 'pasos',
-          completed: treadmillActive && currentSteps >= goal,
-          environment: 'nave',
-        }
+        id: 'treadmill-steps',
+        title: treadmillActive ? 'Rutina de caminadora T2' : 'Caminadora 0g (Opcional)',
+        description: treadmillActive
+          ? 'Contando pasos desde el reloj durante la rutina'
+          : 'En 0g no hay pasos; actívala si usas caminadora',
+        category: 'treadmill',
+        targetValue: goal,
+        currentValue: treadmillActive ? currentSteps : 0,
+        unit: 'pasos',
+        completed: treadmillActive && currentSteps >= goal,
+        environment: 'nave',
+      }
       : {
-          id: 'daily-steps',
-          title: `Meta de pasos (${ENVIRONMENTS[env].shortLabel})`,
-          description: 'Lectura automática desde el smartwatch',
-          category: 'steps',
-          targetValue: goal,
-          currentValue: currentSteps,
-          unit: 'pasos',
-          completed: currentSteps >= goal,
-          environment: env,
-        };
+        id: 'daily-steps',
+        title: `Meta de pasos (${ENVIRONMENTS[env].shortLabel})`,
+        description: 'Lectura automática desde el smartwatch',
+        category: 'steps',
+        targetValue: goal,
+        currentValue: currentSteps,
+        unit: 'pasos',
+        completed: currentSteps >= goal,
+        environment: env,
+      };
 
   return [
     {
@@ -541,16 +541,16 @@ export async function syncObservationToBackend(
       ...(shouldResolve
         ? {}
         : {
-            body: JSON.stringify({
-              bodyRegion: input.bodyRegion,
-              muscleName: input.muscleName,
-              conditionName: 'Dolor muscular',
-              description: observation.notes,
-              painIntensity: observation.painIntensity,
-              swelling: observation.swelling,
-              functionalLimitation: observation.functionalLimitation,
-            }),
+          body: JSON.stringify({
+            bodyRegion: input.bodyRegion,
+            muscleName: input.muscleName,
+            conditionName: 'Dolor muscular',
+            description: observation.notes,
+            painIntensity: observation.painIntensity,
+            swelling: observation.swelling,
+            functionalLimitation: observation.functionalLimitation,
           }),
+        }),
       signal: controller.signal,
     });
 
@@ -571,9 +571,10 @@ export async function syncObservationToBackend(
 
 export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecord[]> {
   if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
-    throw new Error(
-      'Configura EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN para cargar los padecimientos.'
+    console.warn(
+      'No se pudieron cargar los padecimientos: falta configurar EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN.'
     );
+    return [];
   }
 
   const controller = new AbortController();
@@ -618,9 +619,10 @@ export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecor
 
 export async function getDailyHealthChecksFromBackend(): Promise<DailyHealthCheck[]> {
   if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
-    throw new Error(
-      'Configura EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN para cargar los cuestionarios.'
+    console.warn(
+      'No se pudieron cargar los cuestionarios: falta configurar EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN.'
     );
+    return [];
   }
 
   const controller = new AbortController();
