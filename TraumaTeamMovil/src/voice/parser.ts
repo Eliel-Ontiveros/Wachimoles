@@ -155,7 +155,7 @@ export function parseCommand(raw: string): ParseResult {
   if (hasAny(text, ['registros', 'historial', 'records', 'history'])) return ok({ type: 'body-tab', tab: 'records', label: 'Registros' });
   if (hasAny(text, ['vista 3d', 'modelo 3d', '3d model', 'cuerpo en 3d'])) return ok({ type: 'body-tab', tab: 'body', label: 'Vista 3D' });
 
-  if (hasAny(text, ['signos vitales', 'monitoreo', 'monitor', 'vitales', 'vital signs', 'vitals', 'pulso', 'inicio', 'home', 'dashboard', 'ecg'])) {
+  if (hasAny(text, ['signos vitales', 'monitoreo', 'monitor', 'vitales', 'vital signs', 'vitals', 'pulso', 'inicio', 'home', 'dashboard', 'ecg', 'ritmo cardiaco', 'frecuencia cardiaca', 'corazon', 'latidos', 'pulsaciones', 'oxigeno', 'saturacion', 'spo2', 'estres', 'heart rate', 'heart', 'oxygen', 'stress'])) {
     return ok({ type: 'navigate', route: '/', label: 'Monitoreo Vital' });
   }
   if (hasAny(text, ['vista corporal', 'cuerpo', 'body', 'explorar', 'explore', 'lesion', 'lesiones'])) {

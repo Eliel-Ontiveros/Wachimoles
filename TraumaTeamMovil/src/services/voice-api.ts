@@ -1,17 +1,18 @@
 import type { VoiceIntent } from '../voice/parser';
 import { API_CONFIG } from './vital-signs-api';
 
-export type LlmInterpretation = { intent: VoiceIntent | null; message?: string };
+export type LlmInterpretation =
+  | { ok: true; intent: VoiceIntent | null; message?: string }
+  | { ok: false; reason: 'not-configured' | 'unreachable' | 'disabled' | 'failed' };
 
 const LLM_TIMEOUT_MS = 9000;
 
 /**
  * Respaldo con LLM (DeepSeek vía backend) para frases que el intérprete local
- * no reconoce. Devuelve null si el servicio no está disponible: la app sigue
- * funcionando con el intérprete local.
+ * no reconoce. Si no está disponible devuelve el motivo, para mostrarlo en la UI.
  */
-export async function interpretWithLlm(text: string): Promise<LlmInterpretation | null> {
-  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) return null;
+export async function interpretWithLlm(text: string): Promise<LlmInterpretation> {
+  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) return { ok: false, reason: 'not-configured' };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
@@ -25,16 +26,22 @@ export async function interpretWithLlm(text: string): Promise<LlmInterpretation 
       body: JSON.stringify({ text: text.slice(0, 300) }),
       signal: controller.signal,
     });
-    if (!response.ok) return null;
+    if (response.status === 503) return { ok: false, reason: 'disabled' };
+    if (!response.ok) {
+      console.warn('[voice] /voice/interpret failed', response.status);
+      return { ok: false, reason: 'failed' };
+    }
     const data: unknown = await response.json();
-    if (typeof data !== 'object' || data === null) return null;
+    if (typeof data !== 'object' || data === null) return { ok: false, reason: 'failed' };
     const { intent, message } = data as { intent?: unknown; message?: unknown };
     return {
+      ok: true,
       intent: typeof intent === 'object' && intent !== null ? (intent as VoiceIntent) : null,
       message: typeof message === 'string' ? message : undefined,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    console.warn('[voice] backend unreachable', error);
+    return { ok: false, reason: 'unreachable' };
   } finally {
     clearTimeout(timer);
   }

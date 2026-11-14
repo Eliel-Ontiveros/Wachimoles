@@ -53,3 +53,15 @@ test('unrecognized and empty input recover gracefully', () => {
   assert.deepEqual([parseCommand('blah blah').ok, parseCommand('blah blah').reason], [false, 'unknown']);
   assert.equal(parseCommand('   ').reason, 'empty');
 });
+
+test('natural phrasings for vitals', () => {
+  for (const s of [
+    'Quisiera ver cómo va mi ritmo cardíaco',
+    'cómo está mi corazón',
+    'muéstrame mi frecuencia cardiaca',
+    'quiero ver mi oxígeno',
+    'how is my heart rate',
+  ]) {
+    assert.equal(intent(s).route, '/', s);
+  }
+});

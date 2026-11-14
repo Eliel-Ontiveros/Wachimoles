@@ -152,8 +152,21 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       // El intérprete local no lo entendió: se consulta al LLM (DeepSeek vía backend).
       report({ kind: 'info', text: 'Pensando…' });
       void interpretWithLlm(text).then((llm) => {
-        if (llm?.intent) execute(llm.intent);
-        else report({ kind: 'error', text: llm?.message ?? result.hint }, true);
+        if (llm.ok && llm.intent) {
+          execute(llm.intent);
+          return;
+        }
+        if (llm.ok) {
+          report({ kind: 'error', text: llm.message ?? result.hint }, true);
+          return;
+        }
+        const why: Record<typeof llm.reason, string> = {
+          'not-configured': 'IA no configurada: falta EXPO_PUBLIC_API_BASE_URL / EXPO_PUBLIC_DASHBOARD_API_TOKEN en la app.',
+          unreachable: 'IA no disponible: no se pudo contactar el backend (¿está corriendo? ¿CORS_ORIGINS incluye este origen?).',
+          disabled: 'IA no disponible: el backend no tiene DEEPSEEK_API_KEY.',
+          failed: 'La IA no pudo procesar la frase. Intenta de nuevo.',
+        };
+        report({ kind: 'error', text: `${why[llm.reason]} ${result.hint}` });
       });
     },
     [execute, report]
