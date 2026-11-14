@@ -1,5 +1,7 @@
 # Backend de Wachimoles_Movil_Backend
 
+The DeepSeek research assistant is documented in [the RAG setup guide](../docs/RAG.md).
+
 API NestJS de solo lectura para el dashboard web independiente en
 [`../Wachimoles_Movil_Frontend`](../Wachimoles_Movil_Frontend). Lee únicamente
 el usuario configurado en `DASHBOARD_USER_ID`. La clave
