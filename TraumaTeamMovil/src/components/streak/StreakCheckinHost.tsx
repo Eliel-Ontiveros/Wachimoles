@@ -26,6 +26,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import LottieView from 'lottie-react-native';
+import { useI18n } from '@/i18n/I18nProvider';
+import type { MessageKey } from '@/i18n/messages';
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import {
@@ -48,7 +50,7 @@ const START_DELAY = 500;
 const ROCKET_SIZE = 300;
 const FIRE_SIZE = 260;
 const SPARK_COLORS = ['#ffc83d', '#ff7a1a', '#ff4d2e', '#fff1b8'];
-const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const DAY_KEYS = [0, 1, 2, 3, 4, 5, 6].map((i) => `vital.streak.d${i}` as MessageKey);
 
 const FLIGHT_EASING = Easing.bezier(0.55, 0.05, 0.4, 1);
 const OFF_FILTER =
@@ -127,6 +129,7 @@ function Dot({ done, today, pop, reduce }: { done: boolean; today: boolean; pop:
 }
 
 function StreakCheckinStage({ req }: { req: StreakCheckinRequest }) {
+  const { t } = useI18n();
   const { width, height } = useWindowDimensions();
   // El escenario ocupa toda la pantalla (sin bordes que recorten onda/destello);
   // el contenido va centrado en la columna de la tarjeta.
@@ -423,11 +426,11 @@ function StreakCheckinStage({ req }: { req: StreakCheckinRequest }) {
           <Animated.Text style={[styles.num, numAStyle]}>{prev}</Animated.Text>
           <Animated.Text style={[styles.num, numBStyle]}>{streak}</Animated.Text>
         </Animated.View>
-        <Animated.Text style={[styles.label, labelStyle]}>días de racha</Animated.Text>
-        <Animated.Text style={[styles.sub, labelStyle]}>¡Sigue así, no pares ahora!</Animated.Text>
+        <Animated.Text style={[styles.label, labelStyle]}>{t('vital.streak.label')}</Animated.Text>
+        <Animated.Text style={[styles.sub, labelStyle]}>{t('vital.streak.sub')}</Animated.Text>
 
         <Animated.View style={[styles.week, weekStyle]}>
-          {DAYS.map((d, i) => {
+          {DAY_KEYS.map((dayKey, i) => {
             const doneBefore = i < todayIndex && todayIndex - i <= prev;
             const isToday = i === todayIndex;
             return (
@@ -438,7 +441,7 @@ function StreakCheckinStage({ req }: { req: StreakCheckinRequest }) {
                   pop={isToday && todayDone}
                   reduce={!!reduce}
                 />
-                <Text style={styles.dayLabel}>{d}</Text>
+                <Text style={styles.dayLabel}>{t(dayKey)}</Text>
               </View>
             );
           })}
@@ -447,11 +450,11 @@ function StreakCheckinStage({ req }: { req: StreakCheckinRequest }) {
         <Animated.View style={[{ marginTop: 34 }, ctaStyle]} pointerEvents={ctaOn ? 'auto' : 'none'}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Continuar"
+            accessibilityLabel={t('vital.streak.continueA11y')}
             onPress={close}
             disabled={!ctaOn}
             style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}>
-            <Text style={styles.ctaText}>CONTINUAR</Text>
+            <Text style={styles.ctaText}>{t('vital.streak.continue')}</Text>
           </Pressable>
         </Animated.View>
       </View>

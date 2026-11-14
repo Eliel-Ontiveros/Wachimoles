@@ -11,6 +11,8 @@ import {
 import Svg, { Polygon } from 'react-native-svg';
 import type { AnimationItem, LottiePlayer } from 'lottie-web';
 
+import { useI18n } from '@/i18n/I18nProvider';
+
 interface StartupSplashAnimationProps {
   onComplete: () => void;
 }
@@ -231,6 +233,7 @@ function buildSplashHtml(animationJson: string, reduceMotion: boolean): string {
 }
 
 export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationProps) {
+  const { t } = useI18n();
   const { width, height } = useWindowDimensions();
   const webContainerRef = useRef<HTMLDivElement | null>(null);
   const onCompleteRef = useRef(onComplete);
@@ -419,7 +422,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
     <View
       style={styles.overlay}
       pointerEvents={isDissolving ? 'none' : 'auto'}
-      accessibilityLabel="Cargando aplicación TraumaTeam">
+      accessibilityLabel={t('vital.splash.a11y')}>
       {/* Malla de hexágonos que se disuelve radialmente para revelar la app */}
       <View style={styles.hexLayer} pointerEvents="none">
         {hexGrid.tiles.map((tile) => (
