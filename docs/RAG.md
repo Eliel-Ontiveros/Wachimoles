@@ -91,6 +91,14 @@ Open the side menu and select **Space Health Assistant**. Start with the built-i
 
 ## 3. Enable DeepSeek generation
 
+### Web muscle reports
+
+The separate Vite web dashboard also calls the existing assistant endpoint. Configure `TraumaTeamWeb/.env` using its `.env.example`, select an active muscle report and press **Review symptoms against documents** in the muscle detail panel. See the [web setup and response behavior](../TraumaTeamWeb/TraumaTeamWeb/README.md).
+
+The web request attaches the selected muscle's reported condition, pain, swelling, functional limitation, timestamp and notes, plus its selected environment. It does not attach other health data or photos. Requests occur only on user action; polling does not trigger generation. The current research corpus supports document-based explanations and abstention, not a clinical diagnosis.
+
+### Backend generation settings
+
 Create an API key in your own [DeepSeek Platform account](https://platform.deepseek.com/). API access and balance are separate from using the consumer chat interface; check the account's current access and billing before enabling calls. Never paste the key into the mobile app, a public Expo variable, or a Git commit.
 
 Edit only `Wachimoles_Backend/.env`:
@@ -105,7 +113,7 @@ Restart the backend and reopen the assistant screen. Submit a question again. Th
 
 The integration calls `POST https://api.deepseek.com/chat/completions` using [DeepSeek's documented API](https://api-docs.deepseek.com/) and [JSON Output](https://api-docs.deepseek.com/guides/json_mode/). The model name is configurable because model availability changes. No OpenAI key, SDK or separate embedding service is required.
 
-When generation is enabled, a question sends its text, selected environment, optional body zone, and retrieved passages to DeepSeek. The assistant does not automatically attach wearable readings, saved questionnaires, body observations or photos. This version makes independent requests and does not retain chat history in the application.
+When generation is enabled, a question sends its text, selected environment, optional body zone, and retrieved passages to DeepSeek. The mobile question screen does not automatically attach wearable readings, saved questionnaires, body observations or photos. The web muscle assessment includes the selected muscle report in its question as described above. This version makes independent requests and does not retain chat history in the application.
 
 ## 4. Verify the flow directly
 
@@ -189,3 +197,6 @@ The existing shared dashboard token is prototype access, and Expo public variabl
 - `Wachimoles_Backend/src/rag/rag.controller.ts`: authenticated HTTP endpoints.
 - `TraumaTeamMovil/src/services/assistant-api.ts`: mobile HTTP contract and source validation.
 - `TraumaTeamMovil/src/app/assistant.tsx`: assistant screen.
+- `TraumaTeamWeb/TraumaTeamWeb/src/services/assistant-api.ts`: authenticated web client and response validation.
+- `TraumaTeamWeb/TraumaTeamWeb/src/services/muscle-assessment.ts`: selected muscle report to RAG request.
+- `TraumaTeamWeb/TraumaTeamWeb/src/components/MuscleRagAssessment.tsx`: web assessment, citations and request states.

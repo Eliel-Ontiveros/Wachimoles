@@ -3,7 +3,7 @@ export interface ConditionPhotoRef {
   path?: string;
   uri: string;
   note?: string;
-  capturedAt?: string;
+  capturedAt?: string | null;
   painIntensity?: number;
 }
 

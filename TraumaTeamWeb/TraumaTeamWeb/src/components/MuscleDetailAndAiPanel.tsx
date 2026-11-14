@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import brandLogo from '../assets/Recurso 6.svg';
 import {
   getMuscleKnowledge,
@@ -9,12 +9,16 @@ import {
 import type { SaveMuscleUpdateInput } from '../App';
 import type {
   BodyConditionRecord,
+  ConnectionEndpointStatus,
+  EnvironmentType,
   DailyHealthCheck,
   InjuryPhoto,
   MuscleData,
   MuscleMedicalKnowledge,
 } from '../types/dashboard';
 import { formatShortUpdateDate, parseConditionUpdates } from '../utils/condition-updates';
+import { toAssistantEnvironment } from '../services/muscle-assessment';
+import { MuscleRagAssessment } from './MuscleRagAssessment';
 import { InjuryPhotosDossier } from './InjuryPhotosDossier';
 import {
   ActivityIcon,
@@ -26,7 +30,6 @@ import {
   LayersIcon,
   OrbitIcon,
   RegionCategoryIcon,
-  SparklesIcon,
   StethoscopeIcon,
 } from './Icons';
 
@@ -43,7 +46,11 @@ interface MuscleDetailAndAiPanelProps {
   allMuscles: MuscleData[];
   latestHealthCheck: DailyHealthCheck | null;
   photos: InjuryPhoto[];
+  photosStatus: ConnectionEndpointStatus['photosStatus'];
+  photosError: string | null;
+  onReloadPhotos: () => void;
   snapshotUri?: string;
+  environment: EnvironmentType;
   resolvedRecord?: BodyConditionRecord | null;
   onSelectMuscle: (muscleId: string) => void;
   onSaveUpdate?: (muscle: MuscleData, input: SaveMuscleUpdateInput) => Promise<void>;
@@ -52,31 +59,36 @@ interface MuscleDetailAndAiPanelProps {
 
 interface SelectedMuscleContentProps {
   muscle: MuscleData;
-  allMuscles: MuscleData[];
   knowledge: MuscleMedicalKnowledge;
   generalSymptoms: string[];
   photos: InjuryPhoto[];
+  photosStatus: ConnectionEndpointStatus['photosStatus'];
+  photosError: string | null;
+  onReloadPhotos: () => void;
   musclePhotos: InjuryPhoto[];
   snapshotUri?: string;
+  environment: EnvironmentType;
   resolvedRecord?: BodyConditionRecord | null;
-  onSelectMuscle: (muscleId: string) => void;
   onSaveUpdate?: (muscle: MuscleData, input: SaveMuscleUpdateInput) => Promise<void>;
   onCureMuscle?: (muscle: MuscleData, closingNote?: string) => Promise<void>;
 }
 
 const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
   muscle,
-  allMuscles,
   knowledge,
   generalSymptoms,
   photos,
+  photosStatus,
+  photosError,
+  onReloadPhotos,
+  environment,
   musclePhotos,
   snapshotUri,
   resolvedRecord,
-  onSelectMuscle,
   onSaveUpdate,
   onCureMuscle,
 }) => {
+  const panelId = useId();
   const obs = muscle.observation;
   const hasReport = muscle.status !== 'normal' && Boolean(obs);
   const isResolvedHistory = !hasReport && Boolean(resolvedRecord);
@@ -273,10 +285,25 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
         </span>
       </div>
 
-      <div className="panel-tab-pills panel-tab-pills-2" role="tablist">
+      <div
+        className="panel-tab-pills panel-tab-pills-2"
+        role="tablist"
+        aria-label="Información de la zona"
+        onKeyDown={(event) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const nextTab = event.key === 'Home' ? 'overview' : event.key === 'End' ? 'photos'
+            : activeTab === 'overview' ? 'photos' : 'overview';
+          setActiveTab(nextTab);
+          document.getElementById(`${panelId}-${nextTab}-tab`)?.focus();
+        }}
+      >
         <button
           type="button"
           role="tab"
+          id={`${panelId}-overview-tab`}
+          aria-controls={`${panelId}-overview`}
+          tabIndex={activeTab === 'overview' ? 0 : -1}
           aria-selected={activeTab === 'overview'}
           className={`panel-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
@@ -287,17 +314,20 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
         <button
           type="button"
           role="tab"
+          id={`${panelId}-photos-tab`}
+          aria-controls={`${panelId}-photos`}
+          tabIndex={activeTab === 'photos' ? 0 : -1}
           aria-selected={activeTab === 'photos'}
           className={`panel-tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
           onClick={() => setActiveTab('photos')}
         >
           <CameraIcon size={13} />
-          <span>Fotos ({musclePhotos.length || photos.length})</span>
+          <span>Fotos ({photosStatus === 'loading' ? '…' : musclePhotos.length})</span>
         </button>
       </div>
 
       {activeTab === 'overview' ? (
-        <div key={muscle.id} className="muscle-detail-stage">
+        <div key={muscle.id} id={`${panelId}-overview`} role="tabpanel" aria-labelledby={`${panelId}-overview-tab`} className="muscle-detail-stage">
           <div className="muscle-readonly-stack">
             {/* Bloque 1: Síntomas, Actualizaciones 1..N y Curación */}
             <div
@@ -699,69 +729,15 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
               )}
             </div>
 
-            {/* Bloque 2: Espacio reservado para propuestas de IA (sin implementar/simular aún) */}
-            <div className="ai-slot-card" aria-label="Espacio reservado para recomendación IA">
-              <svg
-                className="ai-copilot-wave"
-                viewBox="0 0 360 44"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 28 C 48 8, 92 40, 148 22 C 196 6, 248 36, 304 18 C 328 10, 346 22, 360 16"
-                  fill="none"
-                  stroke="rgba(56, 189, 248, 0.32)"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M0 34 C 60 18, 114 42, 176 26 C 228 12, 278 38, 360 24"
-                  fill="none"
-                  stroke="rgba(125, 211, 252, 0.16)"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                />
-              </svg>
-
-              <div className="ai-slot-head">
-                <div className="ai-slot-title">
-                  <span className="ai-slot-icon-orb">
-                    <SparklesIcon size={13} />
-                  </span>
-                  <div className="ai-slot-heading-copy">
-                    <span className="ai-slot-kicker">COPILOTO CLÍNICO</span>
-                    <strong>Propuesta Clínica IA</strong>
-                  </div>
-                </div>
-                <span className="ai-slot-badge">Espacio reservado</span>
-              </div>
-
-              <div className="ai-context-chips">
-                <span className="ai-context-chip">Zona: {muscle.name}</span>
-                {hasReport && obs ? (
-                  <>
-                    <span className="ai-context-chip">{obs.conditionName}</span>
-                    {obs.swelling && <span className="ai-context-chip warn">Edema</span>}
-                    {obs.functionalLimitation && (
-                      <span className="ai-context-chip warn">Limitación</span>
-                    )}
-                  </>
-                ) : isResolvedHistory ? (
-                  <span className="ai-context-chip">Historial curado</span>
-                ) : (
-                  <span className="ai-context-chip muted">Sin síntomas activos</span>
-                )}
-              </div>
-
-              <div className="ai-slot-body">
-                <p>
-                  Pendiente de conexión con el módulo IA / RAG. Aquí se mostrarán las sugerencias
-                  para {muscle.name} a partir de los síntomas recibidos.
-                </p>
-              </div>
-            </div>
+            <MuscleRagAssessment
+              key={JSON.stringify([muscle.id, muscle.status, muscle.observation, environment])}
+              muscle={muscle}
+              initialEnvironment={toAssistantEnvironment(environment)}
+            />
 
             {/* Bloque 3: Explicación anatómica compacta del músculo */}
-            <div className="anatomy-compact-card">
+            <details className="anatomy-compact-card">
+              <summary>Anatomía y contexto <ChevronRightIcon size={15} /></summary>
               <div className="anatomy-dual-grid">
                 <div className="anatomy-info-tile">
                   <div className="anatomy-tile-head">
@@ -795,17 +771,19 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
                   ))}
                 </div>
               </div>
-            </div>
+            </details>
           </div>
         </div>
       ) : (
-        <InjuryPhotosDossier
-          key={muscle.id}
-          photos={photos}
-          muscles={allMuscles}
-          selectedMuscleId={muscle.id}
-          onSelectMuscle={onSelectMuscle}
-        />
+        <div id={`${panelId}-photos`} role="tabpanel" aria-labelledby={`${panelId}-photos-tab`}>
+          <InjuryPhotosDossier
+            key={muscle.id}
+            photos={photos}
+            status={photosStatus}
+            error={photosError}
+            onReload={onReloadPhotos}
+          />
+        </div>
       )}
     </section>
   );
@@ -816,7 +794,11 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
   allMuscles,
   latestHealthCheck,
   photos,
+  photosStatus,
+  photosError,
+  onReloadPhotos,
   snapshotUri,
+  environment,
   resolvedRecord,
   onSelectMuscle,
   onSaveUpdate,
@@ -952,14 +934,16 @@ export const MuscleDetailAndAiPanel: React.FC<MuscleDetailAndAiPanelProps> = ({
     <SelectedMuscleContent
       key={muscle.id}
       muscle={muscle}
-      allMuscles={allMuscles}
       knowledge={knowledge}
       generalSymptoms={generalSymptoms}
       photos={photos}
+      photosStatus={photosStatus}
+      photosError={photosError}
+      onReloadPhotos={onReloadPhotos}
+      environment={environment}
       musclePhotos={musclePhotos}
       snapshotUri={snapshotUri}
       resolvedRecord={resolvedRecord}
-      onSelectMuscle={onSelectMuscle}
       onSaveUpdate={onSaveUpdate}
       onCureMuscle={onCureMuscle}
     />
