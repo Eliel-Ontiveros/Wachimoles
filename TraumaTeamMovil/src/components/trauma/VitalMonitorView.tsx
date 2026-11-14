@@ -3,11 +3,13 @@ import {
   Animated,
   Easing,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Svg, {
   Circle,
@@ -28,7 +30,6 @@ import {
   Activity,
   ChevronRight,
   Droplets,
-  X,
   TrendingUp,
   History,
   Flame,
@@ -525,13 +526,104 @@ function VitalHistoryModal({
   currentValue: number | null;
   loading: boolean;
 }) {
+  const { height: windowHeight } = useWindowDimensions();
+  const dismissDistance = Math.max(760, windowHeight);
+  const dismissDistanceRef = useRef(dismissDistance);
   const [chartWidth, setChartWidth] = useState(0);
   const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
+  const sheetTranslateY = useRef(new Animated.Value(dismissDistance)).current;
+  const scrollYRef = useRef(0);
+  const onCloseRef = useRef(onClose);
   const meta = METRIC_META[metric];
+
+  useEffect(() => {
+    dismissDistanceRef.current = dismissDistance;
+  }, [dismissDistance]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     setSelectedPointIdx(null);
   }, [metric, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    scrollYRef.current = 0;
+    sheetTranslateY.setValue(dismissDistanceRef.current);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [visible, sheetTranslateY]);
+
+  const dismissSheet = () => {
+    Animated.timing(sheetTranslateY, {
+      toValue: dismissDistanceRef.current,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start(() => {
+      onCloseRef.current();
+    });
+  };
+
+  const backdropOpacity = sheetTranslateY.interpolate({
+    inputRange: [0, dismissDistance * 0.75],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const { headerPanResponder, bodyPanResponder } = useMemo(() => {
+    const finishDrag = (dy: number, vy: number) => {
+      if (dy > 95 || vy > 0.65) {
+        Animated.timing(sheetTranslateY, {
+          toValue: dismissDistanceRef.current,
+          duration: 190,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }).start(() => {
+          onCloseRef.current();
+        });
+      } else {
+        Animated.spring(sheetTranslateY, {
+          toValue: 0,
+          bounciness: 5,
+          speed: 18,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }).start();
+      }
+    };
+
+    const sharedCallbacks = {
+      onPanResponderMove: (_: unknown, gs: { dy: number }) => {
+        if (gs.dy > 0) {
+          sheetTranslateY.setValue(gs.dy);
+        }
+      },
+      onPanResponderRelease: (_: unknown, gs: { dy: number; vy: number }) =>
+        finishDrag(gs.dy, gs.vy),
+      onPanResponderTerminate: (_: unknown, gs: { dy: number; vy: number }) =>
+        finishDrag(gs.dy, gs.vy),
+    };
+
+    return {
+      headerPanResponder: PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gs) =>
+          Math.abs(gs.dy) > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        ...sharedCallbacks,
+      }),
+      bodyPanResponder: PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gs) =>
+          scrollYRef.current <= 1 && gs.dy > 10 && gs.dy > Math.abs(gs.dx),
+        ...sharedCallbacks,
+      }),
+    };
+  }, [sheetTranslateY]);
 
   const validSamples = useMemo(() => {
     return history.filter((s) => s.metric === metric && Number(s.value) > 0);
@@ -674,20 +766,42 @@ function VitalHistoryModal({
       : chartGeometry.points[chartGeometry.points.length - 1] ?? null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
+    <Modal visible={visible} transparent animationType="none" onRequestClose={dismissSheet}>
+      <View
         style={{
           flex: 1,
-          backgroundColor: 'rgba(5, 11, 25, 0.58)',
           justifyContent: 'flex-end',
         }}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={{ height: '86%' }}>
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            backgroundColor: 'rgba(5, 11, 25, 0.58)',
+            opacity: backdropOpacity,
+          }}
+        />
+        <Pressable
+          onPress={dismissSheet}
+          accessibilityLabel="Cerrar historial"
+          style={{ flex: 1 }}
+        />
+        <Animated.View
+          {...bodyPanResponder.panHandlers}
+          style={{
+            height: '86%',
+            transform: [{ translateY: sheetTranslateY }],
+          }}>
           <View
             style={{ flex: 1 }}
             className="overflow-hidden rounded-t-3xl bg-[#f8fafc] shadow-2xl">
-            {/* Banner espacial superior estilo Bitácora de Vuelo (Web) */}
-            <View style={{ backgroundColor: '#060b19', position: 'relative' }}>
+            {/* Banner espacial superior arrastrable hacia abajo para cerrar */}
+            <View
+              {...headerPanResponder.panHandlers}
+              style={{ backgroundColor: '#060b19', position: 'relative' }}>
               <Svg
                 width="100%"
                 height="100%"
@@ -727,33 +841,19 @@ function VitalHistoryModal({
               </Svg>
 
               <View className="px-5 pb-3.5 pt-2.5">
-                <View className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-white/25" />
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1 pr-3">
-                    <Text className="font-mono text-[9px] font-bold uppercase tracking-[1.6px] text-sky-300">
-                      BITÁCORA DE VUELO
-                    </Text>
-                    <Text className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                      {meta.title}
-                    </Text>
-                    <Text className="mt-0.5 font-mono text-[10px] text-slate-300">
-                      {stats.count > 0 && stats.latestTime
-                        ? `${stats.count} registros recientes · última ${formatDateTimeShort(stats.latestTime)}`
-                        : 'Sin lecturas sincronizadas para esta señal'}
-                    </Text>
-                  </View>
-
-                  <Pressable
-                    onPress={onClose}
-                    accessibilityLabel="Cerrar historial"
-                    style={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.55)',
-                      borderColor: 'rgba(125, 211, 252, 0.35)',
-                      borderWidth: 1,
-                    }}
-                    className="h-8 w-8 items-center justify-center rounded-full active:opacity-70">
-                    <X size={16} color="#e0f2fe" />
-                  </Pressable>
+                <View className="mx-auto mb-2.5 h-1 w-12 rounded-full bg-white/35" />
+                <View>
+                  <Text className="font-mono text-[9px] font-bold uppercase tracking-[1.6px] text-sky-300">
+                    BITÁCORA DE VUELO
+                  </Text>
+                  <Text className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {meta.title}
+                  </Text>
+                  <Text className="mt-0.5 font-mono text-[10px] text-slate-300">
+                    {stats.count > 0 && stats.latestTime
+                      ? `${stats.count} registros recientes · última ${formatDateTimeShort(stats.latestTime)}`
+                      : 'Sin lecturas sincronizadas para esta señal'}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -771,13 +871,13 @@ function VitalHistoryModal({
                       style={
                         active
                           ? {
-                              backgroundColor: '#060b19',
-                              shadowColor: '#020617',
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: 0.16,
-                              shadowRadius: 4,
-                              elevation: 2,
-                            }
+                            backgroundColor: '#060b19',
+                            shadowColor: '#020617',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.16,
+                            shadowRadius: 4,
+                            elevation: 2,
+                          }
                           : undefined
                       }
                       className="flex-1 flex-row items-center justify-center gap-1 rounded-xl py-2">
@@ -798,7 +898,14 @@ function VitalHistoryModal({
               </View>
             </View>
 
-            <ScrollView className="flex-1 px-4 pt-3.5" showsVerticalScrollIndicator={false}>
+            <ScrollView
+              className="flex-1 px-4 pt-3.5"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              scrollEventThrottle={16}
+              onScroll={(e) => {
+                scrollYRef.current = e.nativeEvent.contentOffset.y;
+              }}>
               {loading ? (
                 <HistorySkeleton />
               ) : (
@@ -1112,9 +1219,9 @@ function VitalHistoryModal({
                           spread <= 0
                             ? 50
                             : Math.min(
-                                96,
-                                Math.max(4, Math.round(((day.avg - day.min) / spread) * 100))
-                              );
+                              96,
+                              Math.max(4, Math.round(((day.avg - day.min) / spread) * 100))
+                            );
 
                         return (
                           <View
@@ -1219,8 +1326,8 @@ function VitalHistoryModal({
               )}
             </ScrollView>
           </View>
-        </Pressable>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -1239,38 +1346,6 @@ function getSleepShortDayLabel(day: DailySummary): string {
   return m && d ? `${Number(d)}/${Number(m)}` : day.dateLabel;
 }
 
-function getSleepMeta(hours: number | null) {
-  if (hours === null) {
-    return {
-      label: 'Sin toma',
-      color: '#64748b',
-      bg: '#f8fafc',
-      border: '#e2e8f0',
-      summary: 'Esperando lectura del reloj',
-    };
-  }
-
-  if (hours < 7) {
-    const missing = Math.max(0.1, 7 - hours).toFixed(1);
-    const severe = hours < 5.5;
-    return {
-      label: 'Déficit',
-      color: severe ? '#dc2626' : '#d97706',
-      bg: severe ? '#fef2f2' : '#fffbeb',
-      border: severe ? '#fecaca' : '#fde68a',
-      summary: `Faltaron ${missing} h para la meta (7 h)`,
-    };
-  }
-
-  return {
-    label: 'Óptimo',
-    color: '#059669',
-    bg: '#ecfdf5',
-    border: '#a7f3d0',
-    summary: 'Meta alcanzada (≥ 7 h)',
-  };
-}
-
 function SleepSummaryCard({
   sleepHours,
   onPress,
@@ -1278,7 +1353,6 @@ function SleepSummaryCard({
   sleepHours: number | null;
   onPress: () => void;
 }) {
-  const meta = getSleepMeta(sleepHours);
   const progressPct =
     sleepHours !== null ? Math.max(0, Math.min(100, Math.round((sleepHours / 7) * 100))) : 0;
 
@@ -1286,38 +1360,23 @@ function SleepSummaryCard({
     <Pressable
       onPress={onPress}
       accessibilityLabel="Ver historial de sueño"
-      className="mb-4 rounded-2xl border border-violet-200/80 bg-white p-4 shadow-md active:opacity-90">
-      {/* Cabecera simple: nombre y estado */}
+      className="mb-4 rounded-2xl border border-trauma-line bg-white p-4 shadow-md active:opacity-85">
+      {/* Cabecera simple: nombre y > */}
       <View className="flex-row items-center justify-between">
         <Text className="font-mono text-xs font-bold text-trauma-ink">
           Sueño
         </Text>
-
-        <View
-          style={{
-            backgroundColor: meta.bg,
-            borderColor: meta.border,
-            borderWidth: 1,
-          }}
-          className="flex-row items-center rounded-full px-2.5 py-1">
-          <View
-            style={{ backgroundColor: meta.color }}
-            className="mr-1.5 h-1.5 w-1.5 rounded-full"
-          />
-          <Text style={{ color: meta.color }} className="font-mono text-[9.5px] font-bold">
-            {meta.label}
-          </Text>
-        </View>
+        <ChevronRight size={14} color="#94a3b8" />
       </View>
 
-      {/* Horas dormidas anoche + resumen de meta a la derecha */}
-      <View className="mt-3 flex-row items-end justify-between gap-2">
+      {/* Horas dormidas anoche */}
+      <View className="mt-2.5 flex-row items-end justify-between gap-2">
         <View>
           <View className="flex-row items-baseline">
             <Text className="font-mono text-3xl font-extrabold text-trauma-ink">
               {sleepHours !== null ? sleepHours.toFixed(1) : '--'}
             </Text>
-            <Text className="ml-1 font-mono text-xs font-bold text-violet-700">h</Text>
+            <Text className="ml-1 font-mono text-xs font-bold text-trauma-muted">h</Text>
             {sleepHours !== null && (
               <Text className="ml-2 font-mono text-[10px] font-semibold text-slate-500">
                 ({formatSleepDuration(sleepHours)})
@@ -1325,42 +1384,23 @@ function SleepSummaryCard({
             )}
           </View>
           <Text className="mt-0.5 font-mono text-[9px] text-slate-400">
-            Horas dormidas anoche
+            {sleepHours !== null ? 'Horas dormidas anoche' : 'Sin lecturas registradas'}
           </Text>
         </View>
 
-        <View className="items-end">
-          <Text
-            style={{ color: meta.color }}
-            className="font-mono text-[10px] font-bold">
-            {meta.summary}
+        {sleepHours !== null && (
+          <Text className="font-mono text-[9.5px] font-bold text-sky-600">
+            {progressPct}% de 7 h
           </Text>
-          {sleepHours !== null && (
-            <Text className="mt-0.5 font-mono text-[8.5px] text-slate-400">
-              {progressPct}% de 7 h
-            </Text>
-          )}
-        </View>
+        )}
       </View>
 
-      {/* Barra de progreso simple hacia la meta de 7 h */}
-      <View className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+      {/* Barra de progreso con el mismo azul cian que las demás tarjetas */}
+      <View className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200">
         <View
-          style={{
-            width: `${progressPct}%`,
-            height: '100%',
-            borderRadius: 999,
-            backgroundColor: meta.color,
-          }}
+          className="h-full rounded-full bg-trauma-cyan"
+          style={{ width: `${progressPct}%` }}
         />
-      </View>
-
-      {/* Acción al historial */}
-      <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2">
-        <Text className="font-mono text-[9px] font-bold text-violet-700">
-          Toca para ver historial de sueño por día
-        </Text>
-        <ChevronRight size={12} color="#7c3aed" />
       </View>
     </Pressable>
   );
@@ -1397,9 +1437,6 @@ function MetricCard({
           style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
         />
       </View>
-      <Text className="mt-2 font-mono text-[8.5px] font-bold text-sky-600">
-        Ver historial por día
-      </Text>
     </Pressable>
   );
 }
@@ -1559,13 +1596,6 @@ export function VitalMonitorView() {
 
         {/* Gráfico animado de ECG coherente con el LPM actual */}
         <RealtimeEcgChart bpm={vitals.heartRate} isAvailable={vitals.isAvailable} />
-
-        <View className="mt-1 flex-row items-center justify-between border-t border-slate-100 pt-2">
-          <Text className="font-mono text-[9px] text-sky-600 font-bold">
-            Toca aquí para ver historial de pulso
-          </Text>
-          <ChevronRight size={12} color="#0284c7" />
-        </View>
       </Pressable>
 
       {/* Métricas secundarias: Oxígeno (SpO2) y Estrés */}
