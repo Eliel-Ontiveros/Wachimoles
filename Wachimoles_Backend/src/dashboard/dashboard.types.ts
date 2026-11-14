@@ -66,6 +66,20 @@ export interface BodyConditionsQuery {
   limit?: number;
 }
 
+export const BODY_CONDITION_IMAGE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+
+export interface UploadedBodyConditionImage {
+  buffer: Buffer;
+  mimetype: string;
+  size: number;
+}
+
+export interface BodyConditionImage {
+  path: string;
+  signedUrl: string;
+  expiresAt: string;
+}
+
 export interface DailyHealthCheck {
   id: string;
   dateIso: string;

@@ -8,6 +8,7 @@ export function validateEnvironment(
   const dashboardApiToken = values.DASHBOARD_API_TOKEN;
   const dashboardWebPassword = values.DASHBOARD_WEB_PASSWORD;
   const dashboardUserId = values.DASHBOARD_USER_ID;
+  const storageBucketValue = values.SUPABASE_STORAGE_BUCKET;
   const portValue = values.PORT ?? "3000";
   const originsValue = values.CORS_ORIGINS ?? "";
 
@@ -30,6 +31,17 @@ export function validateEnvironment(
 
   if (typeof serviceRoleKey !== "string" || !serviceRoleKey.trim()) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY must be configured.");
+  }
+
+  if (
+    storageBucketValue !== undefined &&
+    (typeof storageBucketValue !== "string" ||
+      !storageBucketValue.trim() ||
+      /[\/\\\u0000-\u001f]/.test(storageBucketValue))
+  ) {
+    throw new Error(
+      "SUPABASE_STORAGE_BUCKET must be a bucket ID without slashes or control characters."
+    );
   }
 
   if (
@@ -95,6 +107,8 @@ export function validateEnvironment(
     ...values,
     SUPABASE_URL: supabaseUrl.origin,
     SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+    SUPABASE_STORAGE_BUCKET:
+      typeof storageBucketValue === "string" ? storageBucketValue.trim() : "",
     DASHBOARD_API_TOKEN: dashboardApiToken,
     DASHBOARD_WEB_PASSWORD: dashboardWebPassword,
     DASHBOARD_USER_ID: dashboardUserId,

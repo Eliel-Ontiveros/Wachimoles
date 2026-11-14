@@ -42,6 +42,8 @@ Completa `.env` con:
 - `SUPABASE_URL`: URL del proyecto Supabase.
 - `SUPABASE_SERVICE_ROLE_KEY`: clave secreta nueva del proyecto, guardada solo
   en el servidor.
+- `SUPABASE_STORAGE_BUCKET`: ID exacto del bucket de imágenes en Storage. No es
+  una clave API; usa el identificador del bucket que aparece en Supabase.
 - `DASHBOARD_USER_ID`: UUID del usuario fijo. Lo encuentras en Supabase en
   **Authentication → Users**.
 - `DASHBOARD_API_TOKEN`: secreto aleatorio de al menos 32 caracteres para las
@@ -105,6 +107,13 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
   actual de una zona muscular.
 - `DELETE /dashboard/body-conditions/:muscleId` — marca como resuelto el
   padecimiento activo de esa zona; conserva el registro.
+- `POST /dashboard/body-conditions/:muscleId/images` — carga una imagen del
+  padecimiento. Envía `multipart/form-data` con el campo `image`; se aceptan
+  JPEG, PNG o WebP de hasta 10 MB. El backend genera el nombre y la ruta.
+- `GET /dashboard/body-conditions/:muscleId/images` — lista las imágenes de esa
+  zona con enlaces firmados válidos durante una hora.
+- `DELETE /dashboard/body-conditions/:muscleId/images/:fileName` — elimina una
+  imagen cargada para esa zona.
 - `GET /dashboard/health-checks?limit=100` — lista los cuestionarios diarios
   del usuario fijo.
 - `PUT /dashboard/health-checks/:dateIso` — crea o actualiza el cuestionario
@@ -126,6 +135,13 @@ descripción, intensidad del dolor (1–10), hinchazón y limitación funcional.
 la cronología del estado. Al limpiar una observación se marca como resuelta en
 vez de borrar la fila. Los nombres anatómicos se guardan como instantáneas para
 que los registros sigan siendo legibles aunque cambie el catálogo del modelo.
+
+Las imágenes se guardan en el bucket configurado en `SUPABASE_STORAGE_BUCKET`,
+bajo una ruta generada por el backend con el UUID del usuario y el ID del
+músculo. El bucket puede permanecer privado: la API usa la clave de servidor
+para Storage y devuelve enlaces firmados temporales. Las rutas de imágenes
+comparten `DASHBOARD_API_TOKEN` con las demás rutas de padecimientos; nunca
+envíes `SUPABASE_SERVICE_ROLE_KEY` al frontend.
 
 La tabla `daily_health_checks` guarda una fila por usuario y fecha: glucosa,
 presión sistólica y diastólica, temperatura, horas de sueño, ánimo, síntomas,

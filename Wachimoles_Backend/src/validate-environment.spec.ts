@@ -24,4 +24,25 @@ describe("validateEnvironment", () => {
       })
     ).toThrow("DASHBOARD_WEB_PASSWORD must contain between 16 and 256 characters.");
   });
+
+  it("accepts a Storage bucket ID and defaults it to empty when unset", () => {
+    expect(
+      validateEnvironment({
+        ...validEnvironment,
+        SUPABASE_STORAGE_BUCKET: "Wachimoles Images"
+      }).SUPABASE_STORAGE_BUCKET
+    ).toBe("Wachimoles Images");
+    expect(
+      validateEnvironment(validEnvironment).SUPABASE_STORAGE_BUCKET
+    ).toBe("");
+  });
+
+  it("rejects Storage bucket IDs containing path separators", () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        SUPABASE_STORAGE_BUCKET: "bucket/path"
+      })
+    ).toThrow("SUPABASE_STORAGE_BUCKET must be a bucket ID");
+  });
 });
