@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
@@ -194,7 +195,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         report({ kind: 'error', text: 'Este dispositivo o navegador no soporta reconocimiento de voz.' });
         return;
       }
-      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      // En web no hay API de permisos: el navegador pide el micrófono al iniciar.
+      const perm =
+        Platform.OS === 'web' ? { granted: true } : await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!perm.granted) {
         report({ kind: 'error', text: 'Permiso de micrófono denegado. Actívalo en los ajustes.' });
         return;
