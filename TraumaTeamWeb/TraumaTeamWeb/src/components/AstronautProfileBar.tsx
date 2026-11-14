@@ -41,7 +41,7 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
     astronauts.find((a) => a.id === selectedAstronautId) ?? astronauts[0];
   const envBadge =
     activeAstronaut?.environment === 'nave'
-      ? '0g · Órbita'
+      ? '0g · Orbit'
       : activeAstronaut?.gravityLabel ?? '';
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
   return (
     <header className="topbar-shell">
       <div className="topbar-brand">
-        <img src={brandLogo} alt="Logo TraumaTeam" className="brand-logo-img" />
+        <img src={brandLogo} alt="TraumaTeam logo" className="brand-logo-img" />
         <h1 className="brand-wordmark">
           <img
             src={`${import.meta.env.BASE_URL}TraumaTeamText.svg`}
@@ -91,7 +91,7 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
       <div
         ref={dropdownWrapRef}
         className="topbar-profiles astro-dropdown-wrap"
-        aria-label="Perfil de astronauta activo"
+        aria-label="Active astronaut profile"
       >
         {activeAstronaut && (
           <button
@@ -119,17 +119,17 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
           <div
             id={panelId}
             className="astro-dropdown-panel"
-            aria-label="Perfiles de tripulación"
+            aria-label="Crew profiles"
           >
             <div className="astro-dropdown-header">
-              <span>TRIPULACIÓN ACTIVA</span>
+              <span>ACTIVE CREW</span>
             </div>
 
             <div className="astro-dropdown-list">
               {astronauts.map((astro) => {
                 const isSelected = astro.id === selectedAstronautId;
                 const astroEnv =
-                  astro.environment === 'nave' ? '0g · Órbita' : astro.gravityLabel;
+                  astro.environment === 'nave' ? '0g · Orbit' : astro.gravityLabel;
                 return (
                   <button
                     key={astro.id}
@@ -164,13 +164,13 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
               disabled
               aria-disabled="true"
               className="astro-dropdown-add-btn"
-              title="Opción no disponible por el momento"
+              title="Option not available at the moment"
             >
               <span className="astro-add-icon-box">
                 <UserPlusIcon size={14} />
               </span>
-              <span className="astro-add-label">Agregar otro perfil</span>
-              <span className="astro-add-tag">Próximamente</span>
+              <span className="astro-add-label">Add another profile</span>
+              <span className="astro-add-tag">Coming soon</span>
             </button>
           </div>
         )}

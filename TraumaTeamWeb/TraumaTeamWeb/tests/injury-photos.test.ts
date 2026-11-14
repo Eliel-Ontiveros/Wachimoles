@@ -3,7 +3,7 @@ import { afterEach, test } from 'node:test';
 import { fetchInjuryPhotosFromBackend, resetBackendConfig, updateBackendConfig } from '../src/services/backend-api.ts';
 import { parseConditionUpdates } from '../src/utils/condition-updates.ts';
 
-const muscle = { id: 'oblicuo_izq', name: 'Oblicuo izquierdo' };
+const muscle = { id: 'oblicuo_izq', name: 'Left oblique' };
 const image = {
   path: 'test-user/oblicuo_izq/image.jpg',
   signedUrl: 'https://example.supabase.co/storage/v1/object/sign/photos/test-user/oblicuo_izq/image.jpg?token=test',
@@ -73,12 +73,12 @@ test('keeps history notes and their photo association when capture dates are unk
   context.mock.method(globalThis, 'fetch', async () => Response.json([image]));
   const photos = await fetchInjuryPhotosFromBackend(muscle, new AbortController().signal);
   const updates = parseConditionUpdates({
-    description: 'Actualización 1 [14/11 12:00] (Dolor 6/10) - Seguimiento [Foto: image.jpg]\n' +
-      'Actualización 2 [14/11 13:00] (Curado · 0/10) - Sin dolor',
+    description: 'Update 1 [14/11 12:00] (Pain 6/10) - Follow-up [Photo: image.jpg]\n' +
+      'Update 2 [14/11 13:00] (Healed · 0/10) - No pain',
     photos,
   });
   assert.equal(updates.length, 2);
-  assert.equal(updates[0].text, 'Seguimiento');
+  assert.equal(updates[0].text, 'Follow-up');
   assert.equal(updates[0].photoUri, image.signedUrl);
   assert.equal(updates[1].isResolvedEvent, true);
   assert.equal(updates[1].painIntensity, 0);

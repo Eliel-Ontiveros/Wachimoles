@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { displaySymptom, isNoSymptom } from '../utils/display-labels.ts';
 import type {
   DailyHealthCheck,
   HealthStatusLevel,
@@ -148,16 +149,16 @@ function MiniWaveStrip({
 
   const titleText =
     mode === 'bilateral' && bilateralRanges
-      ? `Rojo (${bilateralRanges.lowCritical}) · Amarillo (${bilateralRanges.lowWarning}) · Óptimo (${bilateralRanges.normal}) · Amarillo (${bilateralRanges.highWarning}) · Rojo (${bilateralRanges.highCritical})`
+      ? `Red (${bilateralRanges.lowCritical}) · Yellow (${bilateralRanges.lowWarning}) · Optimal (${bilateralRanges.normal}) · Yellow (${bilateralRanges.highWarning}) · Red (${bilateralRanges.highCritical})`
       : ranges
-        ? `Óptimo (${ranges.green}) · Amarillo (${ranges.yellow}) · Rojo (${ranges.red})`
+        ? `Optimal (${ranges.green}) · Yellow (${ranges.yellow}) · Red (${ranges.red})`
         : undefined;
 
   return (
     <div className="sym-visual-footer">
       <div
         className="sym-index-gauge"
-        aria-label={titleText ? `Índices clínicos: ${titleText}` : undefined}
+        aria-label={titleText ? `Clinical indices: ${titleText}` : undefined}
         title={titleText}
       >
         {mode === 'bilateral' && bilateralRanges ? (
@@ -291,11 +292,11 @@ function MiniWaveStrip({
 }
 
 const MOOD_TAG: Record<number, { label: string; status: HealthStatusLevel; pct: number }> = {
-  5: { label: 'Óptimo 5/5', status: 'normal', pct: 100 },
-  4: { label: 'Estable 4/5', status: 'normal', pct: 80 },
-  3: { label: 'Cansado 3/5', status: 'warning', pct: 60 },
-  2: { label: 'Tenso 2/5', status: 'warning', pct: 40 },
-  1: { label: 'Crítico 1/5', status: 'critical', pct: 20 },
+  5: { label: 'Optimal 5/5', status: 'normal', pct: 100 },
+  4: { label: 'Stable 4/5', status: 'normal', pct: 80 },
+  3: { label: 'Tired 3/5', status: 'warning', pct: 60 },
+  2: { label: 'Tense 2/5', status: 'warning', pct: 40 },
+  1: { label: 'Critical 1/5', status: 'critical', pct: 20 },
 };
 
 export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
@@ -345,12 +346,12 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
 
   const reportedSymptoms = useMemo(() => {
     if (!latestCheck || latestCheck.symptoms.length === 0) return [];
-    return latestCheck.symptoms.filter((s) => s.toLowerCase() !== 'ninguno');
+    return latestCheck.symptoms.filter((s) => !isNoSymptom(s));
   }, [latestCheck]);
 
   return (
     <div className="symptom-pulse-section">
-      {/* Grid compacto 2x3 de tarjetas vistosas estilo Pulso */}
+      {/* Compact 2x3 grid of Pulse-style cards */}
       <div className="symptom-cards-grid">
         {/* Oxígeno SpO2 */}
         <article className="symptom-pulse-card">
@@ -358,7 +359,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span className="sym-icon-box tone-sky">
               <DropletsIcon size={14} />
             </span>
-            <span className="sym-title">Oxígeno</span>
+            <span className="sym-title">Oxygen</span>
           </div>
           <div className="sym-val-row">
             <strong>{evals.spo2Val !== null ? `${evals.spo2Val}` : '--'}</strong>
@@ -389,7 +390,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span className="sym-icon-box tone-amber">
               <ZapIcon size={14} />
             </span>
-            <span className="sym-title">Estrés</span>
+            <span className="sym-title">Stress</span>
           </div>
           <div className="sym-val-row">
             <strong>{evals.stressVal !== null ? `${evals.stressVal}` : '--'}</strong>
@@ -420,7 +421,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span className="sym-icon-box tone-sky">
               <DropletsIcon size={14} />
             </span>
-            <span className="sym-title">Glucosa</span>
+            <span className="sym-title">Glucose</span>
           </div>
           <div className="sym-val-row">
             <strong>{evals.glucoseVal ?? '--'}</strong>
@@ -461,7 +462,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span className="sym-icon-box tone-rose">
               <ActivityIcon size={14} />
             </span>
-            <span className="sym-title">Presión Art.</span>
+            <span className="sym-title">Blood Pressure</span>
           </div>
           <div className="sym-val-row">
             <strong>
@@ -512,7 +513,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span className="sym-icon-box tone-amber">
               <ThermometerIcon size={14} />
             </span>
-            <span className="sym-title">Temperatura</span>
+            <span className="sym-title">Temperature</span>
           </div>
           <div className="sym-val-row">
             <strong>{evals.tempVal !== null ? evals.tempVal.toFixed(1) : '--'}</strong>
@@ -553,7 +554,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
             <span className="sym-icon-box tone-emerald">
               <SmileIcon size={14} />
             </span>
-            <span className="sym-title">Ánimo</span>
+            <span className="sym-title">Mood</span>
           </div>
           <div className="sym-val-row mood-size">
             <strong>{evals.moodInfo ? evals.moodInfo.label : '--'}</strong>
@@ -584,7 +585,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
         <div className="sym-chips-strip">
           {reportedSymptoms.map((sym) => (
             <span key={sym} className="sym-reported-chip">
-              ● {sym}
+              ● {displaySymptom(sym)}
             </span>
           ))}
         </div>

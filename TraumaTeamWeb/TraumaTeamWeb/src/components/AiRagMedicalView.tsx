@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { displaySymptom } from '../utils/display-labels.ts';
 import { generateGlobalAiRagInsights } from '../data/anatomy-catalog';
 import type {
   BodyConditionRecord,
@@ -30,11 +31,11 @@ interface AiRagMedicalViewProps {
 }
 
 const MOOD_LABELS: Record<MoodScore, string> = {
-  1: 'Muy agotado (1/5)',
-  2: 'Cansado (2/5)',
+  1: 'Exhausted (1/5)',
+  2: 'Tired (2/5)',
   3: 'Neutral (3/5)',
-  4: 'Estable (4/5)',
-  5: 'Óptimo (5/5)',
+  4: 'Stable (4/5)',
+  5: 'Optimal (5/5)',
 };
 
 export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
@@ -80,7 +81,7 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
             className={`sev-filter-btn ${severityFilter === 'all' ? 'active' : ''}`}
             onClick={() => setSeverityFilter('all')}
           >
-            Todos ({insights.length})
+            All ({insights.length})
           </button>
           <button
             type="button"
@@ -89,7 +90,7 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
             }`}
             onClick={() => setSeverityFilter('critical')}
           >
-            Críticos ({counts.critical})
+            Critical ({counts.critical})
           </button>
           <button
             type="button"
@@ -98,14 +99,14 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
             }`}
             onClick={() => setSeverityFilter('warning')}
           >
-            Vigilancia ({counts.warning})
+            Watch ({counts.warning})
           </button>
           <button
             type="button"
             className={`sev-filter-btn sev-info ${severityFilter === 'info' ? 'active' : ''}`}
             onClick={() => setSeverityFilter('info')}
           >
-            Base ({counts.info})
+            Info ({counts.info})
           </button>
         </div>
       </div>
@@ -125,10 +126,10 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
                 )}
                 <span>
                   {insight.severity === 'critical'
-                    ? 'CRÍTICO'
+                    ? 'CRITICAL'
                     : insight.severity === 'warning'
-                    ? 'VIGILANCIA'
-                    : 'INFORMATIVO'}
+                    ? 'WATCH'
+                    : 'INFORMATIONAL'}
                 </span>
               </span>
               <span className="airag-category">{insight.category}</span>
@@ -138,7 +139,7 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
             <p className="airag-card-reasoning">{insight.reasoning}</p>
 
             <div className="airag-action-box">
-              <strong>Sugerencia médica IA:</strong> {insight.suggestedAction}
+              <strong>AI medical suggestion:</strong> {insight.suggestedAction}
             </div>
 
             <div className="airag-card-foot">
@@ -153,7 +154,7 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
                   className="btn-jump-muscle"
                   onClick={() => onSelectMuscle(insight.relatedMuscleId!)}
                 >
-                  <span>Ver en 3D</span>
+                  <span>View in 3D</span>
                   <ChevronRightIcon size={13} />
                 </button>
               )}
@@ -167,11 +168,11 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
         <div className="section-mini-header">
           <div className="section-mini-title">
             <FileTextIcon size={15} />
-            <span>Check-ins Clínicos Diarios ({healthChecks.length})</span>
+            <span>Daily Clinical Check-ins ({healthChecks.length})</span>
           </div>
           {healthChecksStatus === 'unauthorized' && (
             <button type="button" className="btn-link-inline" onClick={onOpenBackendConfig}>
-              Ingresar Token API
+              Enter API Token
             </button>
           )}
         </div>
@@ -184,20 +185,20 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
                   <strong>{hc.dateIso}</strong>
                   <span className={`hc-status-badge status-${hc.overallStatus}`}>
                     {hc.overallStatus === 'critical'
-                      ? 'CRÍTICO'
+                      ? 'CRITICAL'
                       : hc.overallStatus === 'warning'
-                      ? 'VIGILANCIA'
+                      ? 'WATCH'
                       : 'NOMINAL'}
                   </span>
                 </div>
 
                 <div className="hc-metrics-strip">
                   <span>
-                    <DropletsIcon size={12} /> Glucosa:{' '}
+                    <DropletsIcon size={12} /> Glucose:{' '}
                     <b>{hc.bloodSugarMgDl !== null ? `${hc.bloodSugarMgDl} mg/dL` : '--'}</b>
                   </span>
                   <span>
-                    <HeartIcon size={12} /> PA:{' '}
+                    <HeartIcon size={12} /> BP:{' '}
                     <b>
                       {hc.systolicBp !== null && hc.diastolicBp !== null
                         ? `${hc.systolicBp}/${hc.diastolicBp}`
@@ -209,11 +210,11 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
                     <b>{hc.temperatureC !== null ? `${hc.temperatureC} °C` : '--'}</b>
                   </span>
                   <span>
-                    <MoonIcon size={12} /> Sueño:{' '}
+                    <MoonIcon size={12} /> Sleep:{' '}
                     <b>{hc.sleepHours !== null ? `${hc.sleepHours} h` : '--'}</b>
                   </span>
                   <span>
-                    <SmileIcon size={12} /> Ánimo: <b>{MOOD_LABELS[hc.mood]}</b>
+                    <SmileIcon size={12} /> Mood: <b>{MOOD_LABELS[hc.mood]}</b>
                   </span>
                 </div>
 
@@ -221,7 +222,7 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
                   <div className="hc-symptoms-row">
                     {hc.symptoms.map((sym) => (
                       <span key={sym} className="hc-symptom-chip">
-                        {sym}
+                        {displaySymptom(sym)}
                       </span>
                     ))}
                   </div>
@@ -236,13 +237,13 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
           <div className="hc-empty-box">
             {healthChecksStatus === 'unauthorized' ? (
               <p>
-                El endpoint <code>GET /dashboard/health-checks</code> requiere{' '}
-                <code>DASHBOARD_API_TOKEN</code> (Bearer). Configura el token en el botón superior
-                para consultar el historial de cuestionarios diarios desde el móvil.
+                The <code>GET /dashboard/health-checks</code> endpoint requires{' '}
+                <code>DASHBOARD_API_TOKEN</code> (Bearer). Set the token with the button above
+                to view the history of daily questionnaires from the mobile app.
               </p>
             ) : (
               <p>
-                Aún no hay cuestionarios diarios sincronizados para este astronauta en el servidor.
+                No daily questionnaires have been synced for this astronaut on the server yet.
               </p>
             )}
           </div>

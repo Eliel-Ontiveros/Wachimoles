@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MUSCLE_MODEL_BASE64 } from '../assets/muscle-model-base64.js';
 import { getPainColorHex } from '../data/anatomy-catalog';
+import { getRegionCategoryLabel } from '../utils/display-labels.ts';
 import type { BodyRegionCategory, MuscleData } from '../types/dashboard';
 import {
   ActivityIcon,
@@ -43,7 +44,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
   );
 
   return `<!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -231,25 +232,25 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 <body>
   <div id="loading">
     <div class="spinner"></div>
-    <span id="loading-text">CARGANDO VISOR 3D...</span>
+    <span id="loading-text">LOADING 3D VIEWER...</span>
   </div>
   <div id="canvas-container">
     <div id="pins-layer"></div>
     <div id="hover-pill"></div>
     <div id="hud-controls">
-      <button id="btn-flip" class="ctrl-btn" title="Frente / Espalda">
+      <button id="btn-flip" class="ctrl-btn" title="Front / Back">
         <svg viewBox="0 0 24 24"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h14"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H3"/></svg>
       </button>
-      <button id="btn-zoom-in" class="ctrl-btn" title="Acercar">
+      <button id="btn-zoom-in" class="ctrl-btn" title="Zoom in">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
       </button>
-      <button id="btn-zoom-out" class="ctrl-btn" title="Alejar">
+      <button id="btn-zoom-out" class="ctrl-btn" title="Zoom out">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
       </button>
-      <button id="btn-reset" class="ctrl-btn" title="Centrar">
+      <button id="btn-reset" class="ctrl-btn" title="Center">
         <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
-      <button id="btn-toggle-pins" class="ctrl-btn" title="Pines">
+      <button id="btn-toggle-pins" class="ctrl-btn" title="Pins">
         <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
@@ -401,7 +402,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
         btn.appendChild(dot);
 
         btn.addEventListener('mouseenter', () => {
-          hoverPill.textContent = z.name + (z.painIntensity > 0 ? ' · Con síntomas' : '');
+          hoverPill.textContent = z.name + (z.painIntensity > 0 ? ' · With symptoms' : '');
           hoverPill.classList.add('visible');
         });
         btn.addEventListener('mouseleave', () => {
@@ -426,7 +427,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
           const hasPain = z.status !== 'normal' && (z.painIntensity || 0) > 0;
           btn.className = 'zone-pin' + (hasPain ? ' has-pain' : '') + (isActive ? ' active' : '');
           dot.innerHTML = getPinSvg(hasPain, isActive);
-          btn.title = z.name + (hasPain ? ' (Con síntomas)' : '');
+          btn.title = z.name + (hasPain ? ' (With symptoms)' : '');
 
           if (hasPain && !isActive) {
             const col = getGradualPainColor(z.painIntensity || 5);
@@ -776,7 +777,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
         },
         undefined,
         () => {
-          loadingText.textContent = 'Visor 3D no disponible';
+          loadingText.textContent = '3D viewer unavailable';
         }
       );
 
@@ -854,7 +855,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
         const bestZone = pickZoneAnalytic(e.clientX, e.clientY, 1.35);
         if (bestZone) {
           renderer.domElement.style.cursor = 'pointer';
-          hoverPill.textContent = bestZone.name + (bestZone.painIntensity > 0 ? ' · Con síntomas' : '');
+          hoverPill.textContent = bestZone.name + (bestZone.painIntensity > 0 ? ' · With symptoms' : '');
           hoverPill.classList.add('visible');
         } else {
           renderer.domElement.style.cursor = 'grab';
@@ -1028,7 +1029,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 
       animate();
     } catch {
-      loadingText.textContent = 'Visor WebGL no disponible';
+      loadingText.textContent = 'WebGL viewer unavailable';
     }
   </script>
 </body>
@@ -1208,7 +1209,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
 
   const renderMuscleOption = (muscle: MuscleData) => {
     const hasSymptoms = muscle.status !== 'normal' && Boolean(muscle.observation);
-    const conditionLabel = hasSymptoms ? muscle.observation?.conditionName : 'Sin dolencia';
+    const conditionLabel = hasSymptoms ? muscle.observation?.conditionName : 'No ailment';
     const pain = muscle.observation?.painIntensity ?? 0;
     const painColor = getPainColorHex(pain);
     const isSelected = selectedMuscleId === muscle.id;
@@ -1220,7 +1221,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
         type="button"
         role="option"
         aria-selected={isSelected}
-        aria-label={`${muscle.name}${conditionLabel ? ` · ${conditionLabel}` : ''}${hasSymptoms ? ` · Con síntomas · Dolor ${pain}/10` : ''}`}
+        aria-label={`${muscle.name}${conditionLabel ? ` · ${conditionLabel}` : ''}${hasSymptoms ? ` · With symptoms · Pain ${pain}/10` : ''}`}
         tabIndex={-1}
         className={`muscle-picker-option muscle-picker-tile ${hasSymptoms ? 'is-affected-row' : ''} ${isSelected ? 'is-selected' : ''}`}
         onClick={() => handleChooseMuscle(muscle.id)}
@@ -1238,7 +1239,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
           {hasSymptoms && (
             <span className="muscle-option-pain-pill" aria-hidden="true">
               <span className="muscle-option-pain-dot" style={{ backgroundColor: painColor }} />
-              Dolor {pain}/10
+              Pain {pain}/10
             </span>
           )}
         </span>
@@ -1259,7 +1260,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
       <div className="viewer3d-dropdown-bar">
         <div ref={pickerWrapRef} className="viewer3d-select-field">
           <span id={selectId} className="viewer3d-select-label">
-            Músculo / Zona 3D
+            3D Muscle / Zone
           </span>
           <button
             ref={triggerRef}
@@ -1306,7 +1307,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
               <span className="muscle-picker-trigger-text">
                 {selectedMuscle
                   ? selectedMuscle.name
-                  : 'Selecciona el músculo o la zona:'}
+                  : 'Select the muscle or zone:'}
               </span>
             </span>
 
@@ -1361,9 +1362,9 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
               </button>
 
               {affectedMuscles.length > 0 && (
-                <div className="muscle-picker-group" role="group" aria-label="Con síntomas reportados">
+                <div className="muscle-picker-group" role="group" aria-label="With reported symptoms">
                   <div className="muscle-picker-group-label">
-                    Con síntomas reportados ({affectedMuscles.length})
+                    With reported symptoms ({affectedMuscles.length})
                   </div>
                   <div className="muscle-picker-grid">
                     {affectedMuscles.map((muscle) => renderMuscleOption(muscle))}
@@ -1372,8 +1373,8 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
               )}
 
               {groupedByCategory.map((group) => (
-                <div key={group.category} className="muscle-picker-group" role="group" aria-label={group.category}>
-                  <div className="muscle-picker-group-label">{group.category}</div>
+                <div key={group.category} className="muscle-picker-group" role="group" aria-label={getRegionCategoryLabel(group.category)}>
+                  <div className="muscle-picker-group-label">{getRegionCategoryLabel(group.category)}</div>
                   <div className="muscle-picker-grid">
                     {group.items.map((muscle) => renderMuscleOption(muscle))}
                   </div>
@@ -1388,22 +1389,22 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
         <iframe
           ref={iframeRef}
           srcDoc={srcDoc}
-          title="Visor 3D TraumaTeam"
+          title="TraumaTeam 3D viewer"
           className="viewer3d-iframe"
         />
       </div>
 
-      <div className="viewer3d-pain-legend" aria-label="Escala visual de dolor y zona activa">
+      <div className="viewer3d-pain-legend" aria-label="Visual pain scale and active zone">
         <div className="vpl-bar" />
         <div className="vpl-labels">
           <span>
-            <i className="vpl-dot" style={{ backgroundColor: '#fde047' }} /> 1 Leve
+            <i className="vpl-dot" style={{ backgroundColor: '#fde047' }} /> 1 Mild
           </span>
           <span>
-            <i className="vpl-dot" style={{ backgroundColor: '#f97316' }} /> 5 Moderado
+            <i className="vpl-dot" style={{ backgroundColor: '#f97316' }} /> 5 Moderate
           </span>
           <span>
-            <i className="vpl-dot" style={{ backgroundColor: '#991b1b' }} /> 10 Intenso
+            <i className="vpl-dot" style={{ backgroundColor: '#991b1b' }} /> 10 Intense
           </span>
         </div>
       </div>

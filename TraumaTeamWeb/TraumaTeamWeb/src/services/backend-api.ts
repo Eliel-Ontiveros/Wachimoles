@@ -63,9 +63,9 @@ const SAMPLE_METRICS: readonly SampleMetric[] = [
   'sleep',
 ];
 
-const MONTHS_ES = [
-  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+const MONTHS_EN = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
 const REQUEST_TIMEOUT_MS = 6500;
@@ -208,7 +208,7 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
 function resolveUrl(path: string, params?: Record<string, string>): string {
   const base = runtimeConfig.apiBaseUrl.trim();
   if (!base) {
-    throw new Error('Falta configurar la URL del backend en .env (EXPO_PUBLIC_LOCAL_API_URL).');
+    throw new Error('The backend URL is not configured in .env (EXPO_PUBLIC_LOCAL_API_URL).');
   }
   const url = new URL(path, base);
   if (params) {
@@ -241,7 +241,7 @@ export async function checkBackendHealth(): Promise<boolean> {
 }
 
 /**
- * Obtiene muestras biométricas reales del astronauta configurado.
+ * Fetches real biometric samples of the configured astronaut.
  * Usa /dashboard/data con HTTP Basic Auth (.env) y respalda con /dashboard/samples si hay Bearer token.
  */
 export async function fetchSamplesFromBackend(
@@ -263,7 +263,7 @@ export async function fetchSamplesFromBackend(
     if (res.ok) {
       const json: unknown = await res.json();
       if (!Array.isArray(json) || !json.every(isDashboardSample)) {
-        throw new Error('El backend devolvió muestras con formato inesperado.');
+        throw new Error('The backend returned samples in an unexpected format.');
       }
       return json;
     }
@@ -272,8 +272,8 @@ export async function fetchSamplesFromBackend(
       throw new ApiRequestError(
         res.status,
         res.status === 401
-          ? 'Credenciales web rechazadas en /dashboard/data (401).'
-          : `Error al consultar muestras (${res.status}).`
+          ? 'Web credentials rejected at /dashboard/data (401).'
+          : `Error fetching samples (${res.status}).`
       );
     }
   }
@@ -290,18 +290,18 @@ export async function fetchSamplesFromBackend(
       throw new ApiRequestError(
         res.status,
         res.status === 401
-          ? 'Token de API rechazado en /dashboard/samples (401).'
-          : `Error al consultar /dashboard/samples (${res.status}).`
+          ? 'API token rejected at /dashboard/samples (401).'
+          : `Error fetching /dashboard/samples (${res.status}).`
       );
     }
     const json: unknown = await res.json();
     if (!Array.isArray(json) || !json.every(isDashboardSample)) {
-      throw new Error('El backend devolvió muestras con formato inesperado.');
+      throw new Error('The backend returned samples in an unexpected format.');
     }
     return json;
   }
 
-  throw new ApiRequestError(401, 'No hay contraseña web ni token API configurados.');
+  throw new ApiRequestError(401, 'No web password or API token is configured.');
 }
 
 async function fetchWithBearerOrBasic(url: string, init: RequestInit): Promise<Response> {
@@ -331,7 +331,7 @@ async function fetchWithBearerOrBasic(url: string, init: RequestInit): Promise<R
 
   throw new ApiRequestError(
     401,
-    'Se requiere token DASHBOARD_API_TOKEN para acceder a este recurso.'
+    'A DASHBOARD_API_TOKEN token is required to access this resource.'
   );
 }
 
@@ -344,13 +344,13 @@ export async function fetchBodyConditionsFromBackend(
     throw new ApiRequestError(
       res.status,
       res.status === 401
-        ? 'Acceso protegido con Bearer DASHBOARD_API_TOKEN en /dashboard/body-conditions (401).'
-        : `No se pudieron cargar las lesiones 3D (${res.status}).`
+        ? 'Access protected with Bearer DASHBOARD_API_TOKEN at /dashboard/body-conditions (401).'
+        : `Could not load the 3D injuries (${res.status}).`
     );
   }
   const body: unknown = await res.json();
   if (!Array.isArray(body) || !body.every(isBodyConditionRecord)) {
-    throw new Error('Formato inválido recibido desde /dashboard/body-conditions.');
+    throw new Error('Invalid format received from /dashboard/body-conditions.');
   }
   return body;
 }
@@ -380,14 +380,14 @@ export async function saveBodyConditionToBackend(
     throw new ApiRequestError(
       res.status,
       res.status === 401
-        ? 'No autorizado (401). Configura DASHBOARD_API_TOKEN en Conexión Backend para guardar cambios médicos.'
-        : `No se pudo guardar el nivel de riesgo (${res.status}).`
+        ? 'Unauthorized (401). Set DASHBOARD_API_TOKEN in the Backend Connection to save medical changes.'
+        : `Could not save the risk level (${res.status}).`
     );
   }
 
   const body: unknown = await res.json();
   if (!isBodyConditionRecord(body)) {
-    throw new Error('El backend devolvió un registro anatómico inválido al guardar.');
+    throw new Error('The backend returned an invalid anatomical record on save.');
   }
   return body;
 }
@@ -399,8 +399,8 @@ export async function resolveBodyConditionInBackend(muscleId: string): Promise<v
     throw new ApiRequestError(
       res.status,
       res.status === 401
-        ? 'No autorizado (401). Configura DASHBOARD_API_TOKEN para resolver lesiones.'
-        : `No se pudo resolver la lesión (${res.status}).`
+        ? 'Unauthorized (401). Set DASHBOARD_API_TOKEN to resolve injuries.'
+        : `Could not resolve the injury (${res.status}).`
     );
   }
 }
@@ -426,13 +426,13 @@ export async function fetchBodyConditionImagesFromBackend(
     throw new ApiRequestError(
       res.status,
       res.status === 401
-        ? 'Acceso protegido con token en /dashboard/body-conditions/images (401).'
-        : `No se pudieron cargar las fotos del padecimiento (${res.status}).`
+        ? 'Access protected with a token at /dashboard/body-conditions/images (401).'
+        : `Could not load the condition photos (${res.status}).`
     );
   }
   const body: unknown = await res.json();
   if (!Array.isArray(body) || !body.every(isBodyConditionImageRecord)) {
-    throw new Error('Formato inválido recibido desde /dashboard/body-conditions/images.');
+    throw new Error('Invalid format received from /dashboard/body-conditions/images.');
   }
   return body;
 }
@@ -453,13 +453,13 @@ export async function uploadBodyConditionImageToBackend(
     throw new ApiRequestError(
       res.status,
       res.status === 401
-        ? 'No autorizado (401). Configura DASHBOARD_API_TOKEN para subir fotos.'
-        : `No se pudo subir la imagen (${res.status}).`
+        ? 'Unauthorized (401). Set DASHBOARD_API_TOKEN to upload photos.'
+        : `Could not upload the image (${res.status}).`
     );
   }
   const body: unknown = await res.json();
   if (!isBodyConditionImageRecord(body)) {
-    throw new Error('Respuesta inválida al subir imagen de padecimiento.');
+    throw new Error('Invalid response when uploading the condition image.');
   }
   return body;
 }
@@ -473,19 +473,19 @@ export async function fetchDailyHealthChecksFromBackend(
     throw new ApiRequestError(
       res.status,
       res.status === 401
-        ? 'Acceso protegido con Bearer DASHBOARD_API_TOKEN en /dashboard/health-checks (401).'
-        : `No se pudieron cargar los cuestionarios diarios (${res.status}).`
+        ? 'Access protected with Bearer DASHBOARD_API_TOKEN at /dashboard/health-checks (401).'
+        : `Could not load the daily questionnaires (${res.status}).`
     );
   }
   const body: unknown = await res.json();
   if (!Array.isArray(body)) {
-    throw new Error('Formato inválido recibido desde /dashboard/health-checks.');
+    throw new Error('Invalid format received from /dashboard/health-checks.');
   }
   const parsedChecks: DailyHealthCheck[] = [];
   for (const item of body) {
     const parsed = parseDailyHealthCheck(item);
     if (!parsed) {
-      throw new Error('Formato inválido recibido desde /dashboard/health-checks.');
+      throw new Error('Invalid format received from /dashboard/health-checks.');
     }
     parsedChecks.push(parsed);
   }
@@ -574,13 +574,13 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
     lastMeasuredIso = latestDate.toISOString();
     const diffSec = Math.floor((Date.now() - latestDate.getTime()) / 1000);
     if (diffSec < 60 && diffSec >= 0) {
-      formattedTime = `Hace ${Math.max(1, diffSec)} seg`;
+      formattedTime = `${Math.max(1, diffSec)} sec ago`;
     } else if (diffSec < 3600 && diffSec >= 0) {
-      formattedTime = `Hace ${Math.floor(diffSec / 60)} min`;
+      formattedTime = `${Math.floor(diffSec / 60)} min ago`;
     } else {
       const h = String(latestDate.getHours()).padStart(2, '0');
       const m = String(latestDate.getMinutes()).padStart(2, '0');
-      formattedTime = `${latestDate.toLocaleDateString('es-MX')} · ${h}:${m}`;
+      formattedTime = `${latestDate.toLocaleDateString('en-US')} · ${h}:${m}`;
     }
   }
 
@@ -641,9 +641,9 @@ export function formatDayLabel(dateKey: string): string {
     '0'
   )}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
-  const shortDate = `${d} ${MONTHS_ES[m - 1] ?? ''}`;
-  if (dateKey === todayKey) return `Hoy · ${shortDate}`;
-  if (dateKey === yesterdayKey) return `Ayer · ${shortDate}`;
+  const shortDate = `${MONTHS_EN[m - 1] ?? ''} ${d}`;
+  if (dateKey === todayKey) return `Today · ${shortDate}`;
+  if (dateKey === yesterdayKey) return `Yesterday · ${shortDate}`;
   return `${shortDate} ${y}`;
 }
 
