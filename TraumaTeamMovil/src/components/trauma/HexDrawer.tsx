@@ -15,6 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, usePathname, type Href } from 'expo-router';
 import { Activity, BookOpen, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
 
+import { useI18n } from '@/i18n/I18nProvider';
+import type { Locale, MessageKey } from '@/i18n/messages';
+import { SegmentedControl } from '@/settings/SegmentedControl';
+import { useAppTheme, type ThemePreference } from '@/theme';
+
 import { useDrawer } from './drawer-context';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -63,7 +68,15 @@ function buildTiles(w: number, h: number, ox: number, oy: number): Tile[] {
 }
 
 // Celda hexagonal animada para la transición de apertura/cierre
-const HexTile = memo(function HexTile({ tile, progress }: { tile: Tile; progress: Animated.Value }) {
+const HexTile = memo(function HexTile({
+  tile,
+  progress,
+  fill,
+}: {
+  tile: Tile;
+  progress: Animated.Value;
+  fill: string;
+}) {
   const start = tile.d * 0.52;
   const end = start + 0.48;
   const scale = progress.interpolate({ inputRange: [start, end], outputRange: [0, 1], extrapolate: 'clamp' });
@@ -93,8 +106,8 @@ const HexTile = memo(function HexTile({ tile, progress }: { tile: Tile; progress
       <Svg width={BOX_W} height={BOX_H}>
         <Polygon
           points={TILE_POINTS}
-          fill="#ffffff"
-          stroke="#ffffff"
+          fill={fill}
+          stroke={fill}
           strokeWidth={1.5}
         />
       </Svg>
@@ -104,46 +117,24 @@ const HexTile = memo(function HexTile({ tile, progress }: { tile: Tile; progress
 
 const NAV_ITEMS: {
   path: string;
-  label: string;
-  subtitle: string;
+  label: MessageKey;
+  subtitle: MessageKey;
   href: Href;
   Icon: typeof Activity;
 }[] = [
-    {
-      path: '/',
-      label: 'Monitoreo Vital',
-      subtitle: 'Signos vitales, pulso y ECG',
-      href: '/',
-      Icon: Activity,
-    },
-    {
-      path: '/explore',
-      label: 'Vista Corporal',
-      subtitle: 'Modelo 3D y fotos de lesión',
-      href: '/explore',
-      Icon: PersonStanding,
-    },
-    {
-      path: '/missions',
-      label: 'Misiones y Viaje',
-      subtitle: 'Rachas, rutinas y navecita',
-      href: '/missions',
-      Icon: Rocket,
-    },
-    {
-      path: '/assistant',
-      label: 'Space Health Assistant',
-      subtitle: 'Research with cited sources',
-      href: '/assistant',
-      Icon: BookOpen,
-    },
-  ];
+  { path: '/', label: 'route./', subtitle: 'nav.vitals.subtitle', href: '/', Icon: Activity },
+  { path: '/explore', label: 'route./explore', subtitle: 'nav.body.subtitle', href: '/explore', Icon: PersonStanding },
+  { path: '/missions', label: 'route./missions', subtitle: 'nav.missions.subtitle', href: '/missions', Icon: Rocket },
+  { path: '/assistant', label: 'nav.assistant', subtitle: 'nav.assistant.subtitle', href: '/assistant', Icon: BookOpen },
+];
 
 export function HexDrawer() {
   const { isOpen, close } = useDrawer();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const { t, locale, setLocale } = useI18n();
+  const { colors, preference, setPreference } = useAppTheme();
 
   const drawerW = Math.min(width * 0.82, 330);
   const [mounted, setMounted] = useState(false);
@@ -216,9 +207,9 @@ export function HexDrawer() {
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: 'rgba(15,23,42,0.35)', opacity: progress },
+          { backgroundColor: colors.overlay, opacity: progress },
         ]}>
-        <Pressable style={{ flex: 1 }} onPress={close} accessibilityLabel="Cerrar menú" />
+        <Pressable style={{ flex: 1 }} onPress={close} accessibilityLabel={t('nav.closeMenu')} />
       </Animated.View>
 
       {/* Contenedor del panel lateral blanco */}
@@ -231,16 +222,16 @@ export function HexDrawer() {
           width: drawerW,
           overflow: 'hidden',
           borderRightWidth: 1,
-          borderRightColor: '#e2e8f0',
-          shadowColor: '#0f172a',
+          borderRightColor: colors.border,
+          shadowColor: colors.shadow,
           shadowOffset: { width: 4, height: 0 },
-          shadowOpacity: 0.08,
+          shadowOpacity: colors.shadowOpacity,
           shadowRadius: 18,
           elevation: 16,
         }}>
         {/* Onda de hexágonos blancos que arman el drawer desde el botón ☰ */}
-        {tiles.map((t) => (
-          <HexTile key={t.key} tile={t} progress={progress} />
+        {tiles.map((tile) => (
+          <HexTile key={tile.key} tile={tile} progress={progress} fill={colors.surface} />
         ))}
 
         {/* Fondo blanco puro que garantiza un acabado inmaculado sin cuadrículas */}
@@ -249,7 +240,7 @@ export function HexDrawer() {
           style={[
             StyleSheet.absoluteFill,
             {
-              backgroundColor: '#ffffff',
+              backgroundColor: colors.surface,
               opacity: solidWhiteOpacity,
             },
           ]}
@@ -275,21 +266,21 @@ export function HexDrawer() {
           {/* Cabecera del Drawer */}
           <View className="mb-6 flex-row items-center justify-between">
             <View>
-              <Text className="font-mono text-xl text-slate-900">
+              <Text className="font-mono text-xl text-slate-900 dark:text-trauma-nightInk">
                 <Text className="font-extrabold text-sky-500">Trauma</Text>Team
               </Text>
             </View>
             <Pressable
               onPress={close}
-              accessibilityLabel="Cerrar menú"
-              className="h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 active:bg-slate-100">
-              <X size={17} color="#1e293b" />
+              accessibilityLabel={t('nav.closeMenu')}
+              className="h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 active:bg-slate-100 dark:border-trauma-nightLine dark:bg-trauma-nightAlt dark:active:bg-trauma-nightLine">
+              <X size={17} color={colors.text} />
             </Pressable>
           </View>
 
           {/* Sección de Navegación */}
-          <Text className="mb-2 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
-            NAVEGACIÓN
+          <Text className="mb-2 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
+            {t('nav.section')}
           </Text>
 
           {NAV_ITEMS.map(({ path, label, subtitle, href, Icon }) => {
@@ -302,29 +293,60 @@ export function HexDrawer() {
                   router.navigate(href);
                 }}
                 className={`mb-2.5 flex-row items-center rounded-2xl border p-3 active:opacity-75 ${active
-                  ? 'border-sky-300 bg-sky-50/70'
-                  : 'border-slate-100 bg-white'
+                  ? 'border-sky-300 bg-sky-50/70 dark:border-trauma-cyanEdge/50 dark:bg-trauma-nightAlt'
+                  : 'border-slate-100 bg-white dark:border-trauma-nightLine dark:bg-trauma-night'
                   }`}>
                 <View
-                  className={`mr-3 h-10 w-10 items-center justify-center rounded-xl ${active ? 'bg-sky-500' : 'bg-slate-100'
+                  className={`mr-3 h-10 w-10 items-center justify-center rounded-xl ${active ? 'bg-sky-500' : 'bg-slate-100 dark:bg-trauma-nightAlt'
                     }`}>
-                  <Icon size={18} color={active ? '#ffffff' : '#64748b'} />
+                  <Icon size={18} color={active ? '#ffffff' : colors.textMuted} />
                 </View>
 
                 <View className="flex-1">
                   <Text
-                    className={`font-mono text-xs font-bold ${active ? 'text-sky-900' : 'text-slate-800'
+                    className={`font-mono text-xs font-bold ${active ? 'text-sky-900 dark:text-trauma-cyanEdge' : 'text-slate-800 dark:text-trauma-nightInk'
                       }`}>
-                    {label}
+                    {t(label)}
                   </Text>
-                  <Text className="font-mono text-[9.5px] text-slate-400">{subtitle}</Text>
+                  <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                    {t(subtitle)}
+                  </Text>
                 </View>
 
-                <ChevronRight size={16} color={active ? '#0284c7' : '#cbd5e1'} />
+                <ChevronRight size={16} color={active ? colors.accentDeep : colors.textSubtle} />
               </Pressable>
             );
           })}
 
+          {/* Ajustes: idioma y tema */}
+          <Text className="mb-2 mt-4 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
+            {t('settings.title')}
+          </Text>
+          <Text className="mb-1.5 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
+            {t('settings.language')}
+          </Text>
+          <SegmentedControl<Locale>
+            accessibilityLabel={t('settings.language')}
+            value={locale}
+            onChange={setLocale}
+            options={[
+              { value: 'es', label: t('settings.lang.es') },
+              { value: 'en', label: t('settings.lang.en') },
+            ]}
+          />
+          <Text className="mb-1.5 mt-3 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
+            {t('settings.theme')}
+          </Text>
+          <SegmentedControl<ThemePreference>
+            accessibilityLabel={t('settings.theme')}
+            value={preference}
+            onChange={setPreference}
+            options={[
+              { value: 'system', label: t('settings.theme.system') },
+              { value: 'light', label: t('settings.theme.light') },
+              { value: 'dark', label: t('settings.theme.dark') },
+            ]}
+          />
         </Animated.View>
       </View>
     </View>

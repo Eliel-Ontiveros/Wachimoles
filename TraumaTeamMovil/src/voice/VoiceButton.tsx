@@ -5,6 +5,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Mic, X } from 'lucide-react-native';
 
 import { useI18n } from '../i18n/I18nProvider';
+import { useAppTheme } from '../theme';
 import { useVoice } from './voice-context';
 import { VoiceOrb } from './VoiceOrb';
 
@@ -236,6 +237,7 @@ export function VoiceFab() {
 export function DictationButton({ onText, label }: { onText: (text: string) => void; label?: string }) {
   const v = useVoice();
   const { t } = useI18n();
+  const { colors } = useAppTheme();
   const text = label ?? t('voice.dictate');
   const active = v.listening && v.mode === 'dictation';
   return (
@@ -244,10 +246,12 @@ export function DictationButton({ onText, label }: { onText: (text: string) => v
       accessibilityRole="button"
       accessibilityLabel={text}
       className={`flex-row items-center self-start rounded-full border px-3 py-1.5 active:opacity-70 ${
-        active ? 'border-red-300 bg-red-50' : 'border-sky-200 bg-sky-50'
+        active
+          ? 'border-red-300 bg-red-50 dark:border-red-400/50 dark:bg-red-950'
+          : 'border-sky-200 bg-sky-50 dark:border-sky-300/40 dark:bg-sky-950'
       }`}>
-      <Mic size={13} color={active ? '#dc2626' : '#0284c7'} />
-      <Text className={`ml-1.5 font-mono text-[10.5px] font-bold ${active ? 'text-red-600' : 'text-sky-700'}`}>
+      <Mic size={13} color={active ? colors.danger : colors.accentDeep} />
+      <Text className={`ml-1.5 font-mono text-[10.5px] font-bold ${active ? 'text-red-600 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'}`}>
         {active ? t('voice.listening') : text}
       </Text>
     </Pressable>

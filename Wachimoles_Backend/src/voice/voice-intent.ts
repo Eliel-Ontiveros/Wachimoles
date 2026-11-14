@@ -39,6 +39,8 @@ export type VoiceIntent =
     }
   | { type: "vital-history"; metric: VitalMetric }
   | { type: "dismiss-alert" }
+  | { type: "set-theme"; theme: ThemePreference }
+  | { type: "set-locale"; locale: AppLocale }
   | { type: "describe-screen"; screen?: "/" | "/explore" | "/missions" };
 
 export type VoiceScreen = "/" | "/explore" | "/missions";
@@ -73,6 +75,8 @@ export const INTENT_TYPES = [
   "fill-health-check",
   "vital-history",
   "dismiss-alert",
+  "set-theme",
+  "set-locale",
   "describe-screen"
 ] as const satisfies readonly VoiceIntent["type"][];
 export type IntentType = (typeof INTENT_TYPES)[number];
@@ -91,6 +95,10 @@ export type MissionId =
   | "env-marte-load"
   | "env-marte-resp";
 
+export type ThemePreference = "system" | "light" | "dark";
+export type AppLocale = "es" | "en";
+export const THEME_PREFERENCES = ["system", "light", "dark"] as const;
+export const APP_LOCALES = ["es", "en"] as const;
 export const ENVIRONMENTS = ["tierra", "nave", "luna", "marte"] as const;
 export const VITAL_METRICS = ["heart_rate", "spo2", "stress", "sleep"] as const;
 export const MISSION_IDS = [
@@ -252,6 +260,14 @@ export function sanitizeIntent(raw: unknown): VoiceIntent | null {
   if (type === "set-environment") {
     const environment = oneOf(ENVIRONMENTS, r.environment);
     return environment ? { type, environment } : null;
+  }
+  if (type === "set-theme") {
+    const theme = oneOf(THEME_PREFERENCES, r.theme);
+    return theme ? { type, theme } : null;
+  }
+  if (type === "set-locale") {
+    const locale = oneOf(APP_LOCALES, r.locale);
+    return locale ? { type, locale } : null;
   }
   if (type === "complete-mission") {
     const missionId = oneOf(MISSION_IDS, r.missionId);

@@ -22,3 +22,19 @@ test('S6 capabilities mirror: every screen has a summary and 3 examples in every
     }
   }
 });
+
+test('areas contribute unique keys (no area overrides another)', async () => {
+  const { AREAS_ES, AREAS_EN } = await import('../src/i18n/messages.ts');
+  for (const [name, dicts] of [['es', AREAS_ES], ['en', AREAS_EN]]) {
+    const seen = new Map();
+    for (const [area, dict] of Object.entries(dicts)) {
+      for (const k of Object.keys(dict)) {
+        assert.equal(seen.has(k), false, `${name}: "${k}" defined in ${seen.get(k)} and ${area}`);
+        seen.set(k, area);
+      }
+    }
+  }
+  for (const area of Object.keys(AREAS_ES)) {
+    assert.deepEqual(Object.keys(AREAS_EN[area]).sort(), Object.keys(AREAS_ES[area]).sort(), area);
+  }
+});
