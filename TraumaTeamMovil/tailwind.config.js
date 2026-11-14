@@ -2,6 +2,7 @@ const { platformSelect } = require('nativewind/theme');
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
   // The app has a single light theme (no `dark:` classes). 'class' stops NativeWind on web from

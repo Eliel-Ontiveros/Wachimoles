@@ -4,14 +4,16 @@ import { useVitalSigns } from '../../hooks/use-vital-signs';
 import {
   calculateMissionStateFromDeparture,
   ENVIRONMENTS,
+  extendMissionArrivalIso,
   getDateDaysAgoIso,
   getMissionsForEnvironment,
   getRouteTotalDays,
   getTodayIsoDate,
+  getBodyConditionImagesFromBackend,
   getDailyHealthChecksFromBackend,
   syncEnvironmentToBackend,
   syncHealthCheckToBackend,
-  uploadInjuryPhotoToBackend,
+  uploadBodyConditionImageToBackend,
 } from '../../services/mission-api';
 import {
   CriticalAlert,
@@ -95,7 +97,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (!isMounted) return;
-        console.error('No se pudieron cargar los cuestionarios diarios.', error);
+        console.warn('No se pudieron cargar los cuestionarios diarios.', error);
         Alert.alert(
           'No se pudo cargar el cuestionario',
           'Revisa la conexión con el backend e inténtalo de nuevo.'
@@ -198,12 +200,12 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     void syncEnvironmentToBackend(calc.calculatedEnvironment);
   }, []);
 
-  // Al cambiar manualmente la ubicación a Base Lunar o Marte, se adelanta la misión a su llegada
+  // Al cambiar manualmente la ubicación a Estación EEI, Base Lunar o Marte, se adelanta la misión a su llegada
   const setEnvironment = useCallback(
     (env: EnvironmentType) => {
       setEnvironmentState(env);
       setArrivalDate(null);
-      if (env === 'luna' || env === 'marte') {
+      if (env === 'estacion' || env === 'luna' || env === 'marte') {
         const nextOrigin = origin === env ? 'tierra' : origin;
         if (origin === env) setOrigin('tierra');
         setDestination(env);
@@ -237,7 +239,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           arrivalDate
         ).totalDays;
         const nextDay = Math.min(total, d + 1);
-        if (nextDay >= total && destination !== 'nave') {
+        if (nextDay >= total) {
           setEnvironmentState(destination);
         }
         return nextDay;
@@ -273,6 +275,31 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     setMissionSetupOpen(false);
     void syncEnvironmentToBackend(nextEnv);
   }, [origin, destination]);
+
+  // Extiende la fecha de llegada en caso de atraso de la misión
+  const delayMission = useCallback(
+    (extraDays: number) => {
+      if (extraDays <= 0) return;
+      const nextArrival = extendMissionArrivalIso(
+        departureDate,
+        effectiveArrivalDate,
+        extraDays
+      );
+      setArrivalDate(nextArrival);
+      const calc = calculateMissionStateFromDeparture(
+        origin,
+        destination,
+        departureDate,
+        nextArrival
+      );
+      setMissionDay(calc.missionDay);
+      if (!calc.arrived && calc.calculatedEnvironment !== environment) {
+        setEnvironmentState(calc.calculatedEnvironment);
+        void syncEnvironmentToBackend(calc.calculatedEnvironment);
+      }
+    },
+    [departureDate, effectiveArrivalDate, origin, destination, environment]
+  );
 
   const toggleTreadmillRoutine = useCallback(() => {
     setTreadmillRoutineActive((prev) => !prev);
@@ -368,15 +395,22 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     async (
       muscleId: string,
       muscleName: string,
-      photo: { uri: string; painIntensity?: number; note?: string }
+      photo: {
+        uri: string;
+        fileName?: string;
+        mimeType?: string;
+        painIntensity?: number;
+        note?: string;
+      }
     ): Promise<InjuryPhoto> => {
       const existing = injuryPhotos[muscleId] ?? [];
       const nextDay = existing.length + 1;
+      const uploadedImage = await uploadBodyConditionImageToBackend(muscleId, photo);
       const entry: InjuryPhoto = {
-        id: `photo-${muscleId}-${Date.now()}`,
+        id: uploadedImage.path,
         muscleId,
         muscleName,
-        uri: photo.uri,
+        uri: uploadedImage.signedUrl,
         dayNumber: nextDay,
         capturedAt: formatNowLabel(),
         painIntensity: photo.painIntensity,
@@ -386,18 +420,29 @@ export function MissionProvider({ children }: { children: ReactNode }) {
         ...prev,
         [muscleId]: [...(prev[muscleId] ?? []), entry],
       }));
-      void uploadInjuryPhotoToBackend({
-        muscleId,
-        muscleName,
-        uri: photo.uri,
-        dayNumber: nextDay,
-        capturedAt: entry.capturedAt,
-        painIntensity: photo.painIntensity,
-        note: photo.note,
-      });
       return entry;
     },
     [injuryPhotos]
+  );
+
+  const refreshInjuryPhotos = useCallback(
+    async (muscleId: string, muscleName: string): Promise<InjuryPhoto[]> => {
+      const images = await getBodyConditionImagesFromBackend(muscleId);
+      const photos = images
+        .slice()
+        .reverse()
+        .map((image, index) => ({
+          id: image.path,
+          muscleId,
+          muscleName,
+          uri: image.signedUrl,
+          dayNumber: index + 1,
+          capturedAt: 'Imagen guardada en Supabase',
+        }));
+      setInjuryPhotos((prev) => ({ ...prev, [muscleId]: photos }));
+      return photos;
+    },
+    []
   );
 
   const unreadAlertCount = useMemo(
@@ -425,6 +470,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       closeMissionSetup,
       configureMission,
       arriveEarly,
+      delayMission,
       setEnvironment,
       streakDays,
       checkedInToday,
@@ -443,6 +489,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       acknowledgeAllAlerts,
       injuryPhotos,
       addInjuryPhoto,
+      refreshInjuryPhotos,
       healthChecks,
       submitHealthCheck,
     }),
@@ -461,6 +508,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       closeMissionSetup,
       configureMission,
       arriveEarly,
+      delayMission,
       setEnvironment,
       streakDays,
       checkedInToday,
@@ -479,6 +527,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       acknowledgeAllAlerts,
       injuryPhotos,
       addInjuryPhoto,
+      refreshInjuryPhotos,
       healthChecks,
       submitHealthCheck,
     ]

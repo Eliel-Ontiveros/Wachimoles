@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -44,6 +45,8 @@ import {
   getBodyConditionsFromBackend,
   syncObservationToBackend,
 } from '../../services/mission-api';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 // Vista de exploración anatómica y registro de malestares
 interface BodyViewProps {
@@ -91,15 +94,15 @@ function ProblemDetailModal({
   onDelete: () => void;
   onOpenTimelapse: () => void;
 }) {
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const confirmingDelete = Boolean(visible && muscle && confirmingDeleteId === muscle.id);
 
   // Animaciones de entrada del modal y barra de dolor
-  const sheetAnim = useRef(new Animated.Value(0)).current;
-  const barAnim = useRef(new Animated.Value(0)).current;
+  const [sheetAnim] = useState(() => new Animated.Value(0));
+  const [barAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (visible && muscle?.observation) {
-      setConfirmingDelete(false);
       sheetAnim.setValue(0);
       barAnim.setValue(0);
 
@@ -109,7 +112,7 @@ function ProblemDetailModal({
           damping: 20,
           stiffness: 180,
           mass: 0.8,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(barAnim, {
           toValue: (muscle.observation.painIntensity || 0) / 10,
@@ -129,6 +132,16 @@ function ProblemDetailModal({
   const painColor = getPainColorHex(intensity);
   const severityLabel = getPainSeverityLabel(intensity);
 
+  const handleClose = () => {
+    setConfirmingDeleteId(null);
+    onClose();
+  };
+
+  const handleConfirmDelete = () => {
+    setConfirmingDeleteId(null);
+    onDelete();
+  };
+
   const translateY = sheetAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [60, 0],
@@ -147,9 +160,9 @@ function ProblemDetailModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}>
+      onRequestClose={handleClose}>
       <Pressable
-        onPress={onClose}
+        onPress={handleClose}
         style={{
           flex: 1,
           backgroundColor: 'rgba(15,23,42,0.45)',
@@ -230,7 +243,7 @@ function ProblemDetailModal({
                   </View>
 
                   <Pressable
-                    onPress={onClose}
+                    onPress={handleClose}
                     className="h-8 w-8 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200">
                     <X size={15} color="#475569" strokeWidth={2.2} />
                   </Pressable>
@@ -255,8 +268,8 @@ function ProblemDetailModal({
               <View className="mt-3.5 flex-row gap-2">
                 <View
                   className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${observation.swelling
-                      ? 'border-sky-200 bg-sky-50/70'
-                      : 'border-slate-100 bg-slate-50'
+                    ? 'border-sky-200 bg-sky-50/70'
+                    : 'border-slate-100 bg-slate-50'
                     }`}>
                   <Layers
                     size={14}
@@ -273,8 +286,8 @@ function ProblemDetailModal({
 
                 <View
                   className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${observation.functionalLimitation
-                      ? 'border-sky-200 bg-sky-50/70'
-                      : 'border-slate-100 bg-slate-50'
+                    ? 'border-sky-200 bg-sky-50/70'
+                    : 'border-slate-100 bg-slate-50'
                     }`}>
                   <MotionStatusIcon
                     size={14}
@@ -325,7 +338,7 @@ function ProblemDetailModal({
                   </Pressable>
 
                   <Pressable
-                    onPress={() => setConfirmingDelete(true)}
+                    onPress={() => setConfirmingDeleteId(muscle.id)}
                     className="flex-row items-center justify-center rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 active:opacity-75">
                     <Trash2 size={13} color="#dc2626" strokeWidth={2.1} />
                     <Text className="ml-1.5 font-mono text-xs font-bold text-red-600">
@@ -340,14 +353,14 @@ function ProblemDetailModal({
                   </Text>
                   <View className="flex-row items-center gap-2">
                     <Pressable
-                      onPress={() => setConfirmingDelete(false)}
+                      onPress={() => setConfirmingDeleteId(null)}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 active:opacity-75">
                       <Text className="font-mono text-[10.5px] font-bold text-slate-600">
                         Cancelar
                       </Text>
                     </Pressable>
                     <Pressable
-                      onPress={onDelete}
+                      onPress={handleConfirmDelete}
                       className="rounded-lg bg-red-600 px-3 py-1.5 active:opacity-80">
                       <Text className="font-mono text-[10.5px] font-bold text-white">
                         Sí, borrar
@@ -394,9 +407,16 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
           currentMuscles.map((muscle) => {
             if (locallyEditedMuscleIds.current.has(muscle.id)) return muscle;
             const record = records.find(
-              (item) => item.muscleId === muscle.id && item.status === 'active'
+              (item) =>
+                item.muscleId.trim().toLowerCase() === muscle.id.toLowerCase() &&
+                item.status === 'active'
             );
-            if (!record) return muscle;
+            if (!record || record.painIntensity <= 0) return muscle;
+
+            const normalizedDate = new Date(record.recordedAt.replace(' ', 'T'));
+            const updatedAt = Number.isNaN(normalizedDate.getTime())
+              ? record.recordedAt
+              : normalizedDate.toLocaleString();
 
             return {
               ...muscle,
@@ -406,7 +426,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
                 swelling: record.swelling,
                 functionalLimitation: record.functionalLimitation,
                 notes: record.description ?? '',
-                updatedAt: new Date(record.recordedAt).toLocaleString(),
+                updatedAt,
               },
             };
           })
@@ -414,7 +434,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
       })
       .catch((error: unknown) => {
         if (!isMounted) return;
-        console.error('No se pudieron cargar los padecimientos del cuerpo 3D.', error);
+        console.warn('No se pudieron cargar los padecimientos del cuerpo 3D.', error);
         Alert.alert(
           'No se pudieron cargar los registros',
           'Revisa la conexión con el backend e inténtalo de nuevo.'
@@ -490,11 +510,11 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
       muscleName: muscle.name,
       observation: observation
         ? {
-            painIntensity: observation.painIntensity,
-            swelling: observation.swelling,
-            functionalLimitation: observation.functionalLimitation,
-            notes: observation.notes,
-          }
+          painIntensity: observation.painIntensity,
+          swelling: observation.swelling,
+          functionalLimitation: observation.functionalLimitation,
+          notes: observation.notes,
+        }
         : null,
     }).then(({ synced }) => {
       if (!synced) {
@@ -538,11 +558,10 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
           <Pressable
             key={t.id}
             onPress={() => setTab(t.id)}
-            className={`flex-1 items-center rounded-md border px-2 py-1.5 active:opacity-70 ${
-              tab === t.id
+            className={`flex-1 items-center rounded-md border px-2 py-1.5 active:opacity-70 ${tab === t.id
                 ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
                 : 'border-trauma-ink bg-white'
-            }`}>
+              }`}>
             <Text className="font-mono text-[11px] font-bold text-trauma-ink" numberOfLines={1}>
               {t.label}
             </Text>

@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Image, Pressable, Text, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { Flag } from 'lucide-react-native';
-import { ENVIRONMENTS, SPACE_LOCATIONS } from '../../services/mission-api';
+import { ClockPlus, Flag, X } from 'lucide-react-native';
+import {
+  ENVIRONMENTS,
+  formatRouteDays,
+  getDelayPresetDays,
+  SPACE_LOCATIONS,
+} from '../../services/mission-api';
 import { EnvironmentType, SpaceLocation } from '../../types/mission';
 import { useMission } from './mission-context';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const SHIP_SIZE = 32;
 const TRACK_HEIGHT = 76;
@@ -47,7 +55,7 @@ function SpaceBodyBadge({ loc, isOrigin = false }: { loc: SpaceLocation; isOrigi
           toValue: 1,
           duration: 9000,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         })
       );
       loop.start();
@@ -60,13 +68,13 @@ function SpaceBodyBadge({ loc, isOrigin = false }: { loc: SpaceLocation; isOrigi
           toValue: 1.09,
           duration: 1500,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(anim, {
           toValue: 1,
           duration: 1500,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
     );
@@ -183,8 +191,10 @@ export function SpaceJourneyTimeline({
     daysUntilDeparture,
     totalMissionDays,
     arriveEarly,
+    delayMission,
   } = useMission();
   const [trackWidth, setTrackWidth] = useState(0);
+  const [delayPickerOpen, setDelayPickerOpen] = useState(false);
 
   const [progressAnim] = useState(() => new Animated.Value(0));
   const [floatAnim] = useState(() => new Animated.Value(0));
@@ -201,15 +211,20 @@ export function SpaceJourneyTimeline({
 
   const totalDays = previewTotalDays ?? totalMissionDays;
   const ratio = Math.max(0.06, Math.min(0.96, totalDays > 0 ? activeDay / totalDays : 0.06));
+  const progressPct = totalDays > 0 ? Math.min(100, Math.round((activeDay / totalDays) * 100)) : 0;
+  const activeDayLabel = formatRouteDays(activeDay);
+  const totalDaysLabel = formatRouteDays(totalDays);
   const isPreview = previewDay !== undefined || previewOrigin !== undefined;
   const canArriveEarly = !compact && !isPreview && activeDaysUntil === 0 && activeDay < totalDays;
+  const canDelayMission = !compact && !isPreview;
+  const delayPresets = useMemo(() => getDelayPresetDays(totalDays), [totalDays]);
 
   useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: ratio,
       duration: 750,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   }, [ratio, progressAnim]);
 
@@ -220,13 +235,13 @@ export function SpaceJourneyTimeline({
           toValue: -2.5,
           duration: 1300,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(floatAnim, {
           toValue: 2.5,
           duration: 1300,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
     );
@@ -296,7 +311,7 @@ export function SpaceJourneyTimeline({
           <Text className="font-mono text-[9px] font-bold uppercase tracking-wider text-sky-400">
             {activeDaysUntil > 0
               ? `Despegue en ${activeDaysUntil} ${activeDaysUntil === 1 ? 'día' : 'días'}`
-              : activeEnv === 'nave' && activeDest !== 'nave'
+              : activeEnv === 'nave'
                 ? 'En tránsito espacial'
                 : envConfig.label}
           </Text>
@@ -311,7 +326,9 @@ export function SpaceJourneyTimeline({
           }}
           className="rounded-lg border px-2.5 py-1">
           <Text className="font-mono text-[10px] font-bold text-sky-300">
-            {activeDaysUntil > 0 ? `Sale en ${activeDaysUntil}d` : `Día ${activeDay} / ${totalDays}`}
+            {activeDaysUntil > 0
+              ? `Sale en ${activeDaysUntil}d`
+              : `Día ${activeDayLabel} / ${totalDaysLabel}`}
           </Text>
         </View>
       </View>
@@ -390,11 +407,13 @@ export function SpaceJourneyTimeline({
                   height: SHIP_SIZE,
                   transform: [{ translateY: floatAnim }],
                 }}>
-                <View className="h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-sky-400 bg-slate-900 shadow-sm">
+                <View
+                  style={{ backgroundColor: '#060b19', borderColor: '#38bdf8', borderWidth: 1.8 }}
+                  className="h-full w-full items-center justify-center overflow-hidden rounded-full shadow-sm">
                   <Image
-                    source={require('@/assets/images/a2.jpg')}
-                    style={{ width: 24, height: 24 }}
-                    resizeMode="contain"
+                    source={require('@/assets/images/Naveee (1).svg')}
+                    style={{ width: 22, height: 15 }}
+                    contentFit="contain"
                   />
                 </View>
               </Animated.View>
@@ -418,32 +437,105 @@ export function SpaceJourneyTimeline({
           style={{ backgroundColor: 'rgba(56, 189, 248, 0.16)' }}
           className="rounded-md px-2 py-0.5">
           <Text className="font-mono text-[9px] font-bold text-sky-300">
-            Día {activeDay} ({Math.round((activeDay / totalDays) * 100)}%)
+            Día {activeDayLabel} ({progressPct}%)
           </Text>
         </View>
 
         <View className="flex-row items-center">
           <Text className="font-mono text-[9px] text-slate-300">
-            Día {totalDays} · {destInfo.shortLabel}
+            Día {totalDaysLabel} · {destInfo.shortLabel}
           </Text>
           <View className="ml-1.5 h-2 w-2 rounded-full bg-slate-500" />
         </View>
       </View>
 
-      {canArriveEarly && (
-        <Pressable
-          onPress={arriveEarly}
-          accessibilityLabel="Marcar llegada anticipada"
-          style={{
-            backgroundColor: 'rgba(56, 189, 248, 0.14)',
-            borderColor: 'rgba(56, 189, 248, 0.35)',
-          }}
-          className="mt-2.5 flex-row items-center justify-center rounded-xl border py-2 active:opacity-75">
-          <Flag size={12} color="#38bdf8" />
-          <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-sky-300">
-            Llegué antes a {destInfo.shortLabel}
-          </Text>
-        </Pressable>
+      {(canArriveEarly || canDelayMission) && (
+        <View className="mt-2.5 gap-2">
+          <View className="flex-row gap-2">
+            {canArriveEarly && (
+              <Pressable
+                onPress={() => {
+                  setDelayPickerOpen(false);
+                  arriveEarly();
+                }}
+                accessibilityLabel="Marcar llegada anticipada"
+                style={{
+                  backgroundColor: 'rgba(56, 189, 248, 0.14)',
+                  borderColor: 'rgba(56, 189, 248, 0.35)',
+                }}
+                className="flex-1 flex-row items-center justify-center rounded-xl border px-2.5 py-2 active:opacity-75">
+                <Flag size={12} color="#38bdf8" />
+                <Text
+                  numberOfLines={1}
+                  className="ml-1.5 font-mono text-[10.5px] font-bold text-sky-300">
+                  Llegué antes
+                </Text>
+              </Pressable>
+            )}
+
+            {canDelayMission && (
+              <Pressable
+                onPress={() => setDelayPickerOpen((open) => !open)}
+                accessibilityLabel="Añadir tiempo por atraso de misión"
+                style={{
+                  backgroundColor: delayPickerOpen
+                    ? 'rgba(251, 191, 36, 0.22)'
+                    : 'rgba(251, 191, 36, 0.12)',
+                  borderColor: delayPickerOpen
+                    ? 'rgba(251, 191, 36, 0.65)'
+                    : 'rgba(251, 191, 36, 0.38)',
+                }}
+                className="flex-1 flex-row items-center justify-center rounded-xl border px-2.5 py-2 active:opacity-75">
+                <ClockPlus size={12} color="#fbbf24" />
+                <Text
+                  numberOfLines={1}
+                  className="ml-1.5 font-mono text-[10.5px] font-bold text-amber-300">
+                  Añadir tiempo
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          {delayPickerOpen && canDelayMission && (
+            <View
+              style={{
+                backgroundColor: 'rgba(15, 23, 42, 0.72)',
+                borderColor: 'rgba(251, 191, 36, 0.34)',
+              }}
+              className="rounded-xl border p-2.5">
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="font-mono text-[9.5px] font-bold text-amber-200">
+                  Sumar días por atraso a la llegada
+                </Text>
+                <Pressable
+                  onPress={() => setDelayPickerOpen(false)}
+                  accessibilityLabel="Cerrar selector de atraso"
+                  className="h-5 w-5 items-center justify-center rounded-full bg-slate-800 active:opacity-75">
+                  <X size={11} color="#cbd5e1" />
+                </Pressable>
+              </View>
+              <View className="flex-row gap-1.5">
+                {delayPresets.map((extra) => (
+                  <Pressable
+                    key={extra}
+                    onPress={() => {
+                      delayMission(extra);
+                      setDelayPickerOpen(false);
+                    }}
+                    style={{
+                      backgroundColor: 'rgba(251, 191, 36, 0.16)',
+                      borderColor: 'rgba(251, 191, 36, 0.42)',
+                    }}
+                    className="flex-1 items-center rounded-lg border py-1.5 active:opacity-75">
+                    <Text className="font-mono text-[10.5px] font-extrabold text-amber-300">
+                      +{extra}d
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
       )}
     </View>
   );

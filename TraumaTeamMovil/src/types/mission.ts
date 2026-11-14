@@ -1,8 +1,19 @@
 // Tipos para entorno espacial, misiones, rachas, fotos de lesiones y alertas críticas
 
-export type EnvironmentType = 'tierra' | 'nave' | 'luna' | 'marte';
+export type EnvironmentType = 'tierra' | 'nave' | 'estacion' | 'luna' | 'marte';
 
-export type SpaceLocation = 'tierra' | 'nave' | 'luna' | 'marte';
+export type SpaceLocation = 'tierra' | 'estacion' | 'luna' | 'marte';
+
+export interface RouteDurationSpec {
+  origen: SpaceLocation;
+  destino: SpaceLocation;
+  minDias: number;
+  maxDias: number;
+  promedioDias: number;
+  ventanaLanzamientoMeses?: number;
+  esperaRetornoDiasMin?: number;
+  esperaRetornoDiasMax?: number;
+}
 
 export interface MissionSetup {
   origin: SpaceLocation;

@@ -4,6 +4,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthController } from "./health.controller";
 import { VoiceModule } from "./voice/voice.module";
 import { validateEnvironment } from "./validate-environment";
+import { RagModule } from "./rag/rag.module";
 
 @Module({
   imports: [
@@ -12,7 +13,8 @@ import { validateEnvironment } from "./validate-environment";
       validate: validateEnvironment
     }),
     DashboardModule,
-    VoiceModule
+    VoiceModule,
+    RagModule
   ],
   controllers: [HealthController]
 })

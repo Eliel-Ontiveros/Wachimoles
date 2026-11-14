@@ -1,0 +1,14 @@
+{
+  "name": "traumateamweb-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix TraumaTeamWeb run dev",
+    "build": "npm --prefix TraumaTeamWeb run build",
+    "lint": "npm --prefix TraumaTeamWeb run lint",
+    "preview": "npm --prefix TraumaTeamWeb run preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "tailwindcss": "^4.3.5"
+  }
+}

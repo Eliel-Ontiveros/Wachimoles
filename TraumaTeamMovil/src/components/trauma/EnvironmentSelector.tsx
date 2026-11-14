@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -9,13 +9,19 @@ import Svg, {
   Rect,
   Stop,
 } from 'react-native-svg';
-import { Calendar, Check, ChevronDown, Globe, Orbit, Rocket, X } from 'lucide-react-native';
-import { ENVIRONMENTS, getRouteTotalDays, SPACE_LOCATIONS } from '../../services/mission-api';
-import { EnvironmentType } from '../../types/mission';
+import { Calendar, Check, ChevronDown, Globe, Orbit, Rocket, Satellite, X } from 'lucide-react-native';
+import {
+  ENVIRONMENTS,
+  formatRouteDays,
+  getRouteDurationSpec,
+  SPACE_LOCATIONS,
+} from '../../services/mission-api';
+import { EnvironmentType, SpaceLocation } from '../../types/mission';
 import { useMission } from './mission-context';
 
 function EnvironmentIcon({ env, color }: { env: EnvironmentType; color: string }) {
   if (env === 'nave') return <Rocket size={15} color={color} />;
+  if (env === 'estacion') return <Satellite size={15} color={color} />;
   if (env === 'luna') return <Orbit size={15} color={color} />;
   return <Globe size={15} color={color} />;
 }
@@ -34,6 +40,12 @@ const CARD_THEME: Record<
     badgeBg: 'rgba(56, 189, 248, 0.22)',
     iconColor: '#7dd3fc',
     subtitleColor: '#bae6fd',
+  },
+  estacion: {
+    activeBorder: '#22d3ee',
+    badgeBg: 'rgba(34, 211, 238, 0.24)',
+    iconColor: '#67e8f9',
+    subtitleColor: '#cffafe',
   },
   luna: {
     activeBorder: '#cbd5e1',
@@ -67,6 +79,11 @@ function EnvironmentCardBackdrop({ env }: { env: EnvironmentType }) {
           <Stop offset="0%" stopColor="#050a18" />
           <Stop offset="55%" stopColor="#0b132b" />
           <Stop offset="100%" stopColor="#0f172a" />
+        </LinearGradient>
+        <LinearGradient id="envGradEstacion" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#07142b" />
+          <Stop offset="58%" stopColor="#0d2f5e" />
+          <Stop offset="100%" stopColor="#155e75" />
         </LinearGradient>
         <LinearGradient id="envGradLuna" x1="0%" y1="0%" x2="0%" y2="100%">
           <Stop offset="0%" stopColor="#090d16" />
@@ -106,6 +123,42 @@ function EnvironmentCardBackdrop({ env }: { env: EnvironmentType }) {
           <Circle cx={62} cy={72} r={0.9} fill="#ffffff" opacity={0.5} />
           <Circle cx={172} cy={66} r={1.1} fill="#e0f2fe" opacity={0.65} />
           <Circle cx={255} cy={70} r={1.2} fill="#ffffff" opacity={0.7} />
+        </>
+      )}
+
+      {env === 'estacion' && (
+        <>
+          <Rect x={0} y={0} width={320} height={90} fill="url(#envGradEstacion)" />
+          {/* Estrellas en órbita baja */}
+          <Circle cx={38} cy={16} r={1} fill="#cffafe" opacity={0.8} />
+          <Circle cx={96} cy={12} r={1.2} fill="#ffffff" opacity={0.85} />
+          <Circle cx={152} cy={22} r={0.9} fill="#bae6fd" opacity={0.7} />
+          <Circle cx={204} cy={14} r={1.1} fill="#ffffff" opacity={0.75} />
+          <Circle cx={292} cy={18} r={1.2} fill="#67e8f9" opacity={0.8} />
+
+          {/* Horizonte curvo terrestre y halo atmosférico */}
+          <Path
+            d="M 110 90 Q 225 56 320 72 L 320 90 Z"
+            fill="#0284c7"
+            opacity={0.45}
+          />
+          <Path
+            d="M 122 90 Q 226 59 320 74"
+            fill="none"
+            stroke="#38bdf8"
+            strokeWidth={2}
+            opacity={0.72}
+          />
+
+          {/* Silueta geométrica de la Estación Espacial (EEI) */}
+          <Rect x={236} y={32} width={38} height={3.5} rx={1.5} fill="#cbd5e1" />
+          <Rect x={249} y={24} width={11} height={19} rx={3} fill="#e2e8f0" />
+          <Circle cx={254.5} cy={33.5} r={2.2} fill="#22d3ee" />
+          {/* Paneles solares */}
+          <Rect x={234} y={14} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
+          <Rect x={234} y={37} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
+          <Rect x={269} y={14} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
+          <Rect x={269} y={37} width={7} height={16} rx={1.5} fill="#1d4ed8" stroke="#67e8f9" strokeWidth={0.9} />
         </>
       )}
 
@@ -185,7 +238,7 @@ function EnvironmentCardBackdrop({ env }: { env: EnvironmentType }) {
   );
 }
 
-// Selector desplegable de ubicación actual del astronauta (Nave / Luna / Marte / Tierra)
+// Selector desplegable de ubicación actual del astronauta (Nave / EEI / Luna / Marte / Tierra)
 export function EnvironmentSelector({ compact = false }: { compact?: boolean }) {
   const {
     environment,
@@ -197,10 +250,10 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
   } = useMission();
   const [open, setOpen] = useState(false);
 
-  const options = (['nave', 'luna', 'marte', 'tierra'] as EnvironmentType[]).map(
+  const options = (['nave', 'estacion', 'luna', 'marte', 'tierra'] as EnvironmentType[]).map(
     (id) => ENVIRONMENTS[id]
   );
-  const inTransit = environment === 'nave' && destination !== 'nave';
+  const inTransit = environment === 'nave';
   const destShort = SPACE_LOCATIONS[destination].shortLabel;
 
   return (
@@ -261,6 +314,7 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
           }}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
+            style={{ maxHeight: '88%' }}
             className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
             <View className="mb-1 flex-row items-center justify-between">
               <Text className="font-mono text-sm font-bold text-trauma-ink">
@@ -274,87 +328,100 @@ export function EnvironmentSelector({ compact = false }: { compact?: boolean }) 
               </Pressable>
             </View>
             <Text className="mb-4 font-mono text-[10px] text-slate-400">
-              Si cambias tu ubicación a Base Lunar o Marte, la misión se adelantará a la llegada.
+              Si cambias tu ubicación a Estación EEI, Base Lunar o Marte, la misión se adelantará a la llegada.
             </Text>
 
-            <View className="gap-2.5">
-              {options.map((opt) => {
-                const active = opt.id === environment;
-                const theme = CARD_THEME[opt.id];
-                const routeDays = getRouteTotalDays(origin === opt.id ? 'tierra' : origin, opt.id);
-                const subtitle =
-                  opt.id === 'nave'
-                    ? `${opt.gravityLabel} · En tránsito / órbita`
-                    : opt.id === 'tierra'
-                      ? `${opt.gravityLabel} · Base / Readaptación`
-                      : `${opt.gravityLabel} · Adelanta misión al día ${routeDays}`;
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
+              <View className="gap-2.5">
+                {options.map((opt) => {
+                  const active = opt.id === environment;
+                  const theme = CARD_THEME[opt.id];
+                  const targetLoc = opt.id === 'nave' ? null : (opt.id as SpaceLocation);
+                  const routeSpec = targetLoc
+                    ? getRouteDurationSpec(origin === targetLoc ? 'tierra' : origin, targetLoc)
+                    : null;
+                  const routeAvg = routeSpec ? formatRouteDays(routeSpec.promedioDias) : '';
+                  const routeRange = routeSpec
+                    ? `${formatRouteDays(routeSpec.minDias)}–${formatRouteDays(routeSpec.maxDias)}d`
+                    : '';
+                  const subtitle =
+                    opt.id === 'nave'
+                      ? `${opt.gravityLabel} · En tránsito / órbita`
+                      : opt.id === 'tierra'
+                        ? `${opt.gravityLabel} · ${
+                            destination === 'tierra' && origin !== 'tierra' && routeAvg
+                              ? `Retorno ${routeAvg}d (${routeRange})`
+                              : 'Base / Readaptación'
+                          }`
+                        : `${opt.gravityLabel} · Día ${routeAvg} (${routeRange})`;
 
-                return (
-                  <Pressable
-                    key={opt.id}
-                    onPress={() => {
-                      setEnvironment(opt.id);
-                      setOpen(false);
-                    }}
-                    style={{
-                      borderColor: active ? theme.activeBorder : 'rgba(15, 23, 42, 0.14)',
-                      borderWidth: active ? 2 : 1,
-                    }}
-                    className="overflow-hidden rounded-2xl active:opacity-85">
-                    <EnvironmentCardBackdrop env={opt.id} />
-
-                    <View
-                      style={{
-                        backgroundColor: active
-                          ? 'rgba(15, 23, 42, 0.14)'
-                          : 'rgba(15, 23, 42, 0.24)',
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      onPress={() => {
+                        setEnvironment(opt.id);
+                        setOpen(false);
                       }}
-                      className="flex-row items-center justify-between px-3.5 py-3.5">
-                      <View className="flex-1 flex-row items-center pr-2">
-                        <View
-                          style={{
-                            backgroundColor: theme.badgeBg,
-                            borderColor: active
-                              ? theme.activeBorder
-                              : 'rgba(255, 255, 255, 0.22)',
-                            borderWidth: 1,
-                          }}
-                          className="mr-3 h-9 w-9 items-center justify-center rounded-xl">
-                          <EnvironmentIcon env={opt.id} color={theme.iconColor} />
-                        </View>
-                        <View className="flex-1">
-                          <Text className="font-mono text-xs font-extrabold text-white">
-                            {opt.label}
-                          </Text>
-                          <Text
-                            style={{ color: theme.subtitleColor }}
-                            className="mt-0.5 font-mono text-[9.5px] font-semibold">
-                            {subtitle}
-                          </Text>
-                        </View>
-                      </View>
+                      style={{
+                        borderColor: active ? theme.activeBorder : 'rgba(15, 23, 42, 0.14)',
+                        borderWidth: active ? 2 : 1,
+                      }}
+                      className="overflow-hidden rounded-2xl active:opacity-85">
+                      <EnvironmentCardBackdrop env={opt.id} />
 
-                      <View className="flex-row items-center gap-2">
-                        <View
-                          style={{ backgroundColor: 'rgba(255, 255, 255, 0.16)' }}
-                          className="rounded-md px-1.5 py-0.5">
-                          <Text className="font-mono text-[9px] font-bold text-white">
-                            {opt.gravityLabel.split(' ')[0]}
-                          </Text>
-                        </View>
-                        {active && (
+                      <View
+                        style={{
+                          backgroundColor: active
+                            ? 'rgba(15, 23, 42, 0.14)'
+                            : 'rgba(15, 23, 42, 0.24)',
+                        }}
+                        className="flex-row items-center justify-between px-3.5 py-3.5">
+                        <View className="flex-1 flex-row items-center pr-2">
                           <View
-                            style={{ backgroundColor: theme.activeBorder }}
-                            className="h-5 w-5 items-center justify-center rounded-full">
-                            <Check size={12} color="#0f172a" strokeWidth={3} />
+                            style={{
+                              backgroundColor: theme.badgeBg,
+                              borderColor: active
+                                ? theme.activeBorder
+                                : 'rgba(255, 255, 255, 0.22)',
+                              borderWidth: 1,
+                            }}
+                            className="mr-3 h-9 w-9 items-center justify-center rounded-xl">
+                            <EnvironmentIcon env={opt.id} color={theme.iconColor} />
                           </View>
-                        )}
+                          <View className="flex-1">
+                            <Text className="font-mono text-xs font-extrabold text-white">
+                              {opt.label}
+                            </Text>
+                            <Text
+                              style={{ color: theme.subtitleColor }}
+                              className="mt-0.5 font-mono text-[9.5px] font-semibold">
+                              {subtitle}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View className="flex-row items-center gap-2">
+                          <View
+                            style={{ backgroundColor: 'rgba(255, 255, 255, 0.16)' }}
+                            className="rounded-md px-1.5 py-0.5">
+                            <Text className="font-mono text-[9px] font-bold text-white">
+                              {opt.gravityLabel.split(' ')[0]}
+                            </Text>
+                          </View>
+                          {active && (
+                            <View
+                              style={{ backgroundColor: theme.activeBorder }}
+                              className="h-5 w-5 items-center justify-center rounded-full">
+                              <Check size={12} color="#0f172a" strokeWidth={3} />
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
 
             <Pressable
               onPress={() => {

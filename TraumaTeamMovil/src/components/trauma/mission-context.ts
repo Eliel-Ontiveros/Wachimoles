@@ -27,6 +27,7 @@ export type MissionCtx = {
   closeMissionSetup: () => void;
   configureMission: (setup: MissionSetup) => void;
   arriveEarly: () => void;
+  delayMission: (extraDays: number) => void;
   setEnvironment: (env: EnvironmentType) => void;
   streakDays: number;
   checkedInToday: boolean;
@@ -47,8 +48,15 @@ export type MissionCtx = {
   addInjuryPhoto: (
     muscleId: string,
     muscleName: string,
-    photo: { uri: string; painIntensity?: number; note?: string }
+    photo: {
+      uri: string;
+      fileName?: string;
+      mimeType?: string;
+      painIntensity?: number;
+      note?: string;
+    }
   ) => Promise<InjuryPhoto>;
+  refreshInjuryPhotos: (muscleId: string, muscleName: string) => Promise<InjuryPhoto[]>;
   healthChecks: DailyHealthCheck[];
   submitHealthCheck: (check: Omit<DailyHealthCheck, 'id' | 'dateIso' | 'recordedAt'>) => DailyHealthCheck;
 };

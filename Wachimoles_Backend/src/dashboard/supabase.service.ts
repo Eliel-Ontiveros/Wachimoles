@@ -1,10 +1,15 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
+  PayloadTooLargeException,
   ServiceUnavailableException
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { randomUUID } from "node:crypto";
 import {
+  BODY_CONDITION_IMAGE_MAX_SIZE_BYTES,
+  BodyConditionImage,
   BodyCondition,
   BodyConditionStatus,
   BodyConditionsQuery,
@@ -16,7 +21,8 @@ import {
   HealthStatusLevel,
   MoodScore,
   SamplesQuery,
-  SampleMetric
+  SampleMetric,
+  UploadedBodyConditionImage
 } from "./dashboard.types";
 import { SaveDailyHealthCheckDto } from "./daily-health-checks.dto";
 import { SaveBodyConditionDto } from "./body-conditions.dto";
@@ -66,8 +72,52 @@ interface SupabaseDailyHealthCheckRow {
   updated_at: string;
 }
 
+interface SupabaseStorageObject {
+  name: string;
+}
+
+const BODY_CONDITION_IMAGE_SIGNED_URL_TTL_SECONDS = 60 * 60;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isSupabaseStorageObject(value: unknown): value is SupabaseStorageObject {
+  return isRecord(value) && typeof value.name === "string";
+}
+
+function getImageExtension(file: UploadedBodyConditionImage): string {
+  const isJpeg =
+    file.mimetype === "image/jpeg" &&
+    file.buffer.length >= 3 &&
+    file.buffer[0] === 0xff &&
+    file.buffer[1] === 0xd8 &&
+    file.buffer[2] === 0xff;
+  const isPng =
+    file.mimetype === "image/png" &&
+    file.buffer.length >= 8 &&
+    file.buffer.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    );
+  const isWebp =
+    file.mimetype === "image/webp" &&
+    file.buffer.length >= 12 &&
+    file.buffer.toString("ascii", 0, 4) === "RIFF" &&
+    file.buffer.toString("ascii", 8, 12) === "WEBP";
+
+  if (isJpeg) {
+    return "jpg";
+  }
+  if (isPng) {
+    return "png";
+  }
+  if (isWebp) {
+    return "webp";
+  }
+
+  throw new BadRequestException(
+    "Only valid JPEG, PNG, and WebP images are supported."
+  );
 }
 
 function isBodyRegionCategory(value: unknown): value is BodyRegionCategory {
@@ -213,12 +263,14 @@ export class SupabaseService {
   private readonly logger = new Logger(SupabaseService.name);
   private readonly supabaseUrl: string;
   private readonly serviceRoleKey: string;
+  private readonly storageBucket: string;
 
   constructor(config: ConfigService) {
     this.supabaseUrl = config.getOrThrow<string>("SUPABASE_URL");
     this.serviceRoleKey = config.getOrThrow<string>(
       "SUPABASE_SERVICE_ROLE_KEY"
     );
+    this.storageBucket = config.get<string>("SUPABASE_STORAGE_BUCKET")?.trim() ?? "";
   }
 
   async getSamples(
@@ -403,6 +455,114 @@ export class SupabaseService {
     return { resolved: true };
   }
 
+  async uploadBodyConditionImage(
+    userId: string,
+    muscleId: string,
+    file: UploadedBodyConditionImage | undefined
+  ): Promise<BodyConditionImage> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException("An image file is required.");
+    }
+    if (
+      file.size > BODY_CONDITION_IMAGE_MAX_SIZE_BYTES ||
+      file.buffer.length > BODY_CONDITION_IMAGE_MAX_SIZE_BYTES
+    ) {
+      throw new PayloadTooLargeException(
+        "The image must not exceed 10 MB."
+      );
+    }
+
+    const extension = getImageExtension(file);
+    const path = `${userId}/${muscleId}/${randomUUID()}.${extension}`;
+    const response = await this.requestStorage(
+      this.getStorageObjectUrl(null, path),
+      {
+        method: "POST",
+        headers: { "Content-Type": file.mimetype },
+        body: new Blob([Uint8Array.from(file.buffer)], {
+          type: file.mimetype
+        })
+      },
+      "upload body-condition image"
+    );
+    await response.arrayBuffer();
+
+    return this.createSignedBodyConditionImage(path);
+  }
+
+  async getBodyConditionImages(
+    userId: string,
+    muscleId: string
+  ): Promise<BodyConditionImage[]> {
+    const prefix = `${userId}/${muscleId}/`;
+    const response = await this.requestStorage(
+      this.getStorageObjectUrl("list"),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prefix,
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" }
+        })
+      },
+      "list body-condition images"
+    );
+
+    let rows: unknown;
+    try {
+      rows = await response.json();
+    } catch (error) {
+      this.logger.error("Supabase Storage returned invalid image-list JSON.", error);
+      throw new ServiceUnavailableException(
+        "Supabase Storage returned an invalid image-list response."
+      );
+    }
+
+    if (
+      !Array.isArray(rows) ||
+      !rows.every(
+        (row) =>
+          isSupabaseStorageObject(row) &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp)$/i.test(
+            row.name
+          )
+      )
+    ) {
+      this.logger.error("Supabase Storage returned an unexpected image-list shape.");
+      throw new ServiceUnavailableException(
+        "Supabase Storage returned an invalid image-list response."
+      );
+    }
+
+    return Promise.all(
+      rows.map((row) =>
+        this.createSignedBodyConditionImage(`${prefix}${row.name}`)
+      )
+    );
+  }
+
+  async deleteBodyConditionImage(
+    userId: string,
+    muscleId: string,
+    fileName: string
+  ): Promise<{ deleted: true }> {
+    const response = await this.requestStorage(
+      this.getStorageObjectUrl(null),
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prefixes: [`${userId}/${muscleId}/${fileName}`]
+        })
+      },
+      "delete body-condition image"
+    );
+    await response.arrayBuffer();
+    return { deleted: true };
+  }
+
   async getDailyHealthChecks(
     userId: string,
     query: DailyHealthChecksQuery
@@ -477,6 +637,141 @@ export class SupabaseService {
 
   private getDailyHealthChecksUrl(): URL {
     return new URL(`${this.supabaseUrl}/rest/v1/daily_health_checks`);
+  }
+
+  private getStorageObjectUrl(operation: string | null, path?: string): URL {
+    if (!this.storageBucket) {
+      throw new ServiceUnavailableException(
+        "Image storage is not configured. Set SUPABASE_STORAGE_BUCKET."
+      );
+    }
+
+    const bucket = encodeURIComponent(this.storageBucket);
+    const objectPath = path
+      ? `/${path.split("/").map(encodeURIComponent).join("/")}`
+      : "";
+    const operationPath = operation ? `/${operation}` : "";
+    return new URL(
+      `${this.supabaseUrl}/storage/v1/object${operationPath}/${bucket}${objectPath}`
+    );
+  }
+
+  private async createSignedBodyConditionImage(
+    path: string
+  ): Promise<BodyConditionImage> {
+    const response = await this.requestStorage(
+      this.getStorageObjectUrl("sign", path),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expiresIn: BODY_CONDITION_IMAGE_SIGNED_URL_TTL_SECONDS
+        })
+      },
+      "create body-condition image URL"
+    );
+
+    let result: unknown;
+    try {
+      result = await response.json();
+    } catch (error) {
+      this.logger.error("Supabase Storage returned invalid signed-URL JSON.", error);
+      throw new ServiceUnavailableException(
+        "Supabase Storage returned an invalid signed-URL response."
+      );
+    }
+
+    if (!isRecord(result) || typeof result.signedURL !== "string") {
+      this.logger.error("Supabase Storage returned an unexpected signed-URL shape.");
+      throw new ServiceUnavailableException(
+        "Supabase Storage returned an invalid signed-URL response."
+      );
+    }
+
+    const signedValue = result.signedURL;
+    const isAbsoluteUrl = /^https?:\/\//i.test(signedValue);
+    const signedPath = signedValue.startsWith("/storage/v1/")
+      ? signedValue
+      : `/storage/v1/${signedValue.replace(/^\/+/, "")}`;
+    let signedUrl: URL;
+    try {
+      signedUrl = new URL(
+        isAbsoluteUrl ? signedValue : signedPath,
+        `${this.supabaseUrl}/`
+      );
+    } catch (error) {
+      this.logger.error("Supabase Storage returned an invalid signed URL.", error);
+      throw new ServiceUnavailableException(
+        "Supabase Storage returned an invalid signed-URL response."
+      );
+    }
+
+    const expectedPath = `/storage/v1/object/sign/${encodeURIComponent(
+      this.storageBucket
+    )}/${path.split("/").map(encodeURIComponent).join("/")}`;
+    if (
+      signedUrl.origin !== new URL(this.supabaseUrl).origin ||
+      signedUrl.pathname !== expectedPath
+    ) {
+      this.logger.error("Supabase Storage returned a signed URL for another host.");
+      throw new ServiceUnavailableException(
+        "Supabase Storage returned an invalid signed-URL response."
+      );
+    }
+
+    return {
+      path,
+      signedUrl: signedUrl.toString(),
+      expiresAt: new Date(
+        Date.now() + BODY_CONDITION_IMAGE_SIGNED_URL_TTL_SECONDS * 1000
+      ).toISOString()
+    };
+  }
+
+  private async requestStorage(
+    url: URL,
+    init: RequestInit,
+    operation: string
+  ): Promise<Response> {
+    let response: Response;
+    try {
+      const headers = new Headers(init.headers);
+      headers.set("apikey", this.serviceRoleKey);
+      headers.set("Authorization", `Bearer ${this.serviceRoleKey}`);
+      headers.set("Accept", "application/json");
+      response = await fetch(url, {
+        ...init,
+        headers,
+        signal: AbortSignal.timeout(15000)
+      });
+    } catch (error) {
+      this.logger.error(`Supabase Storage ${operation} request failed.`, error);
+      throw new ServiceUnavailableException(
+        "Image storage is temporarily unavailable."
+      );
+    }
+
+    if (!response.ok) {
+      let storageError: unknown;
+      try {
+        storageError = await response.json();
+      } catch {
+        storageError = null;
+      }
+
+      const message =
+        isRecord(storageError) && typeof storageError.message === "string"
+          ? storageError.message.slice(0, 300)
+          : "No error message returned.";
+      this.logger.error(
+        `Supabase Storage ${operation} returned HTTP ${response.status}: ${message}`
+      );
+      throw new ServiceUnavailableException(
+        "Image storage could not complete the request."
+      );
+    }
+
+    return response;
   }
 
   private async requestSupabaseTable(

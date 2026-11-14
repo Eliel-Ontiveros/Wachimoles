@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Modal,
   View,
   Text,
@@ -196,12 +197,17 @@ export function RegisterObservationModal({
   const [functionalLimitation, setFunctionalLimitation] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
   const [sliderWidth, setSliderWidth] = useState<number>(0);
-  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  const [capturedPhoto, setCapturedPhoto] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Sincroniza los datos de la zona seleccionada
   useEffect(() => {
-    if (visible && muscle) {
-      setCapturedPhotoUri(null);
+    if (!visible || !muscle) return;
+    let isMounted = true;
+    void Promise.resolve().then(() => {
+      if (!isMounted) return;
+      setCapturedPhoto(null);
       if (muscle.observation) {
         setPainIntensity(muscle.observation.painIntensity);
         setSwelling(muscle.observation.swelling);
@@ -219,7 +225,10 @@ export function RegisterObservationModal({
         if (prefill.functionalLimitation !== undefined) setFunctionalLimitation(prefill.functionalLimitation);
         if (prefill.notes !== undefined) setNotes(prefill.notes);
       }
-    }
+    });
+    return () => {
+      isMounted = false;
+    };
   }, [visible, muscle, prefill]);
 
   const updatePainFromTouch = (locationX: number) => {
@@ -243,7 +252,7 @@ export function RegisterObservationModal({
         allowsEditing: true,
       });
       if (!res.canceled && res.assets[0]?.uri) {
-        setCapturedPhotoUri(res.assets[0].uri);
+        setCapturedPhoto(res.assets[0]);
       }
     } catch {
       await handlePickPhoto();
@@ -258,7 +267,7 @@ export function RegisterObservationModal({
         allowsEditing: true,
       });
       if (!res.canceled && res.assets[0]?.uri) {
-        setCapturedPhotoUri(res.assets[0].uri);
+        setCapturedPhoto(res.assets[0]);
       }
     } catch {
       Alert.alert('Error', 'No se pudo seleccionar la imagen.');
@@ -266,24 +275,39 @@ export function RegisterObservationModal({
   };
 
   const handleSave = async () => {
-    if (capturedPhotoUri) {
-      await addInjuryPhoto(muscle.id, muscle.name, {
-        uri: capturedPhotoUri,
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      if (capturedPhoto) {
+        await addInjuryPhoto(muscle.id, muscle.name, {
+          uri: capturedPhoto.uri,
+          fileName: capturedPhoto.fileName ?? undefined,
+          mimeType: capturedPhoto.mimeType ?? undefined,
+          painIntensity,
+          note: notes.trim(),
+        });
+      }
+      onSave(muscle.id, {
         painIntensity,
-        note: notes.trim(),
+        swelling,
+        functionalLimitation,
+        notes: notes.trim(),
+        updatedAt: 'Ahora mismo',
       });
+      onClose();
+    } catch (error: unknown) {
+      console.error('[RegisterObservationModal] Error al guardar:', error);
+      Alert.alert(
+        'No se pudo guardar',
+        error instanceof Error ? error.message : 'Ocurrió un error al guardar la imagen.'
+      );
+    } finally {
+      setIsSaving(false);
     }
-    onSave(muscle.id, {
-      painIntensity,
-      swelling,
-      functionalLimitation,
-      notes: notes.trim(),
-      updatedAt: 'Ahora mismo',
-    });
-    onClose();
   };
 
   const handleClear = () => {
+    if (isSaving) return;
     onSave(muscle.id, null);
     onClose();
   };
@@ -574,10 +598,10 @@ export function RegisterObservationModal({
                 <Text className="text-[10px] text-slate-400">Opcional</Text>
               </View>
 
-              {capturedPhotoUri && (
+              {capturedPhoto && (
                 <View className="mb-3 overflow-hidden rounded-2xl border border-slate-200">
                   <Image
-                    source={{ uri: capturedPhotoUri }}
+                    source={{ uri: capturedPhoto.uri }}
                     style={{ width: '100%', height: 150 }}
                     resizeMode="cover"
                   />
@@ -603,15 +627,23 @@ export function RegisterObservationModal({
             {/* Botón Principal Guardar */}
             <Pressable
               onPress={handleSave}
+              disabled={isSaving}
               className="mt-5 flex-row items-center justify-center rounded-2xl bg-[#58c7f3] py-4 shadow-md active:opacity-80">
-              <Check size={18} color="#ffffff" strokeWidth={2.5} />
-              <Text className="ml-2 text-sm font-bold text-white">Guardar registro</Text>
+              {isSaving ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Check size={18} color="#ffffff" strokeWidth={2.5} />
+              )}
+              <Text className="ml-2 text-sm font-bold text-white">
+                {isSaving ? 'Guardando...' : 'Guardar registro'}
+              </Text>
             </Pressable>
 
             {/* Botón secundario para limpiar la zona si ya tenía un malestar registrado */}
             {muscle.status !== 'normal' && (
               <Pressable
                 onPress={handleClear}
+                disabled={isSaving}
                 className="mt-3 flex-row items-center justify-center py-2 active:opacity-70">
                 <RotateCcw size={13} color="#64748b" />
                 <Text className="ml-1.5 text-xs font-medium text-slate-500">
