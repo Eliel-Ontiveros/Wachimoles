@@ -33,6 +33,7 @@ const missions = {
   'missions.loc.luna.short': 'Luna',
   'missions.loc.marte.label': 'Superficie de Marte',
   'missions.loc.marte.short': 'Marte',
+  'missions.mission.fallback.title': 'Misión diaria',
   'missions.unit.min': 'min',
   'missions.unit.pasos': 'pasos',
   'missions.unit.check': 'check',

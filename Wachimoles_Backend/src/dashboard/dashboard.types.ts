@@ -101,3 +101,106 @@ export interface DailyHealthCheck {
 export interface DailyHealthChecksQuery {
   limit?: number;
 }
+
+export type CategoriaMision =
+  | "exercise"
+  | "steps"
+  | "treadmill"
+  | "checkin"
+  | "injury_check";
+
+export type DificultadMision = "baja" | "media" | "alta";
+
+export type EntornoMision =
+  | "tierra"
+  | "nave"
+  | "estacion"
+  | "luna"
+  | "marte"
+  | "all";
+
+export type UbicacionEspacial = "tierra" | "estacion" | "luna" | "marte";
+
+export type EstadoMision = "scheduled" | "in_transit" | "arrived";
+
+export interface MisionCatalogo {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  categoria: CategoriaMision;
+  valorObjetivo: number;
+  unidad: string;
+  entorno: EntornoMision;
+  dificultad: DificultadMision;
+  activa: boolean;
+  creadoEn: string;
+  // Campos en inglés para compatibilidad directa
+  title?: string;
+  description?: string;
+  category?: CategoriaMision;
+  targetValue?: number;
+  unit?: string;
+  environment?: EntornoMision;
+  difficulty?: DificultadMision;
+}
+
+export interface MisionDiariaRotada extends MisionCatalogo {
+  completada: boolean;
+  valorActual: number;
+  completed: boolean;
+  currentValue: number;
+}
+
+export interface EstadoMisionAstronauta {
+  id: string;
+  usuarioId: string;
+  origen: UbicacionEspacial;
+  destino: UbicacionEspacial;
+  fechaSalida: string;
+  fechaLlegadaEstimada: string;
+  fechaLlegadaReal: string | null;
+  diasTotales: number;
+  diaActual: number;
+  porcentajeProgresoRelativo: number;
+  entornoActual: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  estado: EstadoMision;
+  llegadaAnticipada: boolean;
+  creadoEn: string;
+  actualizadoEn: string;
+  // Campos en inglés para compatibilidad con el front
+  origin?: UbicacionEspacial;
+  destination?: UbicacionEspacial;
+  departureDate?: string;
+  estimatedArrivalDate?: string;
+  actualArrivalDate?: string | null;
+  totalDays?: number;
+  currentDay?: number;
+  relativeProgressPct?: number;
+  currentEnvironment?: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  status?: EstadoMision;
+  arrivedEarly?: boolean;
+}
+
+export type UbicacionEntorno = "tierra" | "nave" | "estacion" | "luna" | "marte";
+
+export interface UbicacionAstronauta {
+  usuarioId: string;
+  entorno: UbicacionEntorno;
+  etiqueta: string;
+  gravedadEtiqueta: string;
+  actualizadoEn: string;
+  // Campos en inglés para compatibilidad
+  userId?: string;
+  environment?: UbicacionEntorno;
+  label?: string;
+  gravityLabel?: string;
+  updatedAt?: string;
+}
+
+export interface SupabaseAstronautLocationRow {
+  id: string;
+  user_id: string;
+  entorno: UbicacionEntorno;
+  actualizado_en: string;
+}
+

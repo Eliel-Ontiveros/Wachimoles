@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -15,7 +15,19 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Path, Polygon, Circle, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import { ArrowLeft, Camera, Images, Zap, Layers, FileText, Check, RotateCcw } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Camera,
+  Images,
+  Zap,
+  Layers,
+  FileText,
+  Check,
+  RotateCcw,
+  Clock,
+  PlusCircle,
+  X,
+} from 'lucide-react-native';
 import {
   BodyRegionCategory,
   MuscleData,
@@ -26,16 +38,23 @@ import {
   muscleNameKey,
 } from './BodyModelViewer';
 import { useMission } from './mission-context';
+import type { InjuryPhoto } from '../../types/mission';
+import {
+  appendConditionUpdate,
+  parseConditionUpdates,
+  serializeConditionUpdates,
+} from '../../utils/condition-updates';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useAppTheme } from '@/theme';
 import { DictationButton } from '@/voice/VoiceButton';
 
-// Modal para registrar o editar observación clínica de una zona
+// Modal para registrar o agregar actualizaciones a la observación clínica de una zona
 interface RegisterObservationModalProps {
   visible: boolean;
   muscle: MuscleData;
+  mode?: 'create' | 'update';
+  existingPhotos?: InjuryPhoto[];
   snapshotUri?: string;
-  /** Valores sugeridos (p. ej. por voz) que se aplican al abrir; el usuario revisa y guarda. */
   prefill?: {
     painIntensity?: number;
     swelling?: boolean;
@@ -43,7 +62,11 @@ interface RegisterObservationModalProps {
     notes?: string;
   };
   onClose: () => void;
-  onSave: (muscleId: string, observation: MuscleObservation | null) => void;
+  onSave: (
+    muscleId: string,
+    observation: MuscleObservation | null,
+    options?: { isCured?: boolean; latestUpdateNote?: string }
+  ) => void;
 }
 
 // Icono vectorial por categoría anatómica
@@ -192,12 +215,14 @@ function FunctionalMotionIcon({ size = 18, color }: { size?: number; color: stri
 export function RegisterObservationModal({
   visible,
   muscle,
+  mode,
+  existingPhotos,
   snapshotUri,
   prefill,
   onClose,
   onSave,
 }: RegisterObservationModalProps) {
-  const { addInjuryPhoto } = useMission();
+  const { addInjuryPhoto, injuryPhotos } = useMission();
   const { t } = useI18n();
   const { colors, scheme } = useAppTheme();
   const isDark = scheme === 'dark';
@@ -212,6 +237,28 @@ export function RegisterObservationModal({
     useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const isUpdateMode = (mode ?? (muscle.observation ? 'update' : 'create')) === 'update' && Boolean(muscle.observation);
+  const musclePhotos = useMemo(
+    () => existingPhotos ?? injuryPhotos[muscle.id] ?? [],
+    [existingPhotos, injuryPhotos, muscle.id]
+  );
+
+  const existingUpdates = useMemo(() => {
+    if (!muscle.observation) return [];
+    return parseConditionUpdates({
+      description: muscle.observation.notes,
+      fallbackPain: muscle.observation.painIntensity,
+      fallbackDateLabel: muscle.observation.updatedAt,
+      photos: musclePhotos,
+    });
+  }, [muscle.observation, musclePhotos]);
+
+  const nextUpdateNumber = isUpdateMode
+    ? existingUpdates.length > 0
+      ? Math.max(...existingUpdates.map((u) => u.updateNumber)) + 1
+      : 2
+    : 1;
+
   // Sincroniza los datos de la zona seleccionada
   useEffect(() => {
     if (!visible || !muscle) return;
@@ -223,7 +270,7 @@ export function RegisterObservationModal({
         setPainIntensity(muscle.observation.painIntensity);
         setSwelling(muscle.observation.swelling);
         setFunctionalLimitation(muscle.observation.functionalLimitation);
-        setNotes(muscle.observation.notes);
+        setNotes('');
       } else {
         setPainIntensity(7);
         setSwelling(true);
@@ -285,26 +332,61 @@ export function RegisterObservationModal({
     }
   };
 
-  const handleSave = async () => {
+  const persistUpdate = async (forceCure: boolean) => {
     if (isSaving) return;
     setIsSaving(true);
+    const effectivePain = forceCure ? 0 : painIntensity;
+    const isCured = forceCure || effectivePain === 0;
+    const trimmedInput = notes.trim();
+    const updateText =
+      trimmedInput ||
+      (isCured
+        ? 'Ya no siento el síntoma, molestia superada.'
+        : isUpdateMode
+          ? `Seguimiento #${nextUpdateNumber} registrado.`
+          : `Registro inicial en ${muscle.name}.`);
+
     try {
+      let uploadedPath: string | undefined;
       if (capturedPhoto) {
-        await addInjuryPhoto(muscle.id, muscle.name, {
+        const uploaded = await addInjuryPhoto(muscle.id, muscle.name, {
           uri: capturedPhoto.uri,
           fileName: capturedPhoto.fileName ?? undefined,
           mimeType: capturedPhoto.mimeType ?? undefined,
-          painIntensity,
-          note: notes.trim(),
+          painIntensity: effectivePain,
+          note: `Actualización ${nextUpdateNumber} - ${updateText}`,
         });
+        uploadedPath = uploaded.id;
       }
-      onSave(muscle.id, {
-        painIntensity,
-        swelling,
-        functionalLimitation,
-        notes: notes.trim(),
-        updatedAt: UPDATED_NOW,
+
+      const baseDescription =
+        muscle.observation?.notes?.trim() ||
+        (existingUpdates.length > 0 ? serializeConditionUpdates(existingUpdates) : null);
+
+      const { serializedDescription } = appendConditionUpdate({
+        existingDescription: isUpdateMode ? baseDescription : null,
+        newText: updateText,
+        painIntensity: effectivePain,
+        photoPathOrFileName: uploadedPath,
+        isResolvedEvent: isCured,
+        fallbackPain: muscle.observation?.painIntensity,
+        fallbackDateLabel: muscle.observation?.updatedAt,
       });
+
+      onSave(
+        muscle.id,
+        {
+          painIntensity: effectivePain,
+          swelling: isCured ? false : swelling,
+          functionalLimitation: isCured ? false : functionalLimitation,
+          notes: serializedDescription,
+          updatedAt: UPDATED_NOW,
+        },
+        {
+          isCured,
+          latestUpdateNote: updateText,
+        }
+      );
       onClose();
     } catch (error: unknown) {
       console.error('[RegisterObservationModal] Error al guardar:', error);
@@ -315,6 +397,14 @@ export function RegisterObservationModal({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = () => {
+    void persistUpdate(false);
+  };
+
+  const handleMarkCured = () => {
+    void persistUpdate(true);
   };
 
   const handleClear = () => {
@@ -358,14 +448,27 @@ export function RegisterObservationModal({
           </View>
 
           {/* Barra superior de navegación */}
-          <View className="flex-row items-center px-5 pb-3 pt-4">
-            <Pressable
-              onPress={onClose}
-              accessibilityLabel={t('body.register.back')}
-              className="mr-3 h-9 w-9 items-center justify-center rounded-full active:bg-slate-200 dark:active:bg-trauma-nightLine">
-              <ArrowLeft size={20} color={isDark ? colors.text : '#1e293b'} strokeWidth={2.2} />
-            </Pressable>
-            <Text className="text-lg font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.register.title')}</Text>
+          <View className="flex-row items-center justify-between px-5 pb-3 pt-4">
+            <View className="flex-row items-center">
+              <Pressable
+                onPress={onClose}
+                accessibilityLabel={t('body.register.back')}
+                className="mr-3 h-9 w-9 items-center justify-center rounded-full active:bg-slate-200 dark:active:bg-trauma-nightLine">
+                <ArrowLeft size={20} color={isDark ? colors.text : '#1e293b'} strokeWidth={2.2} />
+              </Pressable>
+              <View>
+                <Text className="text-lg font-bold text-slate-800 dark:text-trauma-nightInk">
+                  {isUpdateMode
+                    ? t('body.register.updateTitle', { n: nextUpdateNumber })
+                    : t('body.register.title')}
+                </Text>
+                <Text className="font-mono text-[10px] text-slate-500 dark:text-trauma-nightMuted">
+                  {isUpdateMode
+                    ? t('body.register.updateSubtitle')
+                    : t('body.register.createSubtitle')}
+                </Text>
+              </View>
+            </View>
           </View>
 
           <ScrollView
@@ -413,6 +516,61 @@ export function RegisterObservationModal({
               </View>
             </View>
 
+            {/* Bitácora de actualizaciones previas cuando se agrega una nueva actualización */}
+            {isUpdateMode && existingUpdates.length > 0 && (
+              <View className="mt-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-trauma-nightLine dark:bg-trauma-night">
+                <View className="mb-2.5 flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Clock size={15} color={isDark ? colors.accent : '#0284c7'} strokeWidth={2.2} />
+                    <Text className="ml-1.5 text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                      {t('body.register.historyTitle', { n: existingUpdates.length })}
+                    </Text>
+                  </View>
+                  <Text className="font-mono text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                    {t('body.register.nextUpdate', { n: nextUpdateNumber })}
+                  </Text>
+                </View>
+
+                <View className="gap-2">
+                  {existingUpdates.map((item) => (
+                    <View
+                      key={item.updateNumber}
+                      className="flex-row items-start rounded-2xl border border-slate-100 bg-slate-50/80 p-2.5 dark:border-trauma-nightLine dark:bg-trauma-nightAlt">
+                      <View className="flex-1 pr-2">
+                        <View className="flex-row flex-wrap items-center gap-1.5">
+                          <View className="rounded-md bg-sky-100 px-1.5 py-0.5 dark:bg-sky-950">
+                            <Text className="font-mono text-[9.5px] font-bold text-sky-900 dark:text-sky-200">
+                              {item.title}
+                            </Text>
+                          </View>
+                          {!!item.dateLabel && (
+                            <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                              {item.dateLabel}
+                            </Text>
+                          )}
+                          {item.painIntensity !== undefined && (
+                            <Text className="font-mono text-[9.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
+                              {t('body.register.painOf', { n: item.painIntensity })}
+                            </Text>
+                          )}
+                        </View>
+                        <Text className="mt-1 text-[11.5px] leading-4 text-slate-600 dark:text-trauma-nightMuted">
+                          {item.text}
+                        </Text>
+                      </View>
+                      {item.photoUri && (
+                        <Image
+                          source={{ uri: item.photoUri }}
+                          style={{ width: 46, height: 46, borderRadius: 10 }}
+                          resizeMode="cover"
+                        />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* Tarjeta 2: Intensidad del dolor (Fiel al diseño original con slider minimalista) */}
             <View className="mt-3.5 rounded-3xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
               <View className="flex-row items-center justify-between">
@@ -423,8 +581,16 @@ export function RegisterObservationModal({
                   </Text>
                 </View>
                 {/* Indicador numérico pill: "7 / 10" */}
-                <View className="flex-row items-baseline rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt px-3 py-1">
-                  <Text className="text-sm font-extrabold text-slate-800 dark:text-trauma-nightInk">{painIntensity}</Text>
+                <View
+                  className={`flex-row items-baseline rounded-xl border px-3 py-1 ${painIntensity === 0
+                      ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-400/40 dark:bg-emerald-950/60'
+                      : 'border-slate-200 bg-slate-50 dark:border-trauma-nightLine dark:bg-trauma-nightAlt'
+                    }`}>
+                  <Text
+                    className={`text-sm font-extrabold ${painIntensity === 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-800 dark:text-trauma-nightInk'
+                      }`}>
+                    {painIntensity}
+                  </Text>
                   <Text className="text-xs text-slate-400 dark:text-trauma-nightSubtle"> / 10</Text>
                 </View>
               </View>
@@ -481,15 +647,26 @@ export function RegisterObservationModal({
                       hitSlop={6}
                       className="items-center px-1">
                       <Text
-                        className={`text-xs ${
-                          active ? 'font-extrabold text-slate-900 dark:text-trauma-nightInk' : 'font-medium text-slate-400 dark:text-trauma-nightSubtle'
-                        }`}>
+                        className={`text-xs ${active
+                            ? i === 0
+                              ? 'font-extrabold text-emerald-700 dark:text-emerald-300'
+                              : 'font-extrabold text-slate-900 dark:text-trauma-nightInk'
+                            : 'font-medium text-slate-400 dark:text-trauma-nightSubtle'
+                          }`}>
                         {i}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
+
+              {painIntensity === 0 && (
+                <View className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 px-3 py-2.5 dark:border-emerald-400/40 dark:bg-emerald-950/60">
+                  <Text className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                    {t('body.register.curedNote')}
+                  </Text>
+                </View>
+              )}
 
               {/* Tira minimalista discreta de la escala de color (1 Leve -> 5 Moderado -> 10 Intenso) */}
               <View className="mt-3 pt-1">
@@ -569,11 +746,20 @@ export function RegisterObservationModal({
               </View>
             </View>
 
-            {/* Tarjeta 5: Observaciones escritas */}
+            {/* Tarjeta 5: Texto de la actualización */}
             <View className="mt-3 rounded-3xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
-              <View className="mb-2.5 flex-row items-center">
-                <FileText size={18} color={iconSlate} strokeWidth={2} />
-                <Text className="ml-2 text-sm font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.register.notes')}</Text>
+              <View className="mb-2.5 flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <FileText size={18} color={iconSlate} strokeWidth={2} />
+                  <Text className="ml-2 text-sm font-bold text-slate-800 dark:text-trauma-nightInk">
+                    {isUpdateMode
+                      ? t('body.register.textUpdate', { n: nextUpdateNumber })
+                      : t('body.register.textUpdate', { n: 1 })}
+                  </Text>
+                </View>
+                <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">
+                  {t('body.register.savedInDb')}
+                </Text>
               </View>
 
               <View className="rounded-2xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50/40 dark:bg-trauma-nightAlt p-3">
@@ -581,10 +767,14 @@ export function RegisterObservationModal({
                   value={notes}
                   onChangeText={setNotes}
                   multiline
-                  maxLength={300}
-                  placeholder={t('body.register.placeholder', {
-                    zone: t(muscleNameKey(muscle.id)).toLowerCase(),
-                  })}
+                  maxLength={400}
+                  placeholder={
+                    isUpdateMode
+                      ? t('body.register.placeholderUpdate', { n: nextUpdateNumber })
+                      : t('body.register.placeholder', {
+                          zone: t(muscleNameKey(muscle.id)).toLowerCase(),
+                        })
+                  }
                   placeholderTextColor={colors.textSubtle}
                   className="min-h-[76px] text-xs leading-5 text-slate-700 dark:text-trauma-nightInk"
                   textAlignVertical="top"
@@ -597,29 +787,34 @@ export function RegisterObservationModal({
                 />
               </View>
               <Text className="mt-1.5 text-right text-[11px] text-slate-400 dark:text-trauma-nightSubtle">
-                {notes.length} / 300
+                {notes.length} / 400
               </Text>
             </View>
 
-            {/* Tarjeta 6: Foto de seguimiento diario */}
+            {/* Tarjeta 6: Foto de esta actualización */}
             <View className="mt-3 rounded-3xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
               <View className="mb-2.5 flex-row items-center justify-between">
                 <View className="flex-row items-center">
                   <Camera size={18} color={iconSlate} strokeWidth={2} />
                   <Text className="ml-2 text-sm font-bold text-slate-800 dark:text-trauma-nightInk">
-                    {t('body.register.photo')}
+                    {t('body.register.photoUpdate', { n: nextUpdateNumber })}
                   </Text>
                 </View>
                 <Text className="text-[10px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.register.optional')}</Text>
               </View>
 
               {capturedPhoto && (
-                <View className="mb-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-trauma-nightLine">
+                <View className="relative mb-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-trauma-nightLine">
                   <Image
                     source={{ uri: capturedPhoto.uri }}
                     style={{ width: '100%', height: 150 }}
                     resizeMode="cover"
                   />
+                  <Pressable
+                    onPress={() => setCapturedPhoto(null)}
+                    className="absolute right-2 top-2 h-7 w-7 items-center justify-center rounded-full bg-slate-900/75">
+                    <X size={14} color="#ffffff" />
+                  </Pressable>
                 </View>
               )}
 
@@ -643,18 +838,38 @@ export function RegisterObservationModal({
             <Pressable
               onPress={handleSave}
               disabled={isSaving}
-              className="mt-5 flex-row items-center justify-center rounded-2xl bg-[#58c7f3] py-4 shadow-md active:opacity-80">
+              className={`mt-5 flex-row items-center justify-center rounded-2xl py-4 shadow-md active:opacity-80 ${painIntensity === 0 ? 'bg-emerald-600' : 'bg-[#58c7f3]'
+                }`}>
               {isSaving ? (
                 <ActivityIndicator color="#ffffff" />
+              ) : isUpdateMode ? (
+                <PlusCircle size={18} color="#ffffff" strokeWidth={2.3} />
               ) : (
                 <Check size={18} color="#ffffff" strokeWidth={2.5} />
               )}
               <Text className="ml-2 text-sm font-bold text-white">
-                {isSaving ? t('body.register.saving') : t('body.register.save')}
+                {isSaving
+                  ? t('body.register.saving')
+                  : painIntensity === 0
+                    ? t('body.register.saveCured')
+                    : t('body.register.saveUpdate', { n: nextUpdateNumber })}
               </Text>
             </Pressable>
 
-            {/* Botón secundario para limpiar la zona si ya tenía un malestar registrado */}
+            {/* Botón dedicado para curar el malestar ("Ya no siento el síntoma") */}
+            {isUpdateMode && painIntensity > 0 && (
+              <Pressable
+                onPress={handleMarkCured}
+                disabled={isSaving}
+                className="mt-3 flex-row items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 py-3.5 active:opacity-80 dark:border-emerald-400/40 dark:bg-emerald-950/60">
+                <Check size={16} color={isDark ? colors.success : '#047857'} strokeWidth={2.4} />
+                <Text className="ml-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                  {t('body.register.cureBtn')}
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Botón secundario para limpiar la zona si se registró por error */}
             {muscle.status !== 'normal' && (
               <Pressable
                 onPress={handleClear}

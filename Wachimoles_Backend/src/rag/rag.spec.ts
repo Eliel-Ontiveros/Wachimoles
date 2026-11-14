@@ -12,21 +12,48 @@ const question: AskRagDto = { question: "How does space radiation affect astrona
 describe("RAG over the curated challenge corpus", () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it("indexes all five sources with provenance and bounded passages", () => {
-    expect(corpus.sources).toHaveLength(5);
+  it("indexes the original sources and reviewed evidence summaries with bounded passages", () => {
+    expect(corpus.sources).toHaveLength(17);
+    expect(corpus.sources.filter((source) => source.contentKind === "reviewed_summary")).toHaveLength(12);
     for (const source of corpus.sources) {
       expect(source.contentHash).toMatch(/^[a-f0-9]{64}$/);
       expect(Number.isFinite(Date.parse(source.retrievedAt))).toBe(true);
       expect(corpus.chunks.some((chunk) => chunk.sourceId === source.id)).toBe(true);
+      if (source.contentKind === "reviewed_summary") {
+        expect(source.evidenceContext).toBeTruthy();
+        expect(source.sourceSections).toBeTruthy();
+        expect(source.sourceLicense).toBeTruthy();
+        const passages = corpus.chunks.filter((chunk) => chunk.sourceId === source.id);
+        expect(passages).toHaveLength(1);
+        expect(passages[0].text).toContain("not the complete publication");
+        expect(passages[0].text).toContain("applicability limits");
+      }
     }
     for (const chunk of corpus.chunks) expect(chunk.text.split(/\s+/).length).toBeLessThanOrEqual(350);
+  });
+
+  it.each([
+    ["lower-back discomfort lumbar paraspinal disc height", "chang-lumbar-2016"],
+    ["shoulder swelling reduced movement after exercise", "nasa-shoulder-2025"],
+    ["bone recovery distal tibia trabecular microarchitecture", "gabel-bone-recovery-2022"],
+    ["SpO2 pulse oximetry skin pigmentation", "leeb-oximetry-2024"],
+    ["proprietary wearable stress score anxiety", "hickey-stress-2021"],
+    ["circadian misalignment sleep timing fatigue", "flynn-evans-circadian-2016"],
+    ["partial gravity step counts mechanical loading", "richter-partial-gravity-2017"],
+    ["temperature forehead heat-flux thermoregulation", "stahn-temperature-2017"],
+    ["exercise strength endurance Sprint", "english-sprint-2020"],
+    ["wearable accuracy firmware reference instrument", "doherty-wearables-2024"],
+    ["bimanual coordination sensory reweighting mobility", "tays-sensorimotor-2021"],
+    ["uncrewed Orion dosimetry shielding phantoms", "george-artemis-radiation-2024"]
+  ])("retrieves newly incorporated evidence for %s", (query, sourceId) => {
+    expect(retrieve(corpus, query, "spacecraft").map((item) => item.id)).toContain(sourceId);
   });
 
   it.each([
     ["What are the five hazards of human spaceflight?", "nasa-hazards"],
     [question.question, "csa-radiation"],
     ["Why are bone and muscle changes studied in space?", "nasa-risks"],
-    ["How is sleep studied in space?", "nasa-research"]
+    ["How is sleep studied in space?", "flynn-evans-circadian-2016"]
   ])("retrieves evidence for %s", (query, expectedSource) => {
     const evidence = retrieve(corpus, query, "mars");
     expect(evidence.map((item) => item.id)).toContain(expectedSource);

@@ -88,13 +88,19 @@ export interface DailyHealthCheck {
   updatedAt: string;
 }
 
+export interface BodyConditionImageRecord {
+  path: string;
+  signedUrl: string;
+  expiresAt: string;
+}
+
 export interface InjuryPhoto {
   id: string;
   muscleId: string;
   muscleName: string;
   uri: string;
-  dayNumber: number;
-  capturedAt: string;
+  dayNumber: number | null;
+  capturedAt: string | null;
   painIntensity?: number;
   note?: string;
 }
@@ -107,6 +113,7 @@ export interface MuscleObservation {
   notes: string;
   updatedAt: string;
   recordedAtIso?: string;
+  updatedAtIso?: string;
 }
 
 export interface MuscleData {
@@ -194,7 +201,7 @@ export interface ConnectionEndpointStatus {
   samplesStatus: 'ok' | 'unauthorized' | 'error' | 'idle';
   bodyConditionsStatus: 'ok' | 'unauthorized' | 'error' | 'idle';
   healthChecksStatus: 'ok' | 'unauthorized' | 'error' | 'idle';
-  photosStatus: 'ok' | 'unavailable' | 'error' | 'idle';
+  photosStatus: 'ok' | 'unavailable' | 'error' | 'idle' | 'loading' | 'unauthorized';
   lastSyncIso: string | null;
   errorMessages: string[];
 }

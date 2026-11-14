@@ -12,7 +12,7 @@ import {
   SpaceLocation,
 } from '../types/mission';
 import { Platform } from 'react-native';
-import { translate, type Locale, type MessageKey } from '../i18n/messages';
+import { MESSAGES, translate, type Locale, type MessageKey } from '../i18n/messages';
 
 // Servicio preparado para conectar misiones, entorno y fotos de lesiones con el backend
 
@@ -20,6 +20,8 @@ export interface BodyConditionSyncInput {
   muscleId: string;
   bodyRegion: string;
   muscleName: string;
+  conditionName?: string;
+  resolveAfterSave?: boolean;
   observation: {
     painIntensity: number;
     swelling: boolean;
@@ -785,17 +787,282 @@ export function getMissionsForEnvironment(
   ];
 }
 
-// Endpoint listo para guardar entorno seleccionado en el backend
-export async function syncEnvironmentToBackend(environment: EnvironmentType): Promise<void> {
-  const baseUrl = API_CONFIG.localUrls[0];
+/**
+ * Re-traduce al idioma activo una misión recibida del backend cuando su id es una de las
+ * misiones conocidas de la app; los ids desconocidos conservan el texto del backend.
+ */
+export function localizeMission(
+  m: DailyMission,
+  locale: Locale,
+  env: EnvironmentType,
+  treadmillActive: boolean
+): DailyMission {
+  const has = (key: string) => key in MESSAGES.es;
+  const baseId =
+    m.id === 'treadmill-steps' ? (treadmillActive ? 'treadmill-on' : 'treadmill-off') : m.id;
+  const titleKey = `missions.mission.${baseId}.title`;
+  const descKey = `missions.mission.${baseId}.desc`;
+  const unitKey = `missions.unit.${m.unit}`;
+  return {
+    ...m,
+    title: has(titleKey)
+      ? translate(locale, titleKey as MessageKey, {
+          place: getEnvironmentText(locale, env).shortLabel,
+        })
+      : m.title,
+    description: has(descKey) ? translate(locale, descKey as MessageKey) : m.description,
+    unit: has(unitKey) ? translate(locale, unitKey as MessageKey) : m.unit,
+  };
+}
+
+// Endpoint para consultar misiones rotadas y aleatorias con dificultad desde el backend
+export async function fetchDailyMissionsFromBackend(
+  env: EnvironmentType,
+  currentSteps = 0,
+  checkedInToday = false,
+  treadmillActive = false,
+  dateIso?: string,
+  locale: Locale = 'es'
+): Promise<DailyMission[]> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
+  }
+
+  const queryParams = new URLSearchParams({
+    entorno: env,
+    pasosActuales: String(currentSteps),
+    checkinRealizado: String(checkedInToday),
+    caminadoraActiva: String(treadmillActive),
+  });
+  if (dateIso) {
+    queryParams.set('fecha', dateIso);
+  }
+
+  const path = `/dashboard/missions/daily?${queryParams.toString()}`;
   try {
-    await fetch(`${baseUrl}/mission/environment`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: API_CONFIG.userId, environment }),
-    });
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'GET',
+        headers: { ...headers, Accept: 'application/json' },
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (!response || !response.ok) {
+      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
+    }
+
+    const data: unknown = await response.json();
+    if (!Array.isArray(data)) {
+      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
+    }
+
+    return data.map((item: any) => ({
+      id: String(item.id),
+      title: String(item.title || item.titulo || translate(locale, 'missions.mission.fallback.title')),
+      description: String(item.description || item.descripcion || ''),
+      category: item.category || item.categoria || 'exercise',
+      targetValue: Number(item.targetValue ?? item.valorObjetivo ?? 1),
+      currentValue: Number(item.currentValue ?? item.valorActual ?? 0),
+      unit: String(item.unit || item.unidad || 'min'),
+      completed: Boolean(item.completed ?? item.completada ?? false),
+      environment: item.environment || item.entorno || env,
+    }));
   } catch {
-    // El frontend continúa operando en estado local si el endpoint aún no existe
+    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive, locale);
+  }
+}
+
+export interface AstronautMissionStatePayload {
+  origen: SpaceLocation;
+  destino: SpaceLocation;
+  fechaSalida: string;
+  fechaLlegadaEstimada?: string | null;
+  diasTotales: number;
+  diaActual: number;
+  porcentajeProgresoRelativo?: number;
+  entornoActual: EnvironmentType;
+  estado?: 'scheduled' | 'in_transit' | 'arrived';
+}
+
+// Guarda la ubicación relativa del astronauta en el backend en perspectiva de los días de misión
+export async function syncAstronautMissionStateToBackend(
+  payload: AstronautMissionStatePayload
+): Promise<boolean> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return false;
+  }
+
+  const path = '/dashboard/mission-state';
+  try {
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'PUT',
+        headers: {
+          ...baseHeaders,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          origen: payload.origen,
+          destino: payload.destino,
+          fechaSalida: payload.fechaSalida,
+          fechaLlegadaEstimada: payload.fechaLlegadaEstimada ?? undefined,
+          diasTotales: payload.diasTotales,
+          diaActual: payload.diaActual,
+          porcentajeProgresoRelativo: payload.porcentajeProgresoRelativo,
+          entornoActual: payload.entornoActual,
+          estado: payload.estado,
+        }),
+      });
+      if (response.status !== 401) break;
+    }
+    return Boolean(response?.ok);
+  } catch (err) {
+    console.warn('[mission-api] No se pudo sincronizar ubicación de misión con backend:', err);
+    return false;
+  }
+}
+
+// Endpoint para que el astronauta le pique al botón "Llegué antes" y se guarde en backend
+export async function markEarlyArrivalInBackend(
+  fechaLlegadaReal?: string
+): Promise<boolean> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return false;
+  }
+
+  const path = '/dashboard/mission-state/arrive-early';
+  try {
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'POST',
+        headers: {
+          ...baseHeaders,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          fechaLlegadaReal: fechaLlegadaReal || getTodayIsoDate(),
+        }),
+      });
+      if (response.status !== 401) break;
+    }
+    return Boolean(response?.ok);
+  } catch (err) {
+    console.warn('[mission-api] No se pudo registrar llegada anticipada en backend:', err);
+    return false;
+  }
+}
+
+// Endpoint para guardar la ubicación actual del astronauta en el backend de forma independiente (con o sin misión)
+export async function saveAstronautLocationToBackend(
+  entorno: EnvironmentType
+): Promise<boolean> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return false;
+  }
+
+  const paths = [
+    '/dashboard/astronaut/location',
+    '/dashboard/mission-state/location',
+    '/mission/environment',
+  ];
+
+  for (const path of paths) {
+    try {
+      let response: Response | null = null;
+      for (const baseHeaders of authHeadersList) {
+        response = await fetchBackendWithFallback(path, {
+          method: 'PUT',
+          headers: {
+            ...baseHeaders,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            entorno,
+            environment: entorno,
+            userId: API_CONFIG.userId,
+          }),
+        });
+        if (response.status !== 401 && response.status !== 404) break;
+      }
+      if (response && response.ok) {
+        return true;
+      }
+    } catch {
+      // Intentar siguiente ruta de fallback si hay fallo de red específico
+    }
+  }
+  return false;
+}
+
+// Endpoint para consultar la ubicación actual del astronauta desde el backend
+export async function fetchAstronautLocationFromBackend(): Promise<{
+  entorno: EnvironmentType;
+  label: string;
+  gravityLabel: string;
+} | null> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return null;
+  }
+
+  const paths = ['/dashboard/astronaut/location', '/dashboard/mission-state/location'];
+  for (const path of paths) {
+    try {
+      let response: Response | null = null;
+      for (const headers of authHeadersList) {
+        response = await fetchBackendWithFallback(path, {
+          method: 'GET',
+          headers: { ...headers, Accept: 'application/json' },
+        });
+        if (response.status !== 401 && response.status !== 404) break;
+      }
+
+      if (response && response.ok) {
+        const data: unknown = await response.json();
+        if (isRecord(data)) {
+          const entorno = (data.entorno ?? data.environment) as EnvironmentType;
+          if (
+            entorno === 'tierra' ||
+            entorno === 'nave' ||
+            entorno === 'estacion' ||
+            entorno === 'luna' ||
+            entorno === 'marte'
+          ) {
+            return {
+              entorno,
+              label: typeof data.etiqueta === 'string' ? data.etiqueta : (data.label as string) || entorno,
+              gravityLabel:
+                typeof data.gravedadEtiqueta === 'string'
+                  ? data.gravedadEtiqueta
+                  : (data.gravityLabel as string) || '',
+            };
+          }
+        }
+      }
+    } catch {
+      // Intentar siguiente ruta de fallback
+    }
+  }
+  return null;
+}
+
+// Guarda el entorno seleccionado en el backend de forma inmediata
+export async function syncEnvironmentToBackend(environment: EnvironmentType): Promise<void> {
+  try {
+    await saveAstronautLocationToBackend(environment);
+  } catch {
+    // Si la red no está disponible, el frontend mantiene su estado local sin bloquear al usuario
   }
 }
 
@@ -973,41 +1240,67 @@ export async function syncObservationToBackend(
   }
 
   const observation = input.observation;
-  const shouldResolve = !observation || observation.painIntensity === 0;
+  const resolveAfterSave = Boolean(
+    input.resolveAfterSave || (observation && observation.painIntensity === 0)
+  );
+  const pureDelete = !observation;
   const path = `/dashboard/body-conditions/${encodeURIComponent(input.muscleId)}`;
 
-  try {
+  const sendWithAuth = async (
+    method: 'PUT' | 'DELETE',
+    bodyJson?: string
+  ): Promise<Response | null> => {
     let response: Response | null = null;
     for (const baseHeaders of authHeadersList) {
       response = await fetchBackendWithFallback(path, {
-        method: shouldResolve ? 'DELETE' : 'PUT',
+        method,
         headers: {
           ...baseHeaders,
-          ...(shouldResolve ? {} : { 'Content-Type': 'application/json' }),
+          ...(bodyJson ? { 'Content-Type': 'application/json' } : {}),
         },
-        ...(shouldResolve
-          ? {}
-          : {
-            body: JSON.stringify({
-              bodyRegion: input.bodyRegion,
-              muscleName: input.muscleName,
-              conditionName: 'Dolor muscular',
-              description: observation.notes,
-              painIntensity: observation.painIntensity,
-              swelling: observation.swelling,
-              functionalLimitation: observation.functionalLimitation,
-            }),
-          }),
+        ...(bodyJson ? { body: bodyJson } : {}),
       });
       if (response.status !== 401) break;
     }
+    return response;
+  };
 
-    if (!response || !response.ok) {
+  try {
+    if (!pureDelete && observation) {
+      const clampedPain = Math.max(1, Math.min(10, Math.round(observation.painIntensity || 1)));
+      const putResponse = await sendWithAuth(
+        'PUT',
+        JSON.stringify({
+          bodyRegion: input.bodyRegion,
+          muscleName: input.muscleName,
+          conditionName: input.conditionName?.trim() || 'Dolor muscular',
+          description: observation.notes,
+          painIntensity: clampedPain,
+          swelling: observation.swelling,
+          functionalLimitation: observation.functionalLimitation,
+        })
+      );
+
+      if (!putResponse || !putResponse.ok) {
+        console.warn(
+          `No se pudo sincronizar el padecimiento (${putResponse?.status ?? 0}).`
+        );
+        return { synced: false };
+      }
+
+      if (!resolveAfterSave) {
+        return { synced: true };
+      }
+    }
+
+    const deleteResponse = await sendWithAuth('DELETE');
+    if (!deleteResponse || !deleteResponse.ok) {
       console.warn(
-        `No se pudo sincronizar el padecimiento (${response?.status ?? 0}).`
+        `No se pudo marcar como resuelto el padecimiento (${deleteResponse?.status ?? 0}).`
       );
       return { synced: false };
     }
+
     return { synced: true };
   } catch (error) {
     console.warn('No se pudo sincronizar el padecimiento con el backend.', error);

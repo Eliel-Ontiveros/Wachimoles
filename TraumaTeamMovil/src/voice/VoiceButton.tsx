@@ -18,18 +18,35 @@ export function VoiceFab() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const [typed, setTyped] = useState('');
-  const [enter] = useState(() => new Animated.Value(0));
+  const [mounted, setMounted] = useState(v.panelOpen);
+  const [enter] = useState(() => new Animated.Value(v.panelOpen ? 1 : 0));
 
   useEffect(() => {
-    if (!v.panelOpen) return;
-    enter.setValue(0);
+    if (v.panelOpen) {
+      setMounted(true);
+      enter.stopAnimation();
+      Animated.timing(enter, {
+        toValue: 1,
+        duration: 380,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    if (!mounted) return;
+    enter.stopAnimation();
     Animated.timing(enter, {
-      toValue: 1,
-      duration: 380,
-      easing: Easing.out(Easing.cubic),
+      toValue: 0,
+      duration: 280,
+      easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
-    }).start();
-  }, [v.panelOpen, enter]);
+    }).start(({ finished }) => {
+      if (finished) {
+        setMounted(false);
+      }
+    });
+  }, [v.panelOpen, mounted, enter]);
 
   const status = v.thinking
     ? t('voice.thinking')
@@ -52,7 +69,7 @@ export function VoiceFab() {
   const examples = t('examples').split('|').slice(0, 4);
   const idle = !v.listening && !v.thinking && v.transcript === '' && !fb && !v.question;
 
-  if (!v.panelOpen) {
+  if (!mounted) {
     return (
       <Pressable
         onPress={v.startCommand}
@@ -66,6 +83,7 @@ export function VoiceFab() {
 
   return (
     <Animated.View
+      pointerEvents={v.panelOpen ? 'auto' : 'none'}
       style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, opacity: enter }}>
       <Pressable
         onPress={v.closePanel}

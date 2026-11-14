@@ -43,3 +43,8 @@ Thumbs.db
 *.p12
 *.key
 *.mobileprovision
+
+# Other
+*.agents
+*.codex
+*.impeccable

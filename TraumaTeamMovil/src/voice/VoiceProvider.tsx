@@ -2,7 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Animated, Platform } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import * as Speech from 'expo-speech';
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
+
+type SpeechRecognitionPkg = typeof import('expo-speech-recognition');
+
+let speechRecognitionPkg: SpeechRecognitionPkg | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  speechRecognitionPkg = require('expo-speech-recognition') as SpeechRecognitionPkg;
+} catch {
+  speechRecognitionPkg = null;
+}
+
+const ExpoSpeechRecognitionModule = speechRecognitionPkg?.ExpoSpeechRecognitionModule ?? null;
+const useSpeechRecognitionEvent: SpeechRecognitionPkg['useSpeechRecognitionEvent'] =
+  speechRecognitionPkg?.useSpeechRecognitionEvent ??
+  ((() => {}) as SpeechRecognitionPkg['useSpeechRecognitionEvent']);
 
 import { useDrawer } from '@/components/trauma/drawer-context';
 import { useMission } from '@/components/trauma/mission-context';
@@ -98,7 +112,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   const supported = useMemo(() => {
     try {
-      return ExpoSpeechRecognitionModule.isRecognitionAvailable();
+      return Boolean(ExpoSpeechRecognitionModule?.isRecognitionAvailable());
     } catch {
       return false;
     }
@@ -630,7 +644,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   const begin = useCallback(
     async (next: 'command' | 'dictation' | 'answer') => {
-      if (!supported) {
+      if (!supported || !ExpoSpeechRecognitionModule) {
         report({ kind: 'error', text: t('error.unsupported') });
         return;
       }
@@ -659,7 +673,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         volumeChangeEventOptions: { enabled: true, intervalMillis: 80 },
         contextualStrings: ['signos vitales', 'chequeo diario', 'bíceps', 'isquiotibiales', 'misiones'],
       });
-      timer.current = setTimeout(() => ExpoSpeechRecognitionModule.stop(), LISTEN_TIMEOUT_MS);
+      timer.current = setTimeout(() => ExpoSpeechRecognitionModule?.stop(), LISTEN_TIMEOUT_MS);
     },
     [supported, report, t, speech.lang]
   );
@@ -685,7 +699,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const stop = useCallback(() => {
     clearTimer();
     try {
-      ExpoSpeechRecognitionModule.stop();
+      ExpoSpeechRecognitionModule?.stop();
     } catch {
       setListening(false);
     }
@@ -695,7 +709,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     () => () => {
       clearTimer();
       try {
-        ExpoSpeechRecognitionModule.abort();
+        ExpoSpeechRecognitionModule?.abort();
         Speech.stop();
       } catch {
         // nada que limpiar
@@ -729,7 +743,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     endConversation();
     try {
       Speech.stop();
-      ExpoSpeechRecognitionModule.abort();
+      ExpoSpeechRecognitionModule?.abort();
     } catch {
       // nada que cancelar
     }

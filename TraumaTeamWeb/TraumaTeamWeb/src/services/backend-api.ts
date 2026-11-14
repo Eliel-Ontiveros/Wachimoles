@@ -1,4 +1,5 @@
 import type {
+  BodyConditionImageRecord,
   BodyConditionRecord,
   DailyHealthCheck,
   DailyMetricSummary,
@@ -17,19 +18,21 @@ export interface BackendRuntimeConfig {
   apiToken: string;
 }
 
+const env = import.meta.env ?? {};
+
 const DEFAULT_CONFIG: BackendRuntimeConfig = {
   apiBaseUrl:
-    import.meta.env.VITE_API_BASE_URL ||
-    import.meta.env.EXPO_PUBLIC_API_BASE_URL ||
-    import.meta.env.EXPO_PUBLIC_LOCAL_API_URL ||
+    env.VITE_API_BASE_URL ||
+    env.EXPO_PUBLIC_API_BASE_URL ||
+    env.EXPO_PUBLIC_LOCAL_API_URL ||
     '',
-  webUser: import.meta.env.EXPO_PUBLIC_WEB_USER || 'dashboard',
-  webPassword: import.meta.env.EXPO_PUBLIC_WEB_PASSWORD || '',
-  userId: import.meta.env.EXPO_PUBLIC_USER_ID || '',
+  webUser: env.EXPO_PUBLIC_WEB_USER || 'dashboard',
+  webPassword: env.EXPO_PUBLIC_WEB_PASSWORD || '',
+  userId: env.EXPO_PUBLIC_USER_ID || '',
   apiToken:
-    import.meta.env.VITE_DASHBOARD_API_TOKEN ||
-    import.meta.env.EXPO_PUBLIC_DASHBOARD_API_TOKEN ||
-    import.meta.env.DASHBOARD_API_TOKEN ||
+    env.VITE_DASHBOARD_API_TOKEN ||
+    env.EXPO_PUBLIC_DASHBOARD_API_TOKEN ||
+    env.DASHBOARD_API_TOKEN ||
     '',
 };
 
@@ -149,7 +152,7 @@ function parseDailyHealthCheck(value: unknown): DailyHealthCheck | null {
     !Number.isFinite(value.mood) ||
     !Array.isArray(value.symptoms) ||
     !value.symptoms.every((s) => typeof s === 'string') ||
-    (typeof value.notes !== 'string' && value.notes !== null) ||
+    (typeof value.notes !== 'string' && value.notes !== null && value.notes !== undefined) ||
     (value.overallStatus !== 'normal' &&
       value.overallStatus !== 'warning' &&
       value.overallStatus !== 'critical') ||
@@ -158,6 +161,8 @@ function parseDailyHealthCheck(value: unknown): DailyHealthCheck | null {
   ) {
     return null;
   }
+
+  const notes: string = typeof value.notes === 'string' ? value.notes : '';
 
   return {
     id: value.id,
@@ -169,7 +174,7 @@ function parseDailyHealthCheck(value: unknown): DailyHealthCheck | null {
     sleepHours,
     mood: value.mood as DailyHealthCheck['mood'],
     symptoms: value.symptoms,
-    notes: value.notes,
+    notes,
     overallStatus: value.overallStatus,
     recommendation: value.recommendation,
     recordedAt: value.recordedAt,
@@ -178,15 +183,12 @@ function parseDailyHealthCheck(value: unknown): DailyHealthCheck | null {
   };
 }
 
-function isInjuryPhoto(value: unknown): value is InjuryPhoto {
+function isBodyConditionImageRecord(value: unknown): value is BodyConditionImageRecord {
   if (!isRecord(value)) return false;
   return (
-    typeof value.id === 'string' &&
-    typeof value.muscleId === 'string' &&
-    typeof value.muscleName === 'string' &&
-    typeof value.uri === 'string' &&
-    typeof value.dayNumber === 'number' &&
-    typeof value.capturedAt === 'string'
+    typeof value.path === 'string' &&
+    typeof value.signedUrl === 'string' &&
+    typeof value.expiresAt === 'string'
   );
 }
 
@@ -403,6 +405,65 @@ export async function resolveBodyConditionInBackend(muscleId: string): Promise<v
   }
 }
 
+export async function cureBodyConditionWithHistoryInBackend(
+  muscleId: string,
+  finalPayload: SaveBodyConditionPayload
+): Promise<void> {
+  const clampedPain = Math.max(1, Math.min(10, Math.round(finalPayload.painIntensity || 1)));
+  await saveBodyConditionToBackend(muscleId, {
+    ...finalPayload,
+    painIntensity: clampedPain,
+  });
+  await resolveBodyConditionInBackend(muscleId);
+}
+
+export async function fetchBodyConditionImagesFromBackend(
+  muscleId: string
+): Promise<BodyConditionImageRecord[]> {
+  const url = resolveUrl(`/dashboard/body-conditions/${encodeURIComponent(muscleId)}/images`);
+  const res = await fetchWithBearerOrBasic(url, { method: 'GET' });
+  if (!res.ok) {
+    throw new ApiRequestError(
+      res.status,
+      res.status === 401
+        ? 'Acceso protegido con token en /dashboard/body-conditions/images (401).'
+        : `No se pudieron cargar las fotos del padecimiento (${res.status}).`
+    );
+  }
+  const body: unknown = await res.json();
+  if (!Array.isArray(body) || !body.every(isBodyConditionImageRecord)) {
+    throw new Error('Formato inválido recibido desde /dashboard/body-conditions/images.');
+  }
+  return body;
+}
+
+export async function uploadBodyConditionImageToBackend(
+  muscleId: string,
+  file: File
+): Promise<BodyConditionImageRecord> {
+  const url = resolveUrl(`/dashboard/body-conditions/${encodeURIComponent(muscleId)}/images`);
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const res = await fetchWithBearerOrBasic(url, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new ApiRequestError(
+      res.status,
+      res.status === 401
+        ? 'No autorizado (401). Configura DASHBOARD_API_TOKEN para subir fotos.'
+        : `No se pudo subir la imagen (${res.status}).`
+    );
+  }
+  const body: unknown = await res.json();
+  if (!isBodyConditionImageRecord(body)) {
+    throw new Error('Respuesta inválida al subir imagen de padecimiento.');
+  }
+  return body;
+}
+
 export async function fetchDailyHealthChecksFromBackend(
   limit = 100
 ): Promise<DailyHealthCheck[]> {
@@ -431,70 +492,42 @@ export async function fetchDailyHealthChecksFromBackend(
   return parsedChecks;
 }
 
-export async function fetchInjuryPhotosFromBackend(): Promise<{
-  photos: InjuryPhoto[];
-  available: boolean;
-}> {
-  const params: Record<string, string> = {};
-  if (runtimeConfig.userId) {
-    params.userId = runtimeConfig.userId;
+export async function fetchInjuryPhotosFromBackend(
+  muscle: { id: string; name: string },
+  signal: AbortSignal
+): Promise<InjuryPhoto[]> {
+  const token = runtimeConfig.apiToken.trim();
+  if (!token) throw new ApiRequestError(401, 'A dashboard API token is required to view photos.');
+  const url = resolveUrl(`/dashboard/body-conditions/${encodeURIComponent(muscle.id)}/images`);
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    signal: AbortSignal.any([signal, AbortSignal.timeout(40000)]),
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, response.status === 401
+      ? 'Photo access was denied. Check the dashboard connection credentials.'
+      : 'Photos could not be loaded. Please try again.');
   }
-
-  const url = resolveUrl('/observations/photos', params);
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (runtimeConfig.apiToken) {
-    headers.Authorization = `Bearer ${runtimeConfig.apiToken}`;
-  } else if (runtimeConfig.webPassword) {
-    headers.Authorization = buildBasicHeader(runtimeConfig.webUser, runtimeConfig.webPassword);
-  }
-
-  const res = await fetchWithTimeout(url, { method: 'GET', headers });
-  if (res.status === 404 || res.status === 501) {
-    return { photos: [], available: false };
-  }
-  if (!res.ok) {
-    throw new ApiRequestError(
-      res.status,
-      `No se pudo cargar el expediente fotográfico (${res.status}).`
-    );
-  }
-  const body: unknown = await res.json();
-  if (!Array.isArray(body)) {
-    return { photos: [], available: true };
-  }
-  return {
-    photos: body.filter(isInjuryPhoto),
-    available: true,
-  };
-}
-
-export async function uploadInjuryPhotoToBackend(
-  photo: Omit<InjuryPhoto, 'id'>
-): Promise<{ synced: boolean }> {
-  const url = resolveUrl('/observations/photos');
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  };
-  if (runtimeConfig.apiToken) {
-    headers.Authorization = `Bearer ${runtimeConfig.apiToken}`;
-  } else if (runtimeConfig.webPassword) {
-    headers.Authorization = buildBasicHeader(runtimeConfig.webUser, runtimeConfig.webPassword);
-  }
-
-  try {
-    const res = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        userId: runtimeConfig.userId,
-        ...photo,
-      }),
-    });
-    return { synced: res.ok };
-  } catch {
-    return { synced: false };
-  }
+  const body: unknown = await response.json();
+  if (!Array.isArray(body)) throw new Error('The backend returned an invalid photo list.');
+  return body.map((image: unknown) => {
+    if (!isRecord(image) || typeof image.path !== 'string' ||
+      image.path.split('/').length !== 3 || image.path.split('/')[1] !== muscle.id ||
+      typeof image.signedUrl !== 'string' || typeof image.expiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(image.expiresAt)) || Date.parse(image.expiresAt) <= Date.now()) {
+      throw new Error('The backend returned an invalid or expired photo link. Please reload photos.');
+    }
+    const signedUrl = new URL(image.signedUrl);
+    if (signedUrl.protocol !== 'https:' || signedUrl.username || signedUrl.password) {
+      throw new Error('The backend returned an invalid photo link.');
+    }
+    return {
+      id: image.path, muscleId: muscle.id, muscleName: muscle.name,
+      uri: signedUrl.toString(), dayNumber: null, capturedAt: null,
+    };
+  });
 }
 
 export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData {
@@ -655,3 +688,49 @@ export function groupSamplesByDay(samples: DashboardSample[]): DailyMetricSummar
 
   return summaries.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
 }
+
+export interface AstronautLocationBackendResponse {
+  entorno: 'tierra' | 'nave' | 'estacion' | 'luna' | 'marte';
+  environment: 'tierra' | 'nave' | 'estacion' | 'luna' | 'marte';
+  label: string;
+  gravityLabel: string;
+  actualizadoEn?: string;
+}
+
+export async function fetchAstronautLocationFromBackend(): Promise<AstronautLocationBackendResponse | null> {
+  try {
+    const url = resolveUrl('/dashboard/astronaut/location');
+    const res = await fetchWithBearerOrBasic(url, { method: 'GET' });
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    if (isRecord(data)) {
+      const entorno = (data.entorno ?? data.environment) as
+        | 'tierra'
+        | 'nave'
+        | 'estacion'
+        | 'luna'
+        | 'marte';
+      if (
+        entorno === 'tierra' ||
+        entorno === 'nave' ||
+        entorno === 'estacion' ||
+        entorno === 'luna' ||
+        entorno === 'marte'
+      ) {
+        return {
+          entorno,
+          environment: entorno,
+          label: (data.etiqueta as string) || (data.label as string) || entorno,
+          gravityLabel:
+            (data.gravedadEtiqueta as string) || (data.gravityLabel as string) || '',
+          actualizadoEn:
+            (data.actualizadoEn as string) || (data.actualizado_en as string) || '',
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+

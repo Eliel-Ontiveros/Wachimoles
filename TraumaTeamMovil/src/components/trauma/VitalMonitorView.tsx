@@ -1,15 +1,27 @@
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
-import Svg, { Line, Path, Polyline, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Defs,
+  Line,
+  LinearGradient,
+  Path,
+  RadialGradient,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import {
@@ -17,14 +29,12 @@ import {
   Heart,
   Activity,
   ChevronRight,
-  Clock,
-  X,
+  Droplets,
   TrendingUp,
   History,
   Flame,
-  ArrowUpRight,
-  ArrowDownRight,
   Moon,
+  Zap,
 } from 'lucide-react-native';
 import { DashboardSample } from '../../types/vital-signs';
 import { EnvironmentSelector } from './EnvironmentSelector';
@@ -34,7 +44,7 @@ import { useVoice } from '@/voice/voice-context';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatDate, formatNumber, formatTime } from '@/i18n/format';
 import type { Locale, MessageKey } from '@/i18n/messages';
-import { useAppTheme, type Palette } from '@/theme';
+import { useAppTheme } from '@/theme';
 
 type TFn = (key: MessageKey, params?: Record<string, string | number>) => string;
 
@@ -344,6 +354,41 @@ function formatMetricValue(metric: HistoryMetric, value: number): string {
   return metric === 'sleep' ? value.toFixed(1) : String(Math.round(value));
 }
 
+function formatDateTimeShort(iso: string, locale: Locale): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '--';
+  const date = formatDate(d, locale, { day: '2-digit', month: '2-digit' });
+  return `${date} ${formatTime(d, locale)}`;
+}
+
+function buildSmoothCurvePath(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return '';
+  if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  if (pts.length === 2) {
+    return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+  }
+
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const midX = (pts[i].x + pts[i + 1].x) / 2;
+    const midY = (pts[i].y + pts[i + 1].y) / 2;
+    d += ` Q ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)} ${midX.toFixed(1)} ${midY.toFixed(1)}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${last.x.toFixed(1)} ${last.y.toFixed(1)}`;
+  return d;
+}
+
+const BANNER_STARS = [
+  { x: 24, y: 16, r: 1.1, o: 0.6 },
+  { x: 78, y: 42, r: 0.9, o: 0.45 },
+  { x: 138, y: 14, r: 1.3, o: 0.75 },
+  { x: 210, y: 54, r: 1.0, o: 0.5 },
+  { x: 295, y: 20, r: 1.2, o: 0.7 },
+  { x: 350, y: 48, r: 1.1, o: 0.6 },
+  { x: 392, y: 18, r: 1.3, o: 0.78 },
+];
+
 const METRIC_META: Record<
   HistoryMetric,
   {
@@ -356,6 +401,9 @@ const METRIC_META: Record<
     softBgDark: string;
     minBound: number;
     maxBound: number;
+    nominalMin?: number;
+    nominalMax?: number;
+    nominalKey?: MessageKey;
   }
 > = {
   heart_rate: {
@@ -368,6 +416,9 @@ const METRIC_META: Record<
     softBgDark: '#3a1216',
     minBound: 30,
     maxBound: 220,
+    nominalMin: 60,
+    nominalMax: 100,
+    nominalKey: 'vital.nominal.heart_rate',
   },
   spo2: {
     titleKey: 'vital.title.spo2',
@@ -379,17 +430,23 @@ const METRIC_META: Record<
     softBgDark: '#0c2a3d',
     minBound: 70,
     maxBound: 100,
+    nominalMin: 95,
+    nominalMax: 100,
+    nominalKey: 'vital.nominal.spo2',
   },
   stress: {
     titleKey: 'vital.title.stress',
     tabKey: 'vital.tab.stress',
     unitKey: null,
     unit: '/100',
-    accent: '#f97316',
-    softBg: '#fff7ed',
-    softBgDark: '#3a1d0a',
+    accent: '#f59e0b',
+    softBg: '#fffbeb',
+    softBgDark: '#3a2a08',
     minBound: 0,
     maxBound: 100,
+    nominalMin: 0,
+    nominalMax: 65,
+    nominalKey: 'vital.nominal.stress',
   },
   sleep: {
     titleKey: 'vital.title.sleep',
@@ -401,8 +458,24 @@ const METRIC_META: Record<
     softBgDark: '#241a45',
     minBound: 0,
     maxBound: 12,
+    nominalMin: 7,
+    nominalMax: 9,
+    nominalKey: 'vital.nominal.sleep',
   },
 };
+
+function renderHistoryTabIcon(metric: HistoryMetric, color: string, size = 12) {
+  switch (metric) {
+    case 'heart_rate':
+      return <Heart size={size} color={color} />;
+    case 'spo2':
+      return <Droplets size={size} color={color} />;
+    case 'stress':
+      return <Zap size={size} color={color} />;
+    case 'sleep':
+      return <Moon size={size} color={color} />;
+  }
+}
 
 // Esqueleto animado de carga mientras obtiene historial de métricas
 function HistorySkeleton() {
@@ -454,7 +527,7 @@ function HistorySkeleton() {
   );
 }
 
-// Modal de historial agrupado por día para Pulso, Oxígeno y Estrés
+// Modal Bitácora de Vuelo: historial agrupado y evolución para Pulso, Oxígeno, Estrés y Sueño
 function VitalHistoryModal({
   visible,
   metric,
@@ -474,15 +547,116 @@ function VitalHistoryModal({
 }) {
   const { t, locale } = useI18n();
   const { colors, scheme } = useAppTheme();
+  const { height: windowHeight } = useWindowDimensions();
+  const dismissDistance = Math.max(760, windowHeight);
+  const dismissDistanceRef = useRef(dismissDistance);
   const [chartWidth, setChartWidth] = useState(0);
+  const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
+  const sheetTranslateY = useRef(new Animated.Value(dismissDistance)).current;
+  const scrollYRef = useRef(0);
+  const onCloseRef = useRef(onClose);
   const meta = METRIC_META[metric];
   const unitLabel = meta.unitKey ? t(meta.unitKey) : meta.unit;
-  const gridColor = scheme === 'dark' ? colors.border : '#f1f5f9';
-  const closeIconColor = scheme === 'dark' ? colors.textMuted : '#475569';
+
+  useEffect(() => {
+    dismissDistanceRef.current = dismissDistance;
+  }, [dismissDistance]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    setSelectedPointIdx(null);
+  }, [metric, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    scrollYRef.current = 0;
+    sheetTranslateY.setValue(dismissDistanceRef.current);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [visible, sheetTranslateY]);
+
+  const dismissSheet = () => {
+    Animated.timing(sheetTranslateY, {
+      toValue: dismissDistanceRef.current,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start(() => {
+      onCloseRef.current();
+    });
+  };
+
+  const backdropOpacity = sheetTranslateY.interpolate({
+    inputRange: [0, dismissDistance * 0.75],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const { headerPanResponder, bodyPanResponder } = useMemo(() => {
+    const finishDrag = (dy: number, vy: number) => {
+      if (dy > 95 || vy > 0.65) {
+        Animated.timing(sheetTranslateY, {
+          toValue: dismissDistanceRef.current,
+          duration: 190,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }).start(() => {
+          onCloseRef.current();
+        });
+      } else {
+        Animated.spring(sheetTranslateY, {
+          toValue: 0,
+          bounciness: 5,
+          speed: 18,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }).start();
+      }
+    };
+
+    const sharedCallbacks = {
+      onPanResponderMove: (_: unknown, gs: { dy: number }) => {
+        if (gs.dy > 0) {
+          sheetTranslateY.setValue(gs.dy);
+        }
+      },
+      onPanResponderRelease: (_: unknown, gs: { dy: number; vy: number }) =>
+        finishDrag(gs.dy, gs.vy),
+      onPanResponderTerminate: (_: unknown, gs: { dy: number; vy: number }) =>
+        finishDrag(gs.dy, gs.vy),
+    };
+
+    return {
+      headerPanResponder: PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gs) =>
+          Math.abs(gs.dy) > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        ...sharedCallbacks,
+      }),
+      bodyPanResponder: PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gs) =>
+          scrollYRef.current <= 1 && gs.dy > 10 && gs.dy > Math.abs(gs.dx),
+        ...sharedCallbacks,
+      }),
+    };
+  }, [sheetTranslateY]);
 
   const validSamples = useMemo(() => {
     return history.filter((s) => s.metric === metric && Number(s.value) > 0);
   }, [history, metric]);
+
+  const metricSeries = useMemo(() => {
+    const sorted = validSamples
+      .slice()
+      .sort((a, b) => new Date(a.measuredAt).getTime() - new Date(b.measuredAt).getTime());
+    return sorted.length > 30 ? sorted.slice(sorted.length - 30) : sorted;
+  }, [validSamples]);
 
   const dailySummaries = useMemo(
     () => groupSamplesByDay(validSamples, locale, t),
@@ -490,10 +664,17 @@ function VitalHistoryModal({
   );
 
   const stats = useMemo(() => {
-    if (validSamples.length === 0) {
-      return { min: 0, max: 0, avg: 0, latest: currentValue || 0 };
+    if (metricSeries.length === 0) {
+      return {
+        min: 0,
+        max: 0,
+        avg: 0,
+        latest: currentValue || 0,
+        latestTime: null as string | null,
+        count: 0,
+      };
     }
-    const vals = validSamples.map((s) =>
+    const vals = metricSeries.map((s) =>
       metric === 'sleep' ? s.value : Math.round(s.value)
     );
     const min = Math.min(...vals);
@@ -503,287 +684,675 @@ function VitalHistoryModal({
       metric === 'sleep'
         ? Math.round((sum / vals.length) * 10) / 10
         : Math.round(sum / vals.length);
-    const latest = currentValue ?? vals[0];
-    return { min, max, avg, latest };
-  }, [metric, validSamples, currentValue]);
+    const latestSample = metricSeries[metricSeries.length - 1];
+    const latest = currentValue ?? vals[vals.length - 1];
+    return {
+      min,
+      max,
+      avg,
+      latest,
+      latestTime: latestSample?.measuredAt ?? null,
+      count: metricSeries.length,
+    };
+  }, [metric, metricSeries, currentValue]);
 
-  const chartPoints = useMemo(() => {
-    if (chartWidth <= 0 || validSamples.length < 2) return '';
+  const chartGeometry = useMemo(() => {
+    const height = 148;
+    const padLeft = 32;
+    const padRight = 12;
+    const padTop = 14;
+    const padBottom = 16;
+    const width = Math.max(0, chartWidth);
+    const innerW = Math.max(1, width - padLeft - padRight);
+    const innerH = height - padTop - padBottom;
 
-    const pointsData = [...validSamples.slice(0, 18)].reverse();
-    const minVal = Math.max(meta.minBound, stats.min - 5);
-    const maxVal = Math.min(meta.maxBound, stats.max + 5);
-    const range = maxVal - minVal || 1;
-    const h = 100;
+    if (width <= 0 || metricSeries.length === 0) {
+      return {
+        width,
+        height,
+        padLeft,
+        padRight,
+        padTop,
+        padBottom,
+        innerW,
+        innerH,
+        minVal: 0,
+        maxVal: 100,
+        points: [] as { sample: DashboardSample; x: number; y: number }[],
+        linePathD: '',
+        areaPathD: '',
+        nominalMinY: null as number | null,
+        nominalMaxY: null as number | null,
+      };
+    }
 
-    return pointsData
-      .map((s, idx) => {
-        const x = (idx / (pointsData.length - 1)) * (chartWidth - 20) + 10;
-        const normY = (s.value - minVal) / range;
-        const y = h - normY * (h - 24) - 12;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(' ');
-  }, [chartWidth, validSamples, stats, meta]);
+    let minVal = Math.min(...metricSeries.map((p) => p.value));
+    let maxVal = Math.max(...metricSeries.map((p) => p.value));
+    if (meta.nominalMin !== undefined) minVal = Math.min(minVal, meta.nominalMin);
+    if (meta.nominalMax !== undefined) maxVal = Math.max(maxVal, meta.nominalMax);
+
+    if (minVal === maxVal) {
+      minVal = Math.max(meta.minBound, minVal - 5);
+      maxVal = Math.min(meta.maxBound, maxVal + 5);
+    } else {
+      const span = maxVal - minVal;
+      minVal = Math.max(meta.minBound, minVal - span * 0.12);
+      maxVal = Math.min(meta.maxBound, maxVal + span * 0.12);
+    }
+
+    const span = Math.max(0.001, maxVal - minVal);
+    const points = metricSeries.map((sample, idx) => {
+      const rx = metricSeries.length === 1 ? 0.5 : idx / (metricSeries.length - 1);
+      const ry = (sample.value - minVal) / span;
+      return {
+        sample,
+        x: padLeft + rx * innerW,
+        y: padTop + innerH - ry * innerH,
+      };
+    });
+
+    const linePathD = buildSmoothCurvePath(points);
+    let areaPathD = '';
+    if (points.length >= 2 && linePathD) {
+      const baseY = padTop + innerH;
+      const first = points[0];
+      const last = points[points.length - 1];
+      areaPathD = `${linePathD} L ${last.x.toFixed(1)} ${baseY.toFixed(1)} L ${first.x.toFixed(1)} ${baseY.toFixed(1)} Z`;
+    }
+
+    const toY = (v?: number) => {
+      if (v === undefined) return null;
+      const y = padTop + innerH - ((v - minVal) / span) * innerH;
+      return y >= padTop && y <= padTop + innerH ? y : null;
+    };
+
+    return {
+      width,
+      height,
+      padLeft,
+      padRight,
+      padTop,
+      padBottom,
+      innerW,
+      innerH,
+      minVal,
+      maxVal,
+      points,
+      linePathD,
+      areaPathD,
+      nominalMinY: toY(meta.nominalMin),
+      nominalMaxY: toY(meta.nominalMax),
+    };
+  }, [chartWidth, metricSeries, meta]);
+
+  const activePoint =
+    selectedPointIdx !== null && chartGeometry.points[selectedPointIdx]
+      ? chartGeometry.points[selectedPointIdx]
+      : chartGeometry.points[chartGeometry.points.length - 1] ?? null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
+    <Modal visible={visible} transparent animationType="none" onRequestClose={dismissSheet}>
+      <View
         style={{
           flex: 1,
-          backgroundColor: scheme === 'dark' ? colors.overlay : 'rgba(15,23,42,0.45)',
           justifyContent: 'flex-end',
         }}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={{ height: '82%' }}>
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            backgroundColor: 'rgba(5, 11, 25, 0.58)',
+            opacity: backdropOpacity,
+          }}
+        />
+        <Pressable
+          onPress={dismissSheet}
+          accessibilityLabel={t('vital.history.close')}
+          style={{ flex: 1 }}
+        />
+        <Animated.View
+          {...bodyPanResponder.panHandlers}
+          style={{
+            height: '86%',
+            transform: [{ translateY: sheetTranslateY }],
+          }}>
           <View
             style={{ flex: 1 }}
-            className="overflow-hidden rounded-t-3xl border-t border-slate-200 dark:border-trauma-nightLine bg-white dark:bg-trauma-night shadow-2xl">
-            <View className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-slate-200 dark:bg-trauma-nightLine" />
+            className="overflow-hidden rounded-t-3xl bg-[#f8fafc] shadow-2xl dark:bg-trauma-nightBg">
+            {/* Banner espacial superior arrastrable hacia abajo para cerrar */}
+            <View
+              {...headerPanResponder.panHandlers}
+              style={{ backgroundColor: '#060b19', position: 'relative' }}>
+              <Svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 420 96"
+                preserveAspectRatio="xMidYMid slice"
+                style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
+                <Defs>
+                  <LinearGradient id="mobileHistorySky" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0%" stopColor="#060b19" />
+                    <Stop offset="100%" stopColor="#0b1633" />
+                  </LinearGradient>
+                  <RadialGradient id="mobileEarth" cx="35%" cy="30%" r="65%">
+                    <Stop offset="0%" stopColor="#38bdf8" />
+                    <Stop offset="100%" stopColor="#0369a1" />
+                  </RadialGradient>
+                  <RadialGradient id="mobileMoon" cx="35%" cy="30%" r="65%">
+                    <Stop offset="0%" stopColor="#f1f5f9" />
+                    <Stop offset="100%" stopColor="#94a3b8" />
+                  </RadialGradient>
+                </Defs>
+                <Rect x={0} y={0} width={420} height={96} fill="url(#mobileHistorySky)" />
+                {BANNER_STARS.map((st, idx) => (
+                  <Circle key={idx} cx={st.x} cy={st.y} r={st.r} fill="#e0f2fe" opacity={st.o} />
+                ))}
+                <Path
+                  d="M 226 68 Q 312 18 390 54"
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth={1.3}
+                  strokeDasharray="4 4"
+                  opacity={0.5}
+                />
+                <Circle cx={226} cy={68} r={9} fill="url(#mobileEarth)" opacity={0.92} />
+                <Circle cx={390} cy={54} r={7.5} fill="url(#mobileMoon)" opacity={0.92} />
+                <Circle cx={312} cy={38} r={4} fill="#7dd3fc" opacity={0.9} />
+                <Circle cx={312} cy={38} r={9} fill="rgba(125,211,252,0.18)" />
+              </Svg>
 
-            {/* Cabecera del modal */}
-            <View className="flex-row items-center justify-between border-b border-slate-100 dark:border-trauma-nightLine px-5 pb-3 pt-3">
-              <View className="flex-row items-center">
-                <View
-                  style={{ backgroundColor: scheme === 'dark' ? meta.softBgDark : meta.softBg }}
-                  className="mr-2.5 h-9 w-9 items-center justify-center rounded-xl">
-                  {metric === 'heart_rate' ? (
-                    <Heart size={18} color={meta.accent} fill={meta.accent} />
-                  ) : metric === 'sleep' ? (
-                    <Moon size={18} color={meta.accent} />
-                  ) : (
-                    <Activity size={18} color={meta.accent} />
-                  )}
-                </View>
+              <View className="px-5 pb-3.5 pt-2.5">
+                <View className="mx-auto mb-2.5 h-1 w-12 rounded-full bg-white/35" />
                 <View>
-                  <Text className="font-mono text-base font-extrabold text-slate-900 dark:text-trauma-nightInk">
+                  <Text className="font-mono text-[9px] font-bold uppercase tracking-[1.6px] text-sky-300">
+                    {t('vital.logbook.kicker')}
+                  </Text>
+                  <Text className="mt-0.5 font-mono text-lg font-extrabold text-white">
                     {t(meta.titleKey)}
                   </Text>
-                  <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">
-                    {metric === 'sleep'
-                      ? t('vital.history.subtitleSleep')
-                      : t('vital.history.subtitleDefault')}
+                  <Text className="mt-0.5 font-mono text-[10px] text-slate-300">
+                    {stats.count > 0 && stats.latestTime
+                      ? t('vital.logbook.summary', {
+                          count: stats.count,
+                          time: formatDateTimeShort(stats.latestTime, locale),
+                        })
+                      : t('vital.logbook.noReadings')}
                   </Text>
                 </View>
               </View>
-
-              <Pressable
-                onPress={onClose}
-                accessibilityLabel={t('common.close')}
-                className="h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-trauma-nightAlt active:bg-slate-200 dark:active:bg-trauma-nightLine">
-                <X size={16} color={closeIconColor} />
-              </Pressable>
             </View>
 
-            {/* Pestañas para alternar entre métricas */}
-            <View className="flex-row gap-2 px-5 pt-3">
-              {(['heart_rate', 'spo2', 'stress', 'sleep'] as HistoryMetric[]).map((mKey) => {
-                const active = mKey === metric;
-                return (
-                  <Pressable
-                    key={mKey}
-                    onPress={() => onSelectMetric(mKey)}
-                    className={`flex-1 items-center rounded-xl border py-2 ${active
-                      ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-cyan-950'
-                      : 'border-slate-200 dark:border-trauma-nightLine bg-[#f8fafc] dark:bg-trauma-nightAlt'
-                      }`}>
-                    <Text
-                      className={`font-mono text-[10.5px] font-bold ${active ? 'text-trauma-ink dark:text-trauma-nightInk' : 'text-slate-500 dark:text-trauma-nightMuted'
-                        }`}>
-                      {t(METRIC_META[mKey].tabKey)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+            {/* Pestañas oscuras estilo Web para alternar entre métricas */}
+            <View className="border-b border-slate-200/80 bg-white px-4 py-2.5 dark:bg-trauma-night dark:border-trauma-nightLine">
+              <View className="flex-row gap-1.5 rounded-2xl bg-slate-100 p-1 dark:bg-trauma-nightAlt">
+                {(['heart_rate', 'spo2', 'stress', 'sleep'] as HistoryMetric[]).map((mKey) => {
+                  const active = mKey === metric;
+                  const tabMeta = METRIC_META[mKey];
+                  return (
+                    <Pressable
+                      key={mKey}
+                      onPress={() => onSelectMetric(mKey)}
+                      style={
+                        active
+                          ? {
+                            backgroundColor: '#060b19',
+                            shadowColor: '#020617',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.16,
+                            shadowRadius: 4,
+                            elevation: 2,
+                          }
+                          : undefined
+                      }
+                      className="flex-1 flex-row items-center justify-center gap-1 rounded-xl py-2">
+                      {renderHistoryTabIcon(
+                        mKey,
+                        active ? tabMeta.accent : colors.textMuted,
+                        12
+                      )}
+                      <Text
+                        numberOfLines={1}
+                        style={{ color: active ? tabMeta.accent : colors.textMuted }}
+                        className="font-mono text-[10px] font-bold">
+                        {t(tabMeta.tabKey)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
-            <ScrollView className="flex-1 px-5 pt-3.5" showsVerticalScrollIndicator={false}>
+            <ScrollView
+              className="flex-1 px-4 pt-3.5"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              scrollEventThrottle={16}
+              onScroll={(e) => {
+                scrollYRef.current = e.nativeEvent.contentOffset.y;
+              }}>
               {loading ? (
                 <HistorySkeleton />
               ) : (
                 <>
-                  {/* Tarjetas de Estadísticas Generales */}
-                  <View className="flex-row justify-between gap-2">
-                    <View className="flex-1 items-center rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-[#f8fafc] dark:bg-trauma-nightAlt p-3">
-                      <Text className="font-mono text-[9px] uppercase text-slate-400 dark:text-trauma-nightSubtle">{t('vital.stat.current')}</Text>
-                      <Text className="font-mono text-lg font-extrabold text-slate-900 dark:text-trauma-nightInk">
-                        {stats.latest ? formatMetricValue(metric, stats.latest) : '--'}
-                      </Text>
-                      <Text className="font-mono text-[8.5px] text-slate-500 dark:text-trauma-nightMuted">{unitLabel}</Text>
-                    </View>
-
-                    <View className="flex-1 items-center rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-[#f8fafc] dark:bg-trauma-nightAlt p-3">
-                      <Text className="font-mono text-[9px] uppercase text-slate-400 dark:text-trauma-nightSubtle">{t('vital.stat.average')}</Text>
-                      <Text className="font-mono text-lg font-extrabold text-sky-600 dark:text-sky-300">
-                        {stats.avg ? formatMetricValue(metric, stats.avg) : '--'}
-                      </Text>
-                      <Text className="font-mono text-[8.5px] text-slate-500 dark:text-trauma-nightMuted">{unitLabel}</Text>
-                    </View>
-
-                    <View className="flex-1 items-center rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-[#f8fafc] dark:bg-trauma-nightAlt p-3">
-                      <Text className="font-mono text-[9px] uppercase text-slate-400 dark:text-trauma-nightSubtle">{t('vital.stat.minMax')}</Text>
-                      <Text className="mt-0.5 font-mono text-sm font-extrabold text-slate-900 dark:text-trauma-nightInk">
-                        {stats.min && stats.max
-                          ? `${formatMetricValue(metric, stats.min)} - ${formatMetricValue(metric, stats.max)}`
-                          : '--'}
-                      </Text>
-                      <Text className="font-mono text-[8.5px] text-slate-500 dark:text-trauma-nightMuted">{t('vital.stat.range')}</Text>
-                    </View>
-                  </View>
-
-                  {/* Gráfica de tendencia */}
-                  {validSamples.length >= 2 && (
-                    <View className="mt-3.5 rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
-                      <View className="mb-2 flex-row items-center justify-between">
-                        <View className="flex-row items-center">
-                          <TrendingUp size={13} color={meta.accent} />
-                          <Text className="ml-1.5 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
-                            {t('vital.trend.title')}
-                          </Text>
-                        </View>
-                        <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
-                          {t('vital.trend.lastReadings', { count: Math.min(18, validSamples.length) })}
+                  {/* Estadísticas clave */}
+                  {metric === 'sleep' ? (
+                    <View className="flex-row justify-between gap-2.5">
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.current')}
+                        </Text>
+                        <Text
+                          style={{ color: meta.accent }}
+                          className="mt-0.5 font-mono text-lg font-extrabold">
+                          {stats.latest ? `${formatMetricValue(metric, stats.latest)} ${unitLabel}` : '--'}
                         </Text>
                       </View>
 
-                      <View
-                        style={{ height: 100, width: '100%' }}
-                        onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
-                        {chartWidth > 0 && chartPoints && (
-                          <Svg width={chartWidth} height={100}>
-                            <Defs>
-                              <LinearGradient id="pulseLineGrad" x1="0" y1="0" x2="0" y2="1">
-                                <Stop offset="0%" stopColor={meta.accent} stopOpacity="0.4" />
-                                <Stop offset="100%" stopColor={meta.accent} stopOpacity="0" />
-                              </LinearGradient>
-                            </Defs>
-                            <Line x1={0} y1={22} x2={chartWidth} y2={22} stroke={gridColor} strokeWidth={1} />
-                            <Line x1={0} y1={50} x2={chartWidth} y2={50} stroke={gridColor} strokeWidth={1} />
-                            <Line x1={0} y1={78} x2={chartWidth} y2={78} stroke={gridColor} strokeWidth={1} />
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.max')}
+                        </Text>
+                        <Text className="mt-0.5 font-mono text-lg font-extrabold text-slate-900 dark:text-trauma-nightInk">
+                          {stats.max ? `${formatMetricValue(metric, stats.max)} ${unitLabel}` : '--'}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View className="flex-row justify-between gap-2">
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.lastReading')}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={{ color: meta.accent }}
+                          className="mt-0.5 font-mono text-base font-extrabold">
+                          {stats.latest ? `${formatMetricValue(metric, stats.latest)} ${unitLabel}` : '--'}
+                        </Text>
+                      </View>
 
-                            <Polyline
-                              points={chartPoints}
-                              fill="none"
-                              stroke={meta.accent}
-                              strokeWidth={2.4}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </Svg>
-                        )}
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.average')}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          className="mt-0.5 font-mono text-base font-extrabold text-sky-600 dark:text-sky-300">
+                          {stats.avg ? `${formatMetricValue(metric, stats.avg)} ${unitLabel}` : '--'}
+                        </Text>
+                      </View>
+
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.minMaxDash')}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          className="mt-1 font-mono text-xs font-extrabold text-slate-900 dark:text-trauma-nightInk">
+                          {stats.min && stats.max
+                            ? `${formatMetricValue(metric, stats.min)}–${formatMetricValue(metric, stats.max)} ${unitLabel}`
+                            : '--'}
+                        </Text>
                       </View>
                     </View>
                   )}
 
-                  {/* Resumen agrupado por día */}
+                  {/* Gráfica: barras por día para sueño, curva suavizada interactiva para el resto */}
+                  {metric === 'sleep' ? (
+                    dailySummaries.length > 0 && (
+                      <View className="mt-3.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <View className="mb-3 flex-row items-center justify-between">
+                          <View className="flex-row items-center">
+                            <TrendingUp size={13} color={meta.accent} />
+                            <Text className="ml-1.5 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                              {t('vital.sleep.hoursPerDay')}
+                            </Text>
+                          </View>
+                          <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                            {t('vital.sleep.goalShort')}
+                          </Text>
+                        </View>
+
+                        <View className="flex-row items-end justify-between gap-2 pt-1">
+                          {dailySummaries
+                            .slice(0, 10)
+                            .reverse()
+                            .map((day) => {
+                              const scaleMax = Math.max(10, stats.max ?? 10);
+                              const barPct = Math.max(
+                                12,
+                                Math.min(100, Math.round((day.max / scaleMax) * 100))
+                              );
+                              const barColor =
+                                day.max < 5.5
+                                  ? '#dc2626'
+                                  : day.max < 7
+                                    ? '#d97706'
+                                    : '#059669';
+                              return (
+                                <View key={day.dateKey} className="flex-1 items-center">
+                                  <Text className="mb-1 font-mono text-[8.5px] font-bold text-slate-700 dark:text-trauma-nightInk">
+                                    {day.max.toFixed(1)}h
+                                  </Text>
+                                  <View className="h-24 w-full max-w-[24px] justify-end overflow-hidden rounded-md bg-slate-100 dark:bg-trauma-nightAlt">
+                                    <View
+                                      style={{
+                                        height: `${barPct}%`,
+                                        backgroundColor: barColor,
+                                        borderTopLeftRadius: 5,
+                                        borderTopRightRadius: 5,
+                                      }}
+                                    />
+                                  </View>
+                                  <Text
+                                    numberOfLines={1}
+                                    className="mt-1.5 font-mono text-[8.5px] text-slate-500 dark:text-trauma-nightMuted">
+                                    {getSleepShortDayLabel(day, t)}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                        </View>
+                      </View>
+                    )
+                  ) : (
+                    <View className="mt-3.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:bg-trauma-night dark:border-trauma-nightLine">
+                      <View className="mb-2.5 flex-row items-center justify-between gap-2">
+                        <View className="flex-row items-center">
+                          <TrendingUp size={13} color={meta.accent} />
+                          <Text className="ml-1.5 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                            {t('vital.trend.recent')}
+                          </Text>
+                        </View>
+
+                        {activePoint && (
+                          <View
+                            style={{ borderColor: meta.accent, borderWidth: 1, backgroundColor: scheme === 'dark' ? meta.softBgDark : meta.softBg }}
+                            className="flex-row items-center gap-1.5 rounded-full px-2.5 py-0.5">
+                            <Text style={{ color: meta.accent }} className="font-mono text-[10px] font-extrabold">
+                              {formatMetricValue(metric, activePoint.sample.value)} {unitLabel}
+                            </Text>
+                            <Text className="font-mono text-[9px] text-slate-500 dark:text-trauma-nightMuted">
+                              {formatDateTimeShort(activePoint.sample.measuredAt, locale)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {metricSeries.length === 0 ? (
+                        <View className="items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 py-7 dark:bg-trauma-nightAlt dark:border-trauma-nightLine">
+                          <Activity size={16} color={colors.textSubtle} />
+                          <Text className="mt-1.5 font-mono text-[11px] text-slate-400 dark:text-trauma-nightSubtle">
+                            {t('vital.trend.noReadings', { metric: t(meta.tabKey).toLowerCase() })}
+                          </Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View
+                            style={{ height: chartGeometry.height, width: '100%' }}
+                            onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
+                            {chartGeometry.width > 0 && chartGeometry.points.length > 0 && (
+                              <Svg width={chartGeometry.width} height={chartGeometry.height}>
+                                <Defs>
+                                  <LinearGradient id={`histArea-${metric}`} x1="0" y1="0" x2="0" y2="1">
+                                    <Stop offset="0%" stopColor={meta.accent} stopOpacity="0.26" />
+                                    <Stop offset="100%" stopColor={meta.accent} stopOpacity="0.01" />
+                                  </LinearGradient>
+                                </Defs>
+
+                                {[0, 0.5, 1].map((frac, idx) => {
+                                  const y = chartGeometry.padTop + frac * chartGeometry.innerH;
+                                  const val =
+                                    chartGeometry.maxVal -
+                                    frac * (chartGeometry.maxVal - chartGeometry.minVal);
+                                  return (
+                                    <Fragment key={idx}>
+                                      <Line
+                                        x1={chartGeometry.padLeft}
+                                        y1={y}
+                                        x2={chartGeometry.width - chartGeometry.padRight}
+                                        y2={y}
+                                        stroke={scheme === 'dark' ? colors.border : '#e2e8f0'}
+                                        strokeWidth={1}
+                                        strokeDasharray="3 4"
+                                      />
+                                      <SvgText
+                                        x={chartGeometry.padLeft - 5}
+                                        y={y + 3}
+                                        textAnchor="end"
+                                        fill={colors.textSubtle}
+                                        fontSize="9">
+                                        {formatMetricValue(metric, val)}
+                                      </SvgText>
+                                    </Fragment>
+                                  );
+                                })}
+
+                                {chartGeometry.nominalMinY !== null && (
+                                  <Line
+                                    x1={chartGeometry.padLeft}
+                                    y1={chartGeometry.nominalMinY}
+                                    x2={chartGeometry.width - chartGeometry.padRight}
+                                    y2={chartGeometry.nominalMinY}
+                                    stroke="#38bdf8"
+                                    strokeWidth={1.2}
+                                    strokeDasharray="4 4"
+                                    strokeOpacity={0.75}
+                                  />
+                                )}
+
+                                {chartGeometry.nominalMaxY !== null && (
+                                  <Line
+                                    x1={chartGeometry.padLeft}
+                                    y1={chartGeometry.nominalMaxY}
+                                    x2={chartGeometry.width - chartGeometry.padRight}
+                                    y2={chartGeometry.nominalMaxY}
+                                    stroke="#38bdf8"
+                                    strokeWidth={1.2}
+                                    strokeDasharray="4 4"
+                                    strokeOpacity={0.75}
+                                  />
+                                )}
+
+                                {chartGeometry.areaPathD !== '' && (
+                                  <Path d={chartGeometry.areaPathD} fill={`url(#histArea-${metric})`} />
+                                )}
+
+                                {chartGeometry.linePathD !== '' && (
+                                  <Path
+                                    d={chartGeometry.linePathD}
+                                    fill="none"
+                                    stroke={meta.accent}
+                                    strokeWidth={2.5}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                )}
+
+                                {chartGeometry.points.map((pt, idx) => {
+                                  const isActive =
+                                    activePoint?.sample.sampleId === pt.sample.sampleId &&
+                                    activePoint?.sample.measuredAt === pt.sample.measuredAt;
+                                  return (
+                                    <Fragment key={`${pt.sample.id}-${idx}`}>
+                                      <Circle
+                                        cx={pt.x}
+                                        cy={pt.y}
+                                        r={isActive ? 4.6 : 2.3}
+                                        fill={isActive ? colors.surface : meta.accent}
+                                        stroke={meta.accent}
+                                        strokeWidth={isActive ? 2.2 : 1}
+                                      />
+                                      <Circle
+                                        cx={pt.x}
+                                        cy={pt.y}
+                                        r={12}
+                                        fill="transparent"
+                                        onPress={() => setSelectedPointIdx(idx)}
+                                      />
+                                    </Fragment>
+                                  );
+                                })}
+                              </Svg>
+                            )}
+                          </View>
+
+                          <View className="mt-1 flex-row items-center justify-between border-t border-slate-100 pt-2 dark:border-trauma-nightLine">
+                            <View className="flex-row items-center">
+                              <View
+                                style={{ backgroundColor: '#38bdf8' }}
+                                className="mr-1.5 h-1.5 w-3 rounded-full opacity-75"
+                              />
+                              <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
+                                {meta.nominalKey ? t(meta.nominalKey) : ''}
+                              </Text>
+                            </View>
+                            <Text className="font-mono text-[8.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                              {t('vital.trend.tapPoint')}
+                            </Text>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Resumen por jornada estilo Web */}
                   <View className="mt-4 pb-10">
-                    <View className="mb-2.5 flex-row items-center">
-                      <History size={13} color={colors.textMuted} />
-                      <Text className="ml-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-trauma-nightInk">
-                        {t(dailySummaries.length === 1 ? 'vital.daily.titleOne' : 'vital.daily.title', {
-                          count: dailySummaries.length,
-                        })}
+                    <View className="mb-2.5 flex-row items-center justify-between">
+                      <View className="flex-row items-center">
+                        <History size={13} color="#64748b" />
+                        <Text className="ml-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-trauma-nightInk">
+                          {t('vital.daily.summaryTitle')}
+                        </Text>
+                      </View>
+                      <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                        {dailySummaries.length}{' '}
+                        {t(dailySummaries.length === 1 ? 'vital.daily.day' : 'vital.daily.days')}
                       </Text>
                     </View>
 
                     {dailySummaries.length === 0 ? (
-                      <View className="items-center rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-[#f8fafc] dark:bg-trauma-nightAlt p-6">
+                      <View className="items-center rounded-2xl border border-slate-200/80 bg-white p-6 dark:bg-trauma-night dark:border-trauma-nightLine">
                         <Text className="font-mono text-xs text-slate-400 dark:text-trauma-nightSubtle">
                           {t('vital.daily.empty', { metric: t(meta.tabKey).toLowerCase() })}
                         </Text>
                       </View>
                     ) : (
-                      dailySummaries.map((day) => (
-                        <View
-                          key={day.dateKey}
-                          className="mb-3 rounded-2xl border border-slate-200/80 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
-                          <View className="mb-2.5 flex-row items-center justify-between border-b border-slate-100 dark:border-trauma-nightLine pb-2">
-                            <Text className="font-mono text-xs font-extrabold text-slate-800 dark:text-trauma-nightInk">
-                              {day.dateLabel}
-                            </Text>
-                            <View className="rounded-md bg-slate-100 dark:bg-trauma-nightAlt px-2 py-0.5">
-                              <Text className="font-mono text-[9px] font-bold text-slate-500 dark:text-trauma-nightMuted">
-                                {day.count}{' '}
-                                {metric === 'sleep'
-                                  ? t(day.count === 1 ? 'vital.count.record' : 'vital.count.records')
-                                  : t(day.count === 1 ? 'vital.count.reading' : 'vital.count.readings')}
-                              </Text>
+                      dailySummaries.map((day) => {
+                        const spread = day.max - day.min;
+                        const avgPct =
+                          spread <= 0
+                            ? 50
+                            : Math.min(
+                              96,
+                              Math.max(4, Math.round(((day.avg - day.min) / spread) * 100))
+                            );
+
+                        return (
+                          <View
+                            key={day.dateKey}
+                            className="mb-2.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:bg-trauma-night dark:border-trauma-nightLine">
+                            <View className="mb-2.5 flex-row items-center justify-between">
+                              <View>
+                                <Text className="font-mono text-xs font-extrabold text-slate-800 dark:text-trauma-nightInk">
+                                  {day.dateLabel}
+                                </Text>
+                                <Text className="mt-0.5 font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
+                                  {day.count}{' '}
+                                  {metric === 'sleep'
+                                    ? t(day.count === 1 ? 'vital.count.record' : 'vital.count.records')
+                                    : t(day.count === 1 ? 'vital.count.reading' : 'vital.count.readings')}
+                                </Text>
+                              </View>
+
+                              <View
+                                style={{ backgroundColor: scheme === 'dark' ? meta.softBgDark : meta.softBg }}
+                                className="rounded-full px-2.5 py-1">
+                                <Text
+                                  style={{ color: meta.accent }}
+                                  className="font-mono text-[10px] font-extrabold">
+                                  {t('vital.daily.avgShort', { value: formatMetricValue(metric, day.avg), unit: unitLabel })}
+                                </Text>
+                              </View>
                             </View>
+
+                            {metric === 'sleep' ? (
+                              <View className="flex-row items-center justify-between rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2.5 dark:bg-violet-950 dark:border-violet-900">
+                                <Text className="font-mono text-xs font-bold text-violet-800 dark:text-violet-200">
+                                  {t('vital.sleep.restRecorded')}
+                                </Text>
+                                <Text className="font-mono text-base font-extrabold text-violet-800 dark:text-violet-200">
+                                  {formatMetricValue(metric, day.max)} h
+                                </Text>
+                              </View>
+                            ) : (
+                              <View>
+                                <View className="mb-1.5 flex-row items-center justify-between">
+                                  <Text className="font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted">
+                                    {t('vital.daily.min')}{' '}
+                                    <Text className="font-bold text-slate-800 dark:text-trauma-nightInk">
+                                      {formatMetricValue(metric, day.min)}
+                                    </Text>{' '}
+                                    ({day.minTime})
+                                  </Text>
+                                  <Text className="font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted">
+                                    {t('vital.daily.max')}{' '}
+                                    <Text className="font-bold text-slate-800 dark:text-trauma-nightInk">
+                                      {formatMetricValue(metric, day.max)}
+                                    </Text>{' '}
+                                    ({day.maxTime})
+                                  </Text>
+                                </View>
+
+                                <View className="relative h-2 w-full justify-center rounded-full bg-slate-100 dark:bg-trauma-nightAlt">
+                                  <View
+                                    style={{
+                                      position: 'absolute',
+                                      left: 0,
+                                      right: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      borderRadius: 999,
+                                      backgroundColor: meta.accent,
+                                      opacity: 0.25,
+                                    }}
+                                  />
+                                  <View
+                                    style={{
+                                      position: 'absolute',
+                                      left: `${avgPct}%`,
+                                      marginLeft: -5.5,
+                                      width: 11,
+                                      height: 11,
+                                      borderRadius: 999,
+                                      backgroundColor: colors.surface,
+                                      borderWidth: 2.5,
+                                      borderColor: meta.accent,
+                                      shadowColor: '#0f172a',
+                                      shadowOffset: { width: 0, height: 1 },
+                                      shadowOpacity: 0.2,
+                                      shadowRadius: 2,
+                                      elevation: 2,
+                                    }}
+                                  />
+                                </View>
+                              </View>
+                            )}
                           </View>
-
-                          {metric === 'sleep' ? (
-                            <View className="flex-row items-center justify-between rounded-xl border border-violet-100 dark:border-violet-900 bg-violet-50/60 dark:bg-violet-950/60 p-3">
-                              <View className="flex-row items-center">
-                                <Moon size={16} color="#7c3aed" />
-                                <Text className="ml-2 font-mono text-xs font-bold text-violet-800 dark:text-violet-200">
-                                  {t('vital.sleep.totalDuration')}
-                                </Text>
-                              </View>
-                              <Text className="font-mono text-lg font-extrabold text-violet-800 dark:text-violet-200">
-                                {formatMetricValue(metric, day.max)} h
-                              </Text>
-                            </View>
-                          ) : (
-                            <View className="flex-row gap-2">
-                              <View className="flex-1 rounded-xl border border-red-100 dark:border-red-900 bg-red-50/40 dark:bg-red-950/40 p-2.5">
-                                <View className="flex-row items-center">
-                                  <ArrowUpRight size={12} color={colors.danger} />
-                                  <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-red-600 dark:text-red-300">
-                                    {t('vital.peak.high')}
-                                  </Text>
-                                </View>
-                                <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900 dark:text-trauma-nightInk">
-                                  {formatMetricValue(metric, day.max)} <Text className="text-[9px] font-normal text-slate-500 dark:text-trauma-nightMuted">{unitLabel}</Text>
-                                </Text>
-                                <View className="mt-1 flex-row items-center">
-                                  <Clock size={10} color={colors.textMuted} />
-                                  <Text className="ml-1 font-mono text-[9px] text-slate-500 dark:text-trauma-nightMuted">
-                                    {day.maxTime}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View className="flex-1 items-center justify-center rounded-xl border border-sky-100 dark:border-sky-900 bg-sky-50/50 dark:bg-sky-950/50 p-2.5">
-                                <Text className="font-mono text-[8.5px] font-bold uppercase text-sky-700 dark:text-sky-300">
-                                  {t('vital.stat.average')}
-                                </Text>
-                                <Text className="mt-1 font-mono text-base font-extrabold text-sky-700 dark:text-sky-300">
-                                  {formatMetricValue(metric, day.avg)}
-                                </Text>
-                                <Text className="mt-0.5 font-mono text-[8.5px] text-slate-500 dark:text-trauma-nightMuted">
-                                  {t('vital.avg.ofDay', { unit: unitLabel })}
-                                </Text>
-                              </View>
-
-                              <View className="flex-1 rounded-xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/40 p-2.5">
-                                <View className="flex-row items-center">
-                                  <ArrowDownRight size={12} color={colors.success} />
-                                  <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-emerald-700 dark:text-emerald-300">
-                                    {t('vital.peak.low')}
-                                  </Text>
-                                </View>
-                                <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900 dark:text-trauma-nightInk">
-                                  {formatMetricValue(metric, day.min)} <Text className="text-[9px] font-normal text-slate-500 dark:text-trauma-nightMuted">{unitLabel}</Text>
-                                </Text>
-                                <View className="mt-1 flex-row items-center">
-                                  <Clock size={10} color={colors.textMuted} />
-                                  <Text className="ml-1 font-mono text-[9px] text-slate-500 dark:text-trauma-nightMuted">
-                                    {day.minTime}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          )}
-                        </View>
-                      ))
+                        );
+                      })
                     )}
                   </View>
                 </>
               )}
             </ScrollView>
           </View>
-        </Pressable>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -802,269 +1371,63 @@ function getSleepShortDayLabel(day: DailySummary, t: TFn): string {
   return m && d ? `${Number(d)}/${Number(m)}` : day.dateLabel;
 }
 
-function getSleepMeta(
-  hours: number | null,
-  t: TFn,
-  locale: Locale,
-  colors: Palette,
-  scheme: 'light' | 'dark'
-) {
-  const dark = scheme === 'dark';
-  const missing = (h: number) =>
-    t('vital.sleep.missing', {
-      hours: formatNumber(7 - h, locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-    });
-
-  if (hours === null) {
-    return {
-      label: t('vital.sleep.noReading'),
-      color: colors.textMuted,
-      bg: colors.surfaceAlt,
-      border: colors.border,
-      summary: t('vital.sleep.waiting'),
-      pointerPct: 0,
-    };
-  }
-
-  let pointerPct: number;
-  if (hours < 5.5) {
-    const ratio = Math.max(0, Math.min(1, (hours - 2) / 3.5));
-    pointerPct = 4 + ratio * 28;
-    return {
-      label: t('vital.sleep.deficit'),
-      color: colors.danger,
-      bg: colors.dangerSoft,
-      border: dark ? '#5b1c22' : '#fecaca',
-      summary: missing(hours),
-      pointerPct,
-    };
-  }
-
-  if (hours < 7) {
-    const ratio = (hours - 5.5) / 1.5;
-    pointerPct = 38 + ratio * 20;
-    return {
-      label: t('vital.sleep.watch'),
-      color: colors.warning,
-      bg: colors.warningSoft,
-      border: dark ? '#5c430f' : '#fde68a',
-      summary: missing(hours),
-      pointerPct,
-    };
-  }
-
-  const ratio = Math.max(0, Math.min(1, (hours - 7) / 3));
-  pointerPct = 64 + ratio * 31;
-  return {
-    label: t('vital.sleep.optimal'),
-    color: colors.success,
-    bg: colors.successSoft,
-    border: dark ? '#0f4a36' : '#a7f3d0',
-    summary: hours > 9 ? t('vital.sleep.extended') : t('vital.sleep.inGoal'),
-    pointerPct,
-  };
-}
-
 function SleepSummaryCard({
   sleepHours,
-  sleepHistory,
   onPress,
 }: {
   sleepHours: number | null;
-  sleepHistory: DashboardSample[];
   onPress: () => void;
 }) {
-  const { t, locale } = useI18n();
-  const { colors, scheme } = useAppTheme();
-  const meta = getSleepMeta(sleepHours, t, locale, colors, scheme);
-
-  const recentInfo = useMemo(() => {
-    const days = groupSamplesByDay(sleepHistory, locale, t);
-    if (days.length === 0) return { days: [] as DailySummary[], avg: null as number | null };
-    const latestFive = days.slice(0, 5).reverse();
-    const sum = latestFive.reduce((acc, d) => acc + d.max, 0);
-    const avg = Math.round((sum / latestFive.length) * 10) / 10;
-    return { days: latestFive, avg };
-  }, [sleepHistory, locale, t]);
+  const { t } = useI18n();
+  const { colors } = useAppTheme();
+  const progressPct =
+    sleepHours !== null ? Math.max(0, Math.min(100, Math.round((sleepHours / 7) * 100))) : 0;
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityLabel={t('vital.sleep.a11yHistory')}
-      className="mb-4 rounded-2xl border border-violet-200/80 dark:border-violet-900 bg-white dark:bg-trauma-night p-4 shadow-md active:opacity-90">
-      {/* Cabecera de sueño con estado clínico */}
+      className="mb-4 rounded-2xl border border-trauma-line bg-white p-4 shadow-md active:opacity-85 dark:bg-trauma-night dark:border-trauma-nightLine">
+      {/* Cabecera simple: nombre y > */}
       <View className="flex-row items-center justify-between">
-        <View className="flex-1 flex-row items-center pr-2">
-          <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl border border-violet-100 dark:border-violet-900 bg-violet-50 dark:bg-violet-950">
-            <Moon size={19} color="#7c3aed" />
-          </View>
-          <View className="flex-1">
-            <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
-              {t('vital.sleep.title')}
-            </Text>
-            <Text className="mt-0.5 font-mono text-[9px] text-slate-500 dark:text-trauma-nightMuted">
-              {t('vital.sleep.circadian')}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={{
-            backgroundColor: meta.bg,
-            borderColor: meta.border,
-            borderWidth: 1,
-          }}
-          className="flex-row items-center rounded-full px-2.5 py-1">
-          <View
-            style={{ backgroundColor: meta.color }}
-            className="mr-1.5 h-1.5 w-1.5 rounded-full"
-          />
-          <Text style={{ color: meta.color }} className="font-mono text-[9.5px] font-bold">
-            {meta.label}
-          </Text>
-        </View>
+        <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
+          {t('vital.sleep.cardTitle')}
+        </Text>
+        <ChevronRight size={14} color={colors.textSubtle} />
       </View>
 
-      {/* Lectura principal y promedio reciente */}
-      <View className="mt-3 flex-row items-end justify-between">
+      {/* Horas dormidas anoche */}
+      <View className="mt-2.5 flex-row items-end justify-between gap-2">
         <View>
           <View className="flex-row items-baseline">
             <Text className="font-mono text-3xl font-extrabold text-trauma-ink dark:text-trauma-nightInk">
               {sleepHours !== null ? sleepHours.toFixed(1) : '--'}
             </Text>
-            <Text className="ml-1 font-mono text-xs font-bold text-violet-700 dark:text-violet-300">h</Text>
+            <Text className="ml-1 font-mono text-xs font-bold text-trauma-muted dark:text-trauma-nightMuted">h</Text>
             {sleepHours !== null && (
-              <View className="ml-2 rounded-md bg-violet-50 dark:bg-violet-950 px-1.5 py-0.5">
-                <Text className="font-mono text-[9.5px] font-bold text-violet-700 dark:text-violet-300">
-                  {formatSleepDuration(sleepHours)}
-                </Text>
-              </View>
+              <Text className="ml-2 font-mono text-[10px] font-semibold text-slate-500 dark:text-trauma-nightMuted">
+                ({formatSleepDuration(sleepHours)})
+              </Text>
             )}
           </View>
-          <Text className="mt-0.5 font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted">{meta.summary}</Text>
+          <Text className="mt-0.5 font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
+            {sleepHours !== null ? t('vital.sleep.slept') : t('vital.sleep.noRecorded')}
+          </Text>
         </View>
 
-        {recentInfo.avg !== null && (
-          <View className="items-end rounded-xl border border-violet-100 dark:border-violet-900 bg-violet-50/70 dark:bg-violet-950/70 px-2.5 py-1.5">
-            <Text className="font-mono text-[8.5px] font-bold uppercase text-violet-600 dark:text-violet-300">
-              {t('vital.sleep.avgShort', { count: recentInfo.days.length })}
-            </Text>
-            <Text className="font-mono text-xs font-extrabold text-violet-800 dark:text-violet-200">
-              {recentInfo.avg.toFixed(1)} h
-            </Text>
-          </View>
+        {sleepHours !== null && (
+          <Text className="font-mono text-[9.5px] font-bold text-sky-600 dark:text-sky-300">
+            {t('vital.sleep.progress', { pct: progressPct })}
+          </Text>
         )}
       </View>
 
-      {/* Escala clínica de sueño (Déficit / Vigilar / Óptimo) */}
-      <View className="mt-3">
-        <View className="relative h-2 flex-row items-center gap-1">
-          <View
-            style={{
-              flex: 35,
-              height: 6,
-              borderRadius: 999,
-              backgroundColor: '#ef4444',
-              opacity: sleepHours !== null && sleepHours < 5.5 ? 1 : 0.24,
-            }}
-          />
-          <View
-            style={{
-              flex: 25,
-              height: 6,
-              borderRadius: 999,
-              backgroundColor: '#f59e0b',
-              opacity: sleepHours !== null && sleepHours >= 5.5 && sleepHours < 7 ? 1 : 0.24,
-            }}
-          />
-          <View
-            style={{
-              flex: 40,
-              height: 6,
-              borderRadius: 999,
-              backgroundColor: '#10b981',
-              opacity: sleepHours !== null && sleepHours >= 7 ? 1 : 0.24,
-            }}
-          />
-          {sleepHours !== null && (
-            <View
-              style={{
-                position: 'absolute',
-                left: `${Math.max(4, Math.min(96, meta.pointerPct))}%`,
-                top: -2,
-                marginLeft: -6,
-                width: 12,
-                height: 12,
-                borderRadius: 999,
-                backgroundColor: meta.color,
-                borderWidth: 2,
-                borderColor: colors.surface,
-                shadowColor: colors.shadow,
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.25,
-                shadowRadius: 2,
-                elevation: 3,
-              }}
-            />
-          )}
-        </View>
-        <View className="mt-1.5 flex-row justify-between">
-          <Text className="font-mono text-[8.5px] font-semibold text-rose-600 dark:text-rose-300">&lt;5.5 h</Text>
-          <Text className="font-mono text-[8.5px] font-semibold text-amber-600 dark:text-amber-300">5.5–6.9 h</Text>
-          <Text className="font-mono text-[8.5px] font-semibold text-emerald-700 dark:text-emerald-300">
-            {t('vital.sleep.scaleOptimal')}
-          </Text>
-        </View>
-      </View>
-
-      {/* Mini comparativa de últimas noches */}
-      {recentInfo.days.length > 0 && (
-        <View className="mt-3 rounded-xl border border-slate-100 dark:border-trauma-nightLine bg-slate-50/80 dark:bg-trauma-nightAlt px-2.5 py-2">
-          <View className="mb-1.5 flex-row items-center justify-between">
-            <Text className="font-mono text-[8.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
-              {t('vital.sleep.lastNights')}
-            </Text>
-            <Text className="font-mono text-[8.5px] font-semibold text-violet-600 dark:text-violet-300">
-              {recentInfo.days.length}{' '}
-              {t(recentInfo.days.length === 1 ? 'vital.count.record' : 'vital.count.records')}
-            </Text>
-          </View>
-          <View className="flex-row items-end justify-between gap-2">
-            {recentInfo.days.map((day) => {
-              const barPct = Math.max(18, Math.min(100, Math.round((day.max / 10) * 100)));
-              const barColor =
-                day.max < 5.5 ? '#ef4444' : day.max < 7 ? '#f59e0b' : '#7c3aed';
-              return (
-                <View key={day.dateKey} className="flex-1 items-center">
-                  <Text className="mb-1 font-mono text-[8.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
-                    {day.max.toFixed(1)}h
-                  </Text>
-                  <View className="h-9 w-full max-w-[22px] justify-end overflow-hidden rounded-md bg-slate-200/70 dark:bg-trauma-nightLine">
-                    <View
-                      style={{
-                        height: `${barPct}%`,
-                        backgroundColor: barColor,
-                        borderTopLeftRadius: 4,
-                        borderTopRightRadius: 4,
-                      }}
-                    />
-                  </View>
-                  <Text className="mt-1 font-mono text-[8px] text-slate-400 dark:text-trauma-nightSubtle">
-                    {getSleepShortDayLabel(day, t)}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
-      {/* Acción al historial */}
-      <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 dark:border-trauma-nightLine pt-2">
-        <Text className="font-mono text-[9px] font-bold text-violet-700 dark:text-violet-300">
-          {t('vital.sleep.tapHistory')}
-        </Text>
-        <ChevronRight size={12} color="#7c3aed" />
+      {/* Barra de progreso con el mismo azul cian que las demás tarjetas */}
+      <View className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-trauma-nightLine">
+        <View
+          className="h-full rounded-full bg-trauma-cyan"
+          style={{ width: `${progressPct}%` }}
+        />
       </View>
     </Pressable>
   );
@@ -1092,7 +1455,6 @@ function MetricCard({
   unit?: string;
   onPress?: () => void;
 }) {
-  const { t } = useI18n();
   const { colors } = useAppTheme();
   return (
     <Pressable
@@ -1112,9 +1474,6 @@ function MetricCard({
           style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
         />
       </View>
-      <Text className="mt-2 font-mono text-[8.5px] font-bold text-sky-600 dark:text-sky-300">
-        {t('vital.metric.viewHistory')}
-      </Text>
     </Pressable>
   );
 }
@@ -1278,13 +1637,6 @@ export function VitalMonitorView() {
 
         {/* Gráfico animado de ECG coherente con el LPM actual */}
         <RealtimeEcgChart bpm={vitals.heartRate} isAvailable={vitals.isAvailable} />
-
-        <View className="mt-1 flex-row items-center justify-between border-t border-slate-100 dark:border-trauma-nightLine pt-2">
-          <Text className="font-mono text-[9px] text-sky-600 dark:text-sky-300 font-bold">
-            {t('vital.pulse.tapHere')}
-          </Text>
-          <ChevronRight size={12} color={colors.accentDeep} />
-        </View>
       </Pressable>
 
       {/* Métricas secundarias: Oxígeno (SpO2) y Estrés */}
@@ -1309,7 +1661,6 @@ export function VitalMonitorView() {
 
       <SleepSummaryCard
         sleepHours={vitals.sleepHours}
-        sleepHistory={vitals.sleepHistory}
         onPress={() => handleOpenMetricHistory('sleep')}
       />
 

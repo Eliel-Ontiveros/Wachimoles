@@ -5,6 +5,9 @@ import { DashboardDataController } from "./dashboard-data.controller";
 import { BodyConditionsController } from "./body-conditions.controller";
 import { BodyConditionImagesController } from "./body-condition-images.controller";
 import { DailyHealthChecksController } from "./daily-health-checks.controller";
+import { MissionsController } from "./missions.controller";
+import { AstronautMissionController } from "./astronaut-mission.controller";
+import { AstronautLocationController } from "./astronaut-location.controller";
 import { DashboardWebGuard } from "./dashboard-web.guard";
 import { SupabaseService } from "./supabase.service";
 
@@ -14,7 +17,10 @@ import { SupabaseService } from "./supabase.service";
     DashboardDataController,
     BodyConditionsController,
     BodyConditionImagesController,
-    DailyHealthChecksController
+    DailyHealthChecksController,
+    MissionsController,
+    AstronautMissionController,
+    AstronautLocationController
   ],
   providers: [DashboardTokenGuard, DashboardWebGuard, SupabaseService]
 })

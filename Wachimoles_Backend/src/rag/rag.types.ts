@@ -7,6 +7,16 @@ export interface RagSource {
   retrievedAt: string;
   contentHash: string;
   wordCount: number;
+  // JSON imports widen string literals; the ingestion script validates this value.
+  contentKind?: string;
+  authors?: string;
+  year?: number;
+  identifier?: string;
+  evidenceContext?: string;
+  sourceSections?: string;
+  sourceLicense?: string;
+  reviewedAt?: string;
+  reviewStatus?: string;
 }
 
 export interface RagChunk {

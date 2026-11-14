@@ -35,6 +35,7 @@ const missions: Record<keyof typeof es, string> = {
   'missions.loc.luna.short': 'Moon',
   'missions.loc.marte.label': 'Martian Surface',
   'missions.loc.marte.short': 'Mars',
+  'missions.mission.fallback.title': 'Daily mission',
   'missions.unit.min': 'min',
   'missions.unit.pasos': 'steps',
   'missions.unit.check': 'check',

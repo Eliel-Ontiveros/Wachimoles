@@ -62,8 +62,11 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
     if (bpm >= 115 || bpm < 48) {
       return { label: 'Pulso crítico', color: '#ef4444', stroke: '#ef4444' };
     }
-    if (bpm >= 100 || bpm < 55) {
+    if (bpm >= 100) {
       return { label: 'Pulso elevado', color: '#f59e0b', stroke: '#f59e0b' };
+    }
+    if (bpm < 55) {
+      return { label: 'Pulso bajo', color: '#f59e0b', stroke: '#f59e0b' };
     }
     return { label: 'Pulso en vivo', color: '#0284c7', stroke: '#0284c7' };
   }, [bpm, isAvailable]);

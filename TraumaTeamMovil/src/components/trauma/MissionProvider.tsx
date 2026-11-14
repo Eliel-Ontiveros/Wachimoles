@@ -17,10 +17,16 @@ import {
   syncEnvironmentToBackend,
   syncHealthCheckToBackend,
   uploadBodyConditionImageToBackend,
+  fetchDailyMissionsFromBackend,
+  localizeMission,
+  markEarlyArrivalInBackend,
+  syncAstronautMissionStateToBackend,
+  fetchAstronautLocationFromBackend,
 } from '../../services/mission-api';
 import {
   CriticalAlert,
   DailyHealthCheck,
+  DailyMission,
   EnvironmentType,
   InjuryPhoto,
   MissionSetup,
@@ -78,6 +84,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
   const [missionDay, setMissionDay] = useState<number>(0);
   const [treadmillRoutineActive, setTreadmillRoutineActive] = useState<boolean>(false);
   const [completedOverrides, setCompletedOverrides] = useState<Record<string, boolean>>({});
+  const [backendDailyMissions, setBackendDailyMissions] = useState<DailyMission[] | null>(null);
 
   const [storedAlerts, setAlerts] = useState<StoredAlert[]>([]);
   const [activeStoredToaster, setActiveToasterAlert] = useState<StoredAlert | null>(null);
@@ -123,6 +130,21 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           translate(localeRef.current, 'missions.healthLoad.msg')
         );
       });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Carga la ubicación actual guardada en backend/base de datos (independiente de misión)
+  useEffect(() => {
+    let isMounted = true;
+    void fetchAstronautLocationFromBackend()
+      .then((loc) => {
+        if (!isMounted || !loc) return;
+        setEnvironmentState(loc.entorno);
+      })
+      .catch(() => {});
 
     return () => {
       isMounted = false;
@@ -222,6 +244,20 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     setEnvironmentState(calc.calculatedEnvironment);
     setMissionSetupOpen(false);
     void syncEnvironmentToBackend(calc.calculatedEnvironment);
+    void syncAstronautMissionStateToBackend({
+      origen: setup.origin,
+      destino: setup.destination,
+      fechaSalida: setup.departureDate,
+      fechaLlegadaEstimada: calc.effectiveArrivalDate,
+      diasTotales: calc.totalDays,
+      diaActual: calc.missionDay,
+      porcentajeProgresoRelativo: Math.min(
+        100,
+        Math.round((calc.missionDay / Math.max(0.01, calc.totalDays)) * 100)
+      ),
+      entornoActual: calc.calculatedEnvironment,
+      estado: calc.arrived ? 'arrived' : calc.missionDay === 0 ? 'scheduled' : 'in_transit',
+    });
   }, []);
 
   // Al cambiar manualmente la ubicación a Estación EEI, Base Lunar o Marte, se adelanta la misión a su llegada
@@ -298,6 +334,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     setEnvironmentState(nextEnv);
     setMissionSetupOpen(false);
     void syncEnvironmentToBackend(nextEnv);
+    void markEarlyArrivalInBackend();
   }, [origin, destination]);
 
   // Extiende la fecha de llegada en caso de atraso de la misión
@@ -345,21 +382,67 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     [doDailyCheckIn, toggleTreadmillRoutine]
   );
 
-  const missions = useMemo(() => {
-    return getMissionsForEnvironment(
+  // Consulta misiones rotativas y aleatorias con dificultad desde el backend
+  useEffect(() => {
+    let isMounted = true;
+    void fetchDailyMissionsFromBackend(
       environment,
       vitals.steps,
       checkedInToday,
-      treadmillRoutineActive,
-      locale
-    ).map((m) => {
+      treadmillRoutineActive
+    ).then((retrieved) => {
+      if (isMounted && retrieved.length > 0) {
+        setBackendDailyMissions(retrieved);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [environment]);
+
+  const missions = useMemo(() => {
+    const baseMissions =
+      backendDailyMissions && backendDailyMissions.length > 0
+        ? backendDailyMissions.map((raw) => {
+            const m = localizeMission(raw, locale, environment, treadmillRoutineActive);
+            let currentValue = m.currentValue;
+            let completed = m.completed;
+            if (m.category === 'checkin') {
+              currentValue = checkedInToday ? 1 : 0;
+              completed = checkedInToday;
+            } else if (m.category === 'steps') {
+              currentValue = vitals.steps;
+              completed = vitals.steps >= m.targetValue;
+            } else if (m.category === 'treadmill') {
+              currentValue = treadmillRoutineActive ? vitals.steps : 0;
+              completed = treadmillRoutineActive && vitals.steps >= m.targetValue;
+            }
+            return { ...m, currentValue, completed };
+          })
+        : getMissionsForEnvironment(
+            environment,
+            vitals.steps,
+            checkedInToday,
+            treadmillRoutineActive,
+            locale
+          );
+
+    return baseMissions.map((m) => {
       if (m.category === 'exercise' && completedOverrides[m.id] !== undefined) {
         const done = completedOverrides[m.id];
         return { ...m, completed: done, currentValue: done ? m.targetValue : 0 };
       }
       return m;
     });
-  }, [environment, vitals.steps, checkedInToday, treadmillRoutineActive, completedOverrides, locale]);
+  }, [
+    backendDailyMissions,
+    environment,
+    vitals.steps,
+    checkedInToday,
+    treadmillRoutineActive,
+    completedOverrides,
+    locale,
+  ]);
 
   const submitHealthCheck = useCallback(
     (checkData: Omit<DailyHealthCheck, 'id' | 'dateIso' | 'recordedAt'>): DailyHealthCheck => {

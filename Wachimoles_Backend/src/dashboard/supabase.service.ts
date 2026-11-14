@@ -22,10 +22,27 @@ import {
   MoodScore,
   SamplesQuery,
   SampleMetric,
-  UploadedBodyConditionImage
+  UploadedBodyConditionImage,
+  CategoriaMision,
+  DificultadMision,
+  EntornoMision,
+  UbicacionEspacial,
+  EstadoMision,
+  MisionCatalogo,
+  MisionDiariaRotada,
+  EstadoMisionAstronauta,
+  UbicacionEntorno,
+  UbicacionAstronauta,
+  SupabaseAstronautLocationRow
 } from "./dashboard.types";
 import { SaveDailyHealthCheckDto } from "./daily-health-checks.dto";
 import { SaveBodyConditionDto } from "./body-conditions.dto";
+import { ConsultarMisionesQueryDto } from "./missions.dto";
+import {
+  GuardarEstadoMisionDto,
+  LlegadaAnticipadaDto,
+  GuardarUbicacionAstronautaDto
+} from "./astronaut-mission.dto";
 
 interface SupabaseSampleRow {
   id: number;
@@ -257,6 +274,767 @@ function mapDailyHealthCheck(
     updatedAt: row.updated_at
   };
 }
+
+interface SupabaseMissionRow {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  categoria: CategoriaMision;
+  valor_objetivo: number;
+  unidad: string;
+  entorno: EntornoMision;
+  dificultad: DificultadMision;
+  activa: boolean;
+  creado_en?: string;
+}
+
+interface SupabaseAstronautMissionStateRow {
+  id: string;
+  user_id: string;
+  origen: UbicacionEspacial;
+  destino: UbicacionEspacial;
+  fecha_salida: string;
+  fecha_llegada_estimada: string;
+  fecha_llegada_real: string | null;
+  dias_totales: number | string;
+  dia_actual: number | string;
+  porcentaje_progreso_relativo: number | string;
+  entorno_actual: "tierra" | "nave" | "estacion" | "luna" | "marte";
+  estado: EstadoMision;
+  llegada_anticipada: boolean;
+  creado_en?: string;
+  actualizado_en?: string;
+}
+
+function mapMission(row: SupabaseMissionRow): MisionCatalogo {
+  const target = Number(row.valor_objetivo);
+  return {
+    id: row.id,
+    titulo: row.titulo,
+    descripcion: row.descripcion,
+    categoria: row.categoria,
+    valorObjetivo: target,
+    unidad: row.unidad,
+    entorno: row.entorno,
+    dificultad: row.dificultad,
+    activa: row.activa,
+    creadoEn: row.creado_en ?? new Date().toISOString(),
+    title: row.titulo,
+    description: row.descripcion,
+    category: row.categoria,
+    targetValue: target,
+    unit: row.unidad,
+    environment: row.entorno,
+    difficulty: row.dificultad
+  };
+}
+
+function mapAstronautMissionState(
+  row: SupabaseAstronautMissionStateRow
+): EstadoMisionAstronauta {
+  const diasTotales = Number(row.dias_totales);
+  const diaActual = Number(row.dia_actual);
+  const porcentajeProgresoRelativo = Number(row.porcentaje_progreso_relativo);
+  const fechaSalida = row.fecha_salida;
+  const fechaLlegadaEstimada = row.fecha_llegada_estimada;
+  const fechaLlegadaReal = row.fecha_llegada_real;
+  const origen = row.origen;
+  const destino = row.destino;
+  const entornoActual = row.entorno_actual;
+  const estado = row.estado;
+  const llegadaAnticipada = Boolean(row.llegada_anticipada);
+  const ahoraIso = new Date().toISOString();
+  const creadoEn = row.creado_en ?? ahoraIso;
+  const actualizadoEn = row.actualizado_en ?? ahoraIso;
+
+  return {
+    id: row.id,
+    usuarioId: row.user_id,
+    origen,
+    destino,
+    fechaSalida,
+    fechaLlegadaEstimada,
+    fechaLlegadaReal,
+    diasTotales,
+    diaActual,
+    porcentajeProgresoRelativo,
+    entornoActual,
+    estado,
+    llegadaAnticipada,
+    creadoEn,
+    actualizadoEn,
+    origin: origen,
+    destination: destino,
+    departureDate: fechaSalida,
+    estimatedArrivalDate: fechaLlegadaEstimada,
+    actualArrivalDate: fechaLlegadaReal,
+    totalDays: diasTotales,
+    currentDay: diaActual,
+    relativeProgressPct: porcentajeProgresoRelativo,
+    currentEnvironment: entornoActual,
+    status: estado,
+    arrivedEarly: llegadaAnticipada
+  };
+}
+
+const CONFIG_ENTORNOS: Record<
+  UbicacionEntorno,
+  { etiqueta: string; gravedadEtiqueta: string }
+> = {
+  nave: {
+    etiqueta: "En la Nave (Órbita)",
+    gravedadEtiqueta: "0g Microgravedad"
+  },
+  estacion: {
+    etiqueta: "Estación Espacial (EEI)",
+    gravedadEtiqueta: "0g Microgravedad"
+  },
+  luna: {
+    etiqueta: "Base Lunar",
+    gravedadEtiqueta: "0.16g Gravedad Lunar"
+  },
+  marte: {
+    etiqueta: "Superficie de Marte",
+    gravedadEtiqueta: "0.38g Gravedad Marciana"
+  },
+  tierra: {
+    etiqueta: "En la Tierra (Base)",
+    gravedadEtiqueta: "1.0g Gravedad Terrestre"
+  }
+};
+
+function mapAstronautLocation(
+  row: SupabaseAstronautLocationRow
+): UbicacionAstronauta {
+  const entorno = (row.entorno || "tierra") as UbicacionEntorno;
+  const config = CONFIG_ENTORNOS[entorno] ?? CONFIG_ENTORNOS.tierra;
+  const ahoraIso = new Date().toISOString();
+  const actualizadoEn = row.actualizado_en ?? ahoraIso;
+
+  return {
+    usuarioId: row.user_id,
+    entorno,
+    etiqueta: config.etiqueta,
+    gravedadEtiqueta: config.gravedadEtiqueta,
+    actualizadoEn,
+    userId: row.user_id,
+    environment: entorno,
+    label: config.etiqueta,
+    gravityLabel: config.gravedadEtiqueta,
+    updatedAt: actualizadoEn
+  };
+}
+
+const MISIONES_SEMILLA_POR_DEFECTO: MisionCatalogo[] = [
+  {
+    id: "checkin-diario",
+    titulo: "Check-in médico diario",
+    descripcion: "Confirmar estado general, signos y cuestionario para mantener la racha de salud.",
+    categoria: "checkin",
+    valorObjetivo: 1,
+    unidad: "check",
+    entorno: "all",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Check-in médico diario",
+    description: "Confirmar estado general, signos y cuestionario para mantener la racha de salud.",
+    category: "checkin",
+    targetValue: 1,
+    unit: "check",
+    environment: "all",
+    difficulty: "baja"
+  },
+  {
+    id: "control-lesiones",
+    titulo: "Inspección fotográfica de zonas de dolor",
+    descripcion: "Tomar registro visual de inflamación muscular o piel.",
+    categoria: "injury_check",
+    valorObjetivo: 1,
+    unidad: "check",
+    entorno: "all",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Inspección fotográfica de zonas de dolor",
+    description: "Tomar registro visual de inflamación muscular o piel.",
+    category: "injury_check",
+    targetValue: 1,
+    unit: "check",
+    environment: "all",
+    difficulty: "media"
+  },
+  {
+    id: "tierra-pasos-baja",
+    titulo: "Caminata ligera de acondicionamiento",
+    descripcion: "Día suave: marcha regenerativa y reactivación cardiovascular básica.",
+    categoria: "steps",
+    valorObjetivo: 3500,
+    unidad: "pasos",
+    entorno: "tierra",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Caminata ligera de acondicionamiento",
+    description: "Día suave: marcha regenerativa y reactivación cardiovascular básica.",
+    category: "steps",
+    targetValue: 3500,
+    unit: "pasos",
+    environment: "tierra",
+    difficulty: "baja"
+  },
+  {
+    id: "tierra-pasos-media",
+    titulo: "Meta estándar de pasos en base",
+    descripcion: "Día moderado: mantenimiento de tono muscular y circulación bajo gravedad terrestre.",
+    categoria: "steps",
+    valorObjetivo: 7000,
+    unidad: "pasos",
+    entorno: "tierra",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Meta estándar de pasos en base",
+    description: "Día moderado: mantenimiento de tono muscular y circulación bajo gravedad terrestre.",
+    category: "steps",
+    targetValue: 7000,
+    unit: "pasos",
+    environment: "tierra",
+    difficulty: "media"
+  },
+  {
+    id: "tierra-pasos-alta",
+    titulo: "Marcha de alta resistencia terrestre",
+    descripcion: "Día intenso: preparación física de alta demanda y capacidad pulmonar.",
+    categoria: "steps",
+    valorObjetivo: 11000,
+    unidad: "pasos",
+    entorno: "tierra",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Marcha de alta resistencia terrestre",
+    description: "Día intenso: preparación física de alta demanda y capacidad pulmonar.",
+    category: "steps",
+    targetValue: 11000,
+    unit: "pasos",
+    environment: "tierra",
+    difficulty: "alta"
+  },
+  {
+    id: "tierra-core-baja",
+    titulo: "Movilidad articular y estiramiento core",
+    descripcion: "Rutina suave para descargar columna y flexibilidad.",
+    categoria: "exercise",
+    valorObjetivo: 15,
+    unidad: "min",
+    entorno: "tierra",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Movilidad articular y estiramiento core",
+    description: "Rutina suave para descargar columna y flexibilidad.",
+    category: "exercise",
+    targetValue: 15,
+    unit: "min",
+    environment: "tierra",
+    difficulty: "baja"
+  },
+  {
+    id: "tierra-cardio-media",
+    titulo: "Acondicionamiento aeróbico 1g",
+    descripcion: "Entrenamiento cardiovascular moderado para resistencia muscular.",
+    categoria: "exercise",
+    valorObjetivo: 30,
+    unidad: "min",
+    entorno: "tierra",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Acondicionamiento aeróbico 1g",
+    description: "Entrenamiento cardiovascular moderado para resistencia muscular.",
+    category: "exercise",
+    targetValue: 30,
+    unit: "min",
+    environment: "tierra",
+    difficulty: "media"
+  },
+  {
+    id: "tierra-fuerza-alta",
+    titulo: "Entrenamiento de fuerza y carga máxima",
+    descripcion: "Sesión exigente de fuerza funcional para readaptación motora.",
+    categoria: "exercise",
+    valorObjetivo: 45,
+    unidad: "min",
+    entorno: "tierra",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Entrenamiento de fuerza y carga máxima",
+    description: "Sesión exigente de fuerza funcional para readaptación motora.",
+    category: "exercise",
+    targetValue: 45,
+    unit: "min",
+    environment: "tierra",
+    difficulty: "alta"
+  },
+  {
+    id: "nave-treadmill-baja",
+    titulo: "Caminadora T2 en 0g: marcha suave",
+    descripcion: "Día suave: sesión ligera con sujeción elástica para prevenir trombosis.",
+    categoria: "treadmill",
+    valorObjetivo: 2500,
+    unidad: "pasos",
+    entorno: "nave",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Caminadora T2 en 0g: marcha suave",
+    description: "Día suave: sesión ligera con sujeción elástica para prevenir trombosis.",
+    category: "treadmill",
+    targetValue: 2500,
+    unit: "pasos",
+    environment: "nave",
+    difficulty: "baja"
+  },
+  {
+    id: "nave-treadmill-media",
+    titulo: "Caminadora T2 en 0g: carga estándar",
+    descripcion: "Día moderado: impacto controlado contra arnés para frenar desmineralización.",
+    categoria: "treadmill",
+    valorObjetivo: 4500,
+    unidad: "pasos",
+    entorno: "nave",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Caminadora T2 en 0g: carga estándar",
+    description: "Día moderado: impacto controlado contra arnés para frenar desmineralización.",
+    category: "treadmill",
+    targetValue: 4500,
+    unit: "pasos",
+    environment: "nave",
+    difficulty: "media"
+  },
+  {
+    id: "nave-treadmill-alta",
+    titulo: "Caminadora T2 en 0g: simulación extrema",
+    descripcion: "Día exigente: cadencia rápida para exigir sistema cardiovascular y huesos largos.",
+    categoria: "treadmill",
+    valorObjetivo: 7500,
+    unidad: "pasos",
+    entorno: "nave",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Caminadora T2 en 0g: simulación extrema",
+    description: "Día exigente: cadencia rápida para exigir sistema cardiovascular y huesos largos.",
+    category: "treadmill",
+    targetValue: 7500,
+    unit: "pasos",
+    environment: "nave",
+    difficulty: "alta"
+  },
+  {
+    id: "nave-stretch-baja",
+    titulo: "Descompresión espinal en cabina",
+    descripcion: "Estiramiento suave lumbar y cervical para elongación 0g.",
+    categoria: "exercise",
+    valorObjetivo: 10,
+    unidad: "min",
+    entorno: "nave",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Descompresión espinal en cabina",
+    description: "Estiramiento suave lumbar y cervical para elongación 0g.",
+    category: "exercise",
+    targetValue: 10,
+    unit: "min",
+    environment: "nave",
+    difficulty: "baja"
+  },
+  {
+    id: "nave-ared-media",
+    titulo: "Rutina resistiva ARED moderada",
+    descripcion: "Ejercicios de fuerza contra resistencia de vacío para cuádriceps y espalda.",
+    categoria: "exercise",
+    valorObjetivo: 25,
+    unidad: "min",
+    entorno: "nave",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Rutina resistiva ARED moderada",
+    description: "Ejercicios de fuerza contra resistencia de vacío para cuádriceps y espalda.",
+    category: "exercise",
+    targetValue: 25,
+    unit: "min",
+    environment: "nave",
+    difficulty: "media"
+  },
+  {
+    id: "nave-ared-alta",
+    titulo: "Fuerza intensiva ARED contra atrofia severa",
+    descripcion: "Protocolo de hipertrofia y compresión axial profunda en ingravidez.",
+    categoria: "exercise",
+    valorObjetivo: 40,
+    unidad: "min",
+    entorno: "nave",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Fuerza intensiva ARED contra atrofia severa",
+    description: "Protocolo de hipertrofia y compresión axial profunda en ingravidez.",
+    category: "exercise",
+    targetValue: 40,
+    unit: "min",
+    environment: "nave",
+    difficulty: "alta"
+  },
+  {
+    id: "estacion-treadmill-baja",
+    titulo: "Caminadora T2 en EEI: trote ligero",
+    descripcion: "Sesión breve de amortiguación en módulo de servicio.",
+    categoria: "treadmill",
+    valorObjetivo: 3000,
+    unidad: "pasos",
+    entorno: "estacion",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Caminadora T2 en EEI: trote ligero",
+    description: "Sesión breve de amortiguación en módulo de servicio.",
+    category: "treadmill",
+    targetValue: 3000,
+    unit: "pasos",
+    environment: "estacion",
+    difficulty: "baja"
+  },
+  {
+    id: "estacion-treadmill-media",
+    titulo: "Caminadora T2 en EEI: entrenamiento orbital",
+    descripcion: "Protocolo diario para mantener gasto calórico y estabilidad en 0g.",
+    categoria: "treadmill",
+    valorObjetivo: 5000,
+    unidad: "pasos",
+    entorno: "estacion",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Caminadora T2 en EEI: entrenamiento orbital",
+    description: "Protocolo diario para mantener gasto calórico y estabilidad en 0g.",
+    category: "treadmill",
+    targetValue: 5000,
+    unit: "pasos",
+    environment: "estacion",
+    difficulty: "media"
+  },
+  {
+    id: "estacion-treadmill-alta",
+    titulo: "Caminadora T2 en EEI: protocolo intensivo",
+    descripcion: "Día de alta carga motriz con resistencia incrementada.",
+    categoria: "treadmill",
+    valorObjetivo: 8000,
+    unidad: "pasos",
+    entorno: "estacion",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Caminadora T2 en EEI: protocolo intensivo",
+    description: "Día de alta carga motriz con resistencia incrementada.",
+    category: "treadmill",
+    targetValue: 8000,
+    unit: "pasos",
+    environment: "estacion",
+    difficulty: "alta"
+  },
+  {
+    id: "estacion-sans-baja",
+    titulo: "Control cefálico y pausa visual SANS",
+    descripcion: "Relajación ocular y alivio de presión intracraneal en microgravedad.",
+    categoria: "exercise",
+    valorObjetivo: 15,
+    unidad: "min",
+    entorno: "estacion",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Control cefálico y pausa visual SANS",
+    description: "Relajación ocular y alivio de presión intracraneal en microgravedad.",
+    category: "exercise",
+    targetValue: 15,
+    unit: "min",
+    environment: "estacion",
+    difficulty: "baja"
+  },
+  {
+    id: "estacion-ared-media",
+    titulo: "Resistencia ARED en módulo orbital",
+    descripcion: "Compresión ósea en tren inferior y zona escapular.",
+    categoria: "exercise",
+    valorObjetivo: 25,
+    unidad: "min",
+    entorno: "estacion",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Resistencia ARED en módulo orbital",
+    description: "Compresión ósea en tren inferior y zona escapular.",
+    category: "exercise",
+    targetValue: 25,
+    unit: "min",
+    environment: "estacion",
+    difficulty: "media"
+  },
+  {
+    id: "estacion-fuerza-alta",
+    titulo: "Carga máxima ARED y trabajo isométrico",
+    descripcion: "Entrenamiento estricto para simular gravedad terrestre en masa muscular.",
+    categoria: "exercise",
+    valorObjetivo: 45,
+    unidad: "min",
+    entorno: "estacion",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Carga máxima ARED y trabajo isométrico",
+    description: "Entrenamiento estricto para simular gravedad terrestre en masa muscular.",
+    category: "exercise",
+    targetValue: 45,
+    unit: "min",
+    environment: "estacion",
+    difficulty: "alta"
+  },
+  {
+    id: "luna-pasos-baja",
+    titulo: "Patrulla corta en regolito lunar",
+    descripcion: "Día suave: caminata de reconocimiento en entorno de baja tracción.",
+    categoria: "steps",
+    valorObjetivo: 4000,
+    unidad: "pasos",
+    entorno: "luna",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Patrulla corta en regolito lunar",
+    description: "Día suave: caminata de reconocimiento en entorno de baja tracción.",
+    category: "steps",
+    targetValue: 4000,
+    unit: "pasos",
+    environment: "luna",
+    difficulty: "baja"
+  },
+  {
+    id: "luna-pasos-media",
+    titulo: "Marcha de exploración lunar estándar",
+    descripcion: "Día moderado: desplazamiento entre domos y plataformas de carga.",
+    categoria: "steps",
+    valorObjetivo: 6500,
+    unidad: "pasos",
+    entorno: "luna",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Marcha de exploración lunar estándar",
+    description: "Día moderado: desplazamiento entre domos y plataformas de carga.",
+    category: "steps",
+    targetValue: 6500,
+    unit: "pasos",
+    environment: "luna",
+    difficulty: "media"
+  },
+  {
+    id: "luna-pasos-alta",
+    titulo: "Travesía prolongada de superficie lunar",
+    descripcion: "Día intenso: navegación a pie de cráter con traje presurizado.",
+    categoria: "steps",
+    valorObjetivo: 9500,
+    unidad: "pasos",
+    entorno: "luna",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Travesía prolongada de superficie lunar",
+    description: "Día intenso: navegación a pie de cráter con traje presurizado.",
+    category: "steps",
+    targetValue: 9500,
+    unit: "pasos",
+    environment: "luna",
+    difficulty: "alta"
+  },
+  {
+    id: "luna-balance-baja",
+    titulo: "Control postural y estabilidad de tobillo",
+    descripcion: "Recuperación de propiocepción en 0.16g tras caminata con botas EVA.",
+    categoria: "exercise",
+    valorObjetivo: 15,
+    unidad: "min",
+    entorno: "luna",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Control postural y estabilidad de tobillo",
+    description: "Recuperación de propiocepción en 0.16g tras caminata con botas EVA.",
+    category: "exercise",
+    targetValue: 15,
+    unit: "min",
+    environment: "luna",
+    difficulty: "baja"
+  },
+  {
+    id: "luna-eva-media",
+    titulo: "Movilidad y descarga articular post-EVA",
+    descripcion: "Alivio de tendones patelares y deltoides por peso del traje espacial.",
+    categoria: "exercise",
+    valorObjetivo: 25,
+    unidad: "min",
+    entorno: "luna",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Movilidad y descarga articular post-EVA",
+    description: "Alivio de tendones patelares y deltoides por peso del traje espacial.",
+    category: "exercise",
+    targetValue: 25,
+    unit: "min",
+    environment: "luna",
+    difficulty: "media"
+  },
+  {
+    id: "luna-carga-alta",
+    titulo: "Fuerza funcional con gravedad reducida",
+    descripcion: "Sentadillas de potencia y estabilidad lumbar contra regolito.",
+    categoria: "exercise",
+    valorObjetivo: 40,
+    unidad: "min",
+    entorno: "luna",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Fuerza funcional con gravedad reducida",
+    description: "Sentadillas de potencia y estabilidad lumbar contra regolito.",
+    category: "exercise",
+    targetValue: 40,
+    unit: "min",
+    environment: "luna",
+    difficulty: "alta"
+  },
+  {
+    id: "marte-pasos-baja",
+    titulo: "Aclimatación en hábitat marciano",
+    descripcion: "Día suave: ronda interior y ajuste a la gravedad de 0.38g.",
+    categoria: "steps",
+    valorObjetivo: 5000,
+    unidad: "pasos",
+    entorno: "marte",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Aclimatación en hábitat marciano",
+    description: "Día suave: ronda interior y ajuste a la gravedad de 0.38g.",
+    category: "steps",
+    targetValue: 5000,
+    unit: "pasos",
+    environment: "marte",
+    difficulty: "baja"
+  },
+  {
+    id: "marte-pasos-media",
+    titulo: "Ruta de recolección en superficie marciana",
+    descripcion: "Día moderado: expedición geológica y paso constante sobre dunas.",
+    categoria: "steps",
+    valorObjetivo: 8500,
+    unidad: "pasos",
+    entorno: "marte",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Ruta de recolección en superficie marciana",
+    description: "Día moderado: expedición geológica y paso constante sobre dunas.",
+    category: "steps",
+    targetValue: 8500,
+    unit: "pasos",
+    environment: "marte",
+    difficulty: "media"
+  },
+  {
+    id: "marte-pasos-alta",
+    titulo: "Marcha extrema en terreno rocoso marciano",
+    descripcion: "Día de alta exigencia física en suelo hostil y pendiente pronunciada.",
+    categoria: "steps",
+    valorObjetivo: 12000,
+    unidad: "pasos",
+    entorno: "marte",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Marcha extrema en terreno rocoso marciano",
+    description: "Día de alta exigencia física en suelo hostil y pendiente pronunciada.",
+    category: "steps",
+    targetValue: 12000,
+    unit: "pasos",
+    environment: "marte",
+    difficulty: "alta"
+  },
+  {
+    id: "marte-resp-baja",
+    titulo: "Respiración diafragmática y revisión SpO2",
+    descripcion: "Desaturación de polvo y ventilación guiada en esclusa.",
+    categoria: "exercise",
+    valorObjetivo: 15,
+    unidad: "min",
+    entorno: "marte",
+    dificultad: "baja",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Respiración diafragmática y revisión SpO2",
+    description: "Desaturación de polvo y ventilación guiada en esclusa.",
+    category: "exercise",
+    targetValue: 15,
+    unit: "min",
+    environment: "marte",
+    difficulty: "baja"
+  },
+  {
+    id: "marte-load-media",
+    titulo: "Entrenamiento de carga en 0.38g",
+    descripcion: "Fortalecimiento de erectores espinales y cuádriceps para gravedad marciana.",
+    categoria: "exercise",
+    valorObjetivo: 30,
+    unidad: "min",
+    entorno: "marte",
+    dificultad: "media",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Entrenamiento de carga en 0.38g",
+    description: "Fortalecimiento de erectores espinales y cuádriceps para gravedad marciana.",
+    category: "exercise",
+    targetValue: 30,
+    unit: "min",
+    environment: "marte",
+    difficulty: "media"
+  },
+  {
+    id: "marte-load-alta",
+    titulo: "Sobrecarga muscular y resistencia extrema",
+    descripcion: "Protocolo avanzado de potencia y soporte de carga pesada.",
+    categoria: "exercise",
+    valorObjetivo: 45,
+    unidad: "min",
+    entorno: "marte",
+    dificultad: "alta",
+    activa: true,
+    creadoEn: "2026-11-14T00:00:00.000Z",
+    title: "Sobrecarga muscular y resistencia extrema",
+    description: "Protocolo avanzado de potencia y soporte de carga pesada.",
+    category: "exercise",
+    targetValue: 45,
+    unit: "min",
+    environment: "marte",
+    difficulty: "alta"
+  }
+];
 
 @Injectable()
 export class SupabaseService {
@@ -875,5 +1653,542 @@ export class SupabaseService {
     }
 
     return rows;
+  }
+
+  async obtenerCatalogoMisiones(
+    entorno?: string,
+    dificultad?: string
+  ): Promise<MisionCatalogo[]> {
+    const url = this.getMissionsUrl();
+    url.searchParams.set(
+      "select",
+      "id,titulo,descripcion,categoria,valor_objetivo,unidad,entorno,dificultad,activa,creado_en"
+    );
+    url.searchParams.set("activa", "eq.true");
+    if (dificultad) {
+      url.searchParams.set("dificultad", `eq.${dificultad}`);
+    }
+    if (entorno && entorno !== "all") {
+      url.searchParams.set("or", `(entorno.eq.${entorno},entorno.eq.all)`);
+    }
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        { method: "GET" },
+        "missions"
+      );
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return rows.map((r: any) => mapMission(r));
+      }
+    } catch (err) {
+      this.logger.warn(
+        "No se pudo consultar la tabla missions en Supabase. Usando catálogo de respaldo.",
+        err
+      );
+    }
+
+    let filtradas = MISIONES_SEMILLA_POR_DEFECTO.filter((m) => m.activa);
+    if (entorno && entorno !== "all") {
+      filtradas = filtradas.filter(
+        (m) => m.entorno === entorno || m.entorno === "all"
+      );
+    }
+    if (dificultad) {
+      filtradas = filtradas.filter((m) => m.dificultad === dificultad);
+    }
+    return filtradas;
+  }
+
+  async obtenerMisionesDelDia(
+    usuarioId: string,
+    query: ConsultarMisionesQueryDto
+  ): Promise<MisionDiariaRotada[]> {
+    const entorno = (query.entorno || "nave") as EntornoMision;
+    const catalogo = await this.obtenerCatalogoMisiones(entorno);
+
+    const fechaReferencia = query.fecha || new Date().toISOString().slice(0, 10);
+    const partesFecha = fechaReferencia.split("-").map(Number);
+    const diaNum =
+      partesFecha.length === 3 && !partesFecha.some(isNaN)
+        ? Math.floor(
+            new Date(partesFecha[0], partesFecha[1] - 1, partesFecha[2]).getTime() /
+              86400000
+          )
+        : Math.floor(Date.now() / 86400000);
+
+    const cicloDificultades: DificultadMision[] = ["baja", "media", "alta"];
+    const dificultadRotativa =
+      query.dificultad || cicloDificultades[Math.abs(diaNum) % 3];
+
+    // 1. Misión de Check-in
+    const checkinMision =
+      catalogo.find((m) => m.categoria === "checkin") ||
+      MISIONES_SEMILLA_POR_DEFECTO[0];
+
+    // 2. Misión de Pasos o Caminadora según entorno y dificultad rotada
+    const categoriaActividad =
+      entorno === "nave" || entorno === "estacion" ? "treadmill" : "steps";
+    const candidatasPasos = catalogo.filter(
+      (m) =>
+        m.categoria === categoriaActividad &&
+        (m.entorno === entorno || m.entorno === "all")
+    );
+    const misionPasos =
+      candidatasPasos.find((m) => m.dificultad === dificultadRotativa) ||
+      candidatasPasos[0] ||
+      catalogo.find((m) => m.categoria === categoriaActividad) ||
+      catalogo[2];
+
+    // 3. Misiones de Ejercicio (2 misiones rotativas según el día)
+    const candidatasEjercicio = catalogo.filter(
+      (m) =>
+        m.categoria === "exercise" &&
+        (m.entorno === entorno || m.entorno === "all")
+    );
+    const ejerciciosSeleccionados: MisionCatalogo[] = [];
+    if (candidatasEjercicio.length > 0) {
+      const indiceBase = Math.abs(diaNum) % candidatasEjercicio.length;
+      ejerciciosSeleccionados.push(candidatasEjercicio[indiceBase]);
+      if (candidatasEjercicio.length > 1) {
+        const segundoIndice = (indiceBase + 1) % candidatasEjercicio.length;
+        ejerciciosSeleccionados.push(candidatasEjercicio[segundoIndice]);
+      }
+    }
+
+    const misionesSeleccionadas: MisionCatalogo[] = [
+      checkinMision,
+      misionPasos,
+      ...ejerciciosSeleccionados
+    ];
+
+    const pasosActuales = Number(query.pasosActuales || 0);
+    const checkinRealizado =
+      query.checkinRealizado === true || query.checkinRealizado === "true";
+    const caminadoraActiva =
+      query.caminadoraActiva === true || query.caminadoraActiva === "true";
+
+    return misionesSeleccionadas.map((m) => {
+      let valorActual = 0;
+      let completada = false;
+
+      if (m.categoria === "checkin") {
+        valorActual = checkinRealizado ? 1 : 0;
+        completada = checkinRealizado;
+      } else if (m.categoria === "steps") {
+        valorActual = pasosActuales;
+        completada = pasosActuales >= m.valorObjetivo;
+      } else if (m.categoria === "treadmill") {
+        valorActual = caminadoraActiva ? pasosActuales : 0;
+        completada = caminadoraActiva && pasosActuales >= m.valorObjetivo;
+      }
+
+      return {
+        ...m,
+        valorActual,
+        completada,
+        currentValue: valorActual,
+        completed: completada
+      };
+    });
+  }
+
+  async obtenerEstadoMisionAstronauta(
+    usuarioId: string
+  ): Promise<EstadoMisionAstronauta | null> {
+    const url = this.getAstronautMissionStatesUrl();
+    url.searchParams.set("select", "*");
+    url.searchParams.set("user_id", `eq.${usuarioId}`);
+    url.searchParams.set("limit", "1");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        { method: "GET" },
+        "astronaut mission state"
+      );
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return mapAstronautMissionState(
+          rows[0] as SupabaseAstronautMissionStateRow
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo obtener el estado de misión en Supabase para el usuario ${usuarioId}`,
+        err
+      );
+    }
+    return null;
+  }
+
+  async guardarEstadoMisionAstronauta(
+    usuarioId: string,
+    dto: GuardarEstadoMisionDto
+  ): Promise<EstadoMisionAstronauta> {
+    const origen = dto.origen ?? dto.origin ?? "tierra";
+    const destino = dto.destino ?? dto.destination ?? "marte";
+    const fechaSalida =
+      dto.fechaSalida ??
+      dto.departureDate ??
+      new Date().toISOString().slice(0, 10);
+    const diasTotales = Number(dto.diasTotales ?? dto.totalDays ?? 210);
+    const fechaLlegadaEstimada =
+      dto.fechaLlegadaEstimada ??
+      dto.estimatedArrivalDate ??
+      new Date(Date.now() + diasTotales * 86400000).toISOString().slice(0, 10);
+
+    const diaActual = Math.max(0, Number(dto.diaActual ?? dto.currentDay ?? 0));
+    const porcentajeProgresoRelativo =
+      dto.porcentajeProgresoRelativo !== undefined
+        ? Number(dto.porcentajeProgresoRelativo)
+        : dto.relativeProgressPct !== undefined
+        ? Number(dto.relativeProgressPct)
+        : Math.min(
+            100,
+            Math.round((diaActual / Math.max(0.01, diasTotales)) * 10000) / 100
+          );
+
+    const estado =
+      dto.estado ??
+      dto.status ??
+      (diaActual >= diasTotales
+        ? "arrived"
+        : diaActual === 0
+        ? "scheduled"
+        : "in_transit");
+
+    const entornoActual =
+      dto.entornoActual ??
+      dto.currentEnvironment ??
+      (estado === "arrived" ? destino : diaActual === 0 ? origen : "nave");
+
+    const ahora = new Date().toISOString();
+    const payload = {
+      user_id: usuarioId,
+      origen,
+      destino,
+      fecha_salida: fechaSalida,
+      fecha_llegada_estimada: fechaLlegadaEstimada,
+      fecha_llegada_real: null,
+      dias_totales: diasTotales,
+      dia_actual: diaActual,
+      porcentaje_progreso_relativo: porcentajeProgresoRelativo,
+      entorno_actual: entornoActual,
+      estado,
+      llegada_anticipada: false,
+      actualizado_en: ahora
+    };
+
+    const url = this.getAstronautMissionStatesUrl();
+    url.searchParams.set("on_conflict", "user_id");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=representation"
+          },
+          body: JSON.stringify(payload)
+        },
+        "save astronaut mission state"
+      );
+
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return mapAstronautMissionState(
+          rows[0] as SupabaseAstronautMissionStateRow
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        "No se pudo guardar el estado de misión en Supabase; retornando estado local.",
+        err
+      );
+    }
+
+    return {
+      id: randomUUID(),
+      usuarioId,
+      origen,
+      destino,
+      fechaSalida,
+      fechaLlegadaEstimada,
+      fechaLlegadaReal: null,
+      diasTotales,
+      diaActual,
+      porcentajeProgresoRelativo,
+      entornoActual,
+      estado,
+      llegadaAnticipada: false,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+      origin: origen,
+      destination: destino,
+      departureDate: fechaSalida,
+      estimatedArrivalDate: fechaLlegadaEstimada,
+      totalDays: diasTotales,
+      currentDay: diaActual,
+      relativeProgressPct: porcentajeProgresoRelativo,
+      currentEnvironment: entornoActual,
+      status: estado,
+      arrivedEarly: false
+    };
+  }
+
+  async marcarLlegadaAnticipada(
+    usuarioId: string,
+    dto: LlegadaAnticipadaDto
+  ): Promise<EstadoMisionAstronauta> {
+    const estadoActual = await this.obtenerEstadoMisionAstronauta(usuarioId);
+    const ahoraIso = new Date().toISOString();
+    const fechaLlegadaReal =
+      dto.fechaLlegadaReal ?? dto.actualArrivalDate ?? ahoraIso.slice(0, 10);
+
+    const origen = estadoActual?.origen ?? "tierra";
+    const destino = estadoActual?.destino ?? "marte";
+    const diasTotales = estadoActual?.diasTotales ?? 210;
+    const fechaSalida = estadoActual?.fechaSalida ?? fechaLlegadaReal;
+    const fechaLlegadaEstimada =
+      estadoActual?.fechaLlegadaEstimada ?? fechaLlegadaReal;
+
+    const payload = {
+      user_id: usuarioId,
+      origen,
+      destino,
+      fecha_salida: fechaSalida,
+      fecha_llegada_estimada: fechaLlegadaEstimada,
+      fecha_llegada_real: fechaLlegadaReal,
+      dias_totales: diasTotales,
+      dia_actual: diasTotales,
+      porcentaje_progreso_relativo: 100,
+      entorno_actual: destino,
+      estado: "arrived" as EstadoMision,
+      llegada_anticipada: true,
+      actualizado_en: ahoraIso
+    };
+
+    const url = this.getAstronautMissionStatesUrl();
+    url.searchParams.set("on_conflict", "user_id");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=representation"
+          },
+          body: JSON.stringify(payload)
+        },
+        "arrive early astronaut mission state"
+      );
+
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return mapAstronautMissionState(
+          rows[0] as SupabaseAstronautMissionStateRow
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        "No se pudo guardar la llegada anticipada en Supabase; retornando estado local.",
+        err
+      );
+    }
+
+    return {
+      id: estadoActual?.id ?? randomUUID(),
+      usuarioId,
+      origen,
+      destino,
+      fechaSalida,
+      fechaLlegadaEstimada,
+      fechaLlegadaReal,
+      diasTotales,
+      diaActual: diasTotales,
+      porcentajeProgresoRelativo: 100,
+      entornoActual: destino,
+      estado: "arrived",
+      llegadaAnticipada: true,
+      creadoEn: estadoActual?.creadoEn ?? ahoraIso,
+      actualizadoEn: ahoraIso,
+      origin: origen,
+      destination: destino,
+      departureDate: fechaSalida,
+      estimatedArrivalDate: fechaLlegadaEstimada,
+      actualArrivalDate: fechaLlegadaReal,
+      totalDays: diasTotales,
+      currentDay: diasTotales,
+      relativeProgressPct: 100,
+      currentEnvironment: destino,
+      status: "arrived",
+      arrivedEarly: true
+    };
+  }
+
+  private getMissionsUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/missions`);
+  }
+
+  private getAstronautMissionStatesUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/astronaut_mission_states`);
+  }
+
+  private getAstronautLocationsUrl(): URL {
+    return new URL(`${this.supabaseUrl}/rest/v1/astronaut_locations`);
+  }
+
+  async obtenerUbicacionActualAstronauta(
+    usuarioId: string
+  ): Promise<UbicacionAstronauta> {
+    const url = this.getAstronautLocationsUrl();
+    url.searchParams.set("select", "*");
+    url.searchParams.set("user_id", `eq.${usuarioId}`);
+    url.searchParams.set("limit", "1");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        { method: "GET" },
+        "astronaut current location"
+      );
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return mapAstronautLocation(rows[0] as SupabaseAstronautLocationRow);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo obtener la ubicación actual en Supabase para el usuario ${usuarioId}`,
+        err
+      );
+    }
+
+    // Fallback: si no hay registro en astronaut_locations, revisar si existe estado de misión
+    const estadoMision = await this.obtenerEstadoMisionAstronauta(usuarioId);
+    if (estadoMision?.entornoActual) {
+      const config = CONFIG_ENTORNOS[estadoMision.entornoActual] ?? CONFIG_ENTORNOS.tierra;
+      return {
+        usuarioId,
+        entorno: estadoMision.entornoActual,
+        etiqueta: config.etiqueta,
+        gravedadEtiqueta: config.gravedadEtiqueta,
+        actualizadoEn: estadoMision.actualizadoEn,
+        userId: usuarioId,
+        environment: estadoMision.entornoActual,
+        label: config.etiqueta,
+        gravityLabel: config.gravedadEtiqueta,
+        updatedAt: estadoMision.actualizadoEn
+      };
+    }
+
+    const configDefault = CONFIG_ENTORNOS.tierra;
+    const ahoraIso = new Date().toISOString();
+    return {
+      usuarioId,
+      entorno: "tierra",
+      etiqueta: configDefault.etiqueta,
+      gravedadEtiqueta: configDefault.gravedadEtiqueta,
+      actualizadoEn: ahoraIso,
+      userId: usuarioId,
+      environment: "tierra",
+      label: configDefault.etiqueta,
+      gravityLabel: configDefault.gravedadEtiqueta,
+      updatedAt: ahoraIso
+    };
+  }
+
+  async guardarUbicacionActualAstronauta(
+    usuarioId: string,
+    dto: GuardarUbicacionAstronautaDto
+  ): Promise<UbicacionAstronauta> {
+    const entorno: UbicacionEntorno = dto.entorno ?? dto.environment ?? "tierra";
+    const config = CONFIG_ENTORNOS[entorno] ?? CONFIG_ENTORNOS.tierra;
+    const ahoraIso = new Date().toISOString();
+
+    const payload = {
+      user_id: usuarioId,
+      entorno,
+      actualizado_en: ahoraIso
+    };
+
+    const url = this.getAstronautLocationsUrl();
+    url.searchParams.set("on_conflict", "user_id");
+
+    try {
+      const response = await this.requestSupabaseTable(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=representation"
+          },
+          body: JSON.stringify(payload)
+        },
+        "save astronaut current location"
+      );
+
+      const rows = (await response.json()) as unknown;
+      if (Array.isArray(rows) && rows.length > 0) {
+        void this.actualizarEntornoEnEstadoMisionSiExiste(usuarioId, entorno);
+        return mapAstronautLocation(rows[0] as SupabaseAstronautLocationRow);
+      }
+    } catch (err) {
+      this.logger.warn(
+        "No se pudo guardar la ubicación en Supabase; retornando estado local.",
+        err
+      );
+    }
+
+    void this.actualizarEntornoEnEstadoMisionSiExiste(usuarioId, entorno);
+
+    return {
+      usuarioId,
+      entorno,
+      etiqueta: config.etiqueta,
+      gravedadEtiqueta: config.gravedadEtiqueta,
+      actualizadoEn: ahoraIso,
+      userId: usuarioId,
+      environment: entorno,
+      label: config.etiqueta,
+      gravityLabel: config.gravedadEtiqueta,
+      updatedAt: ahoraIso
+    };
+  }
+
+  private async actualizarEntornoEnEstadoMisionSiExiste(
+    usuarioId: string,
+    entorno: UbicacionEntorno
+  ): Promise<void> {
+    try {
+      const estado = await this.obtenerEstadoMisionAstronauta(usuarioId);
+      if (estado) {
+        const url = this.getAstronautMissionStatesUrl();
+        url.searchParams.set("user_id", `eq.${usuarioId}`);
+        await this.requestSupabaseTable(
+          url,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Prefer: "return=minimal"
+            },
+            body: JSON.stringify({
+              entorno_actual: entorno,
+              actualizado_en: new Date().toISOString()
+            })
+          },
+          "sync environment to astronaut mission states"
+        );
+      }
+    } catch {
+      // Ignorar fallas secundarias al actualizar astronaut_mission_states
+    }
   }
 }

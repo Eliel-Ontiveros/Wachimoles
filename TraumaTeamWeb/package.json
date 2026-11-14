@@ -5,6 +5,7 @@
     "dev": "npm --prefix TraumaTeamWeb run dev",
     "build": "npm --prefix TraumaTeamWeb run build",
     "lint": "npm --prefix TraumaTeamWeb run lint",
+    "test": "npm --prefix TraumaTeamWeb test",
     "preview": "npm --prefix TraumaTeamWeb run preview"
   },
   "dependencies": {
