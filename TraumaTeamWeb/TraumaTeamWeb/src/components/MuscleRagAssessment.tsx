@@ -106,7 +106,7 @@ export function MuscleRagAssessment({ muscle, initialEnvironment }: Props) {
               </select>
             </label>
             <button type="button" className={`rag-assess-button${answer ? ' is-secondary' : ''}`} disabled={loading} onClick={() => void assess()}>
-              {loading ? 'Reviewing documents…' : error ? 'Retry assessment' : answer ? 'Review documents again' : 'Review symptoms against documents'}
+              {loading ? 'Analyzing your symptoms…' : error ? 'Retry assessment' : answer ? 'Review symptoms again' : 'Review your symptoms'}
             </button>
           </div>
         )}

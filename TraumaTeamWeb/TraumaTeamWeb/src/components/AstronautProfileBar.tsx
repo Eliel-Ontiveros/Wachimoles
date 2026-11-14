@@ -31,7 +31,6 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
   astronauts,
   selectedAstronautId,
   onSelectAstronaut,
-  connectionStatus,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownWrapRef = useRef<HTMLDivElement | null>(null);
@@ -177,14 +176,6 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
         )}
       </div>
 
-      <div className="topbar-right">
-        <div className="topbar-connection" role="status" aria-live="polite">
-          <span aria-hidden="true" className={`sync-dot ${connectionStatus.healthOk ? 'online' : 'offline'}`} />
-          <span className="sync-text">
-            {connectionStatus.healthOk ? 'En línea' : 'Sin enlace'}
-          </span>
-        </div>
-      </div>
     </header>
   );
 };

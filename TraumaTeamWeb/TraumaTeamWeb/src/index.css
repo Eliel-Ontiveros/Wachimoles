@@ -189,14 +189,13 @@ h3 {
   border-radius: 0;
   padding: 12px clamp(16px, 2.2vw, 32px);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 32px;
 }
 
 .topbar-brand,
-.topbar-profiles,
-.topbar-right {
+.topbar-profiles {
   min-inline-size: 0;
 }
 
@@ -272,10 +271,8 @@ h3 {
 
 .topbar-profiles {
   position: relative;
-  justify-self: start;
+  justify-self: end;
   max-inline-size: 100%;
-  padding-inline-start: 24px;
-  border-inline-start: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -363,9 +360,9 @@ h3 {
 .astro-dropdown-panel {
   position: absolute;
   top: calc(100% + 8px);
-  inset-inline-start: 24px;
+  inset-inline-end: 0;
   z-index: 60;
-  inline-size: min(296px, calc(100vw - 24px));
+  inline-size: min(296px, calc(100vw - 32px));
   background: var(--bg-surface);
   border: 1.5px solid var(--border-color);
   border-radius: 16px;
@@ -500,23 +497,6 @@ h3 {
   color: var(--text-muted);
 }
 
-.topbar-right {
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.topbar-connection {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
 @media (max-width: 760px) {
   .topbar-shell {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -531,28 +511,8 @@ h3 {
   }
 
   .topbar-profiles {
-    padding-inline-start: 0;
-    border-inline-start: 0;
+    grid-column: 1 / -1;
   }
-
-  .astro-dropdown-panel {
-    inset-inline-start: 0;
-  }
-}
-
-.sync-dot {
-  inline-size: 7px;
-  block-size: 7px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.sync-dot.online {
-  background: #059669;
-}
-
-.sync-dot.offline {
-  background: #f59e0b;
 }
 
 @keyframes spinRotate {
@@ -3702,9 +3662,6 @@ dialog.history-native-dialog::backdrop {
     color: CanvasText;
   }
 
-  .sync-dot {
-    border: 1px solid CanvasText;
-  }
 }
 
 .startup-splash-screen {
