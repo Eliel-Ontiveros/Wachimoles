@@ -5,6 +5,8 @@ import { VoiceService } from "./voice.service";
 const reply = (content: string, ok = true) =>
   jest.fn().mockResolvedValue({
     ok,
+    status: ok ? 200 : 402,
+    text: async () => "Insufficient Balance",
     json: async () => ({ choices: [{ message: { content } }] })
   });
 

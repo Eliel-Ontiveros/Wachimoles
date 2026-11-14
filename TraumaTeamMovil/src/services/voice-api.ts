@@ -4,9 +4,9 @@ import { API_CONFIG } from './vital-signs-api';
 
 export type LlmInterpretation =
   | { ok: true; intent: VoiceIntent | null; message?: string }
-  | { ok: false; reason: 'not-configured' | 'unreachable' | 'disabled' | 'failed' };
+  | { ok: false; reason: 'not-configured' | 'unreachable' | 'disabled' | 'failed'; status?: number };
 
-const LLM_TIMEOUT_MS = 9000;
+const LLM_TIMEOUT_MS = 18000;
 
 /**
  * Respaldo con LLM (DeepSeek vía backend) para frases que el intérprete local
@@ -30,7 +30,7 @@ export async function interpretWithLlm(text: string, locale: Locale): Promise<Ll
     if (response.status === 503) return { ok: false, reason: 'disabled' };
     if (!response.ok) {
       console.warn('[voice] /voice/interpret failed', response.status);
-      return { ok: false, reason: 'failed' };
+      return { ok: false, reason: 'failed', status: response.status };
     }
     const data: unknown = await response.json();
     if (typeof data !== 'object' || data === null) return { ok: false, reason: 'failed' };

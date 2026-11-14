@@ -238,7 +238,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         setThinking(false);
         if (llm.ok && llm.intent) execute(llm.intent);
         else if (llm.ok) report({ kind: 'error', text: llm.message ?? failureText(result) }, true);
-        else report({ kind: 'error', text: `${t(LLM_KEYS[llm.reason])} ${failureText(result)}` });
+        else
+          report({
+            kind: 'error',
+            text: `${t(LLM_KEYS[llm.reason])}${'status' in llm && llm.status ? ` (HTTP ${llm.status})` : ''}`,
+          });
       });
     },
     [execute, failureText, locale, report, t]
