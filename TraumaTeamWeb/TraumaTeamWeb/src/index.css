@@ -2279,26 +2279,26 @@ dialog.history-native-dialog::backdrop {
   gap: 10px;
 }
 
+.muscle-panel-card {
+  container-type: inline-size;
+  gap: 16px;
+  padding: 16px;
+  min-inline-size: 0;
+}
+
 .muscle-hero-dark {
-  position: relative;
-  overflow: hidden;
-  background: radial-gradient(
-      120% 145% at 0% 50%,
-      var(--hero-glow, rgba(56, 189, 248, 0.22)),
-      rgba(6, 11, 25, 0) 62%
-    ),
-    linear-gradient(135deg, #060b19 0%, #0b162d 55%, #0f1d38 100%);
+  background: #0b162d;
   color: #f8fafc;
-  border: 1.5px solid #1e293b;
-  border-radius: 15px;
-  padding: 12px 13px;
+  border-radius: 12px;
+  padding: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  box-shadow: 0 10px 24px -16px rgba(6, 11, 25, 0.65);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
+/* Kept for the existing unselected-zone illustration. */
 .muscle-hero-stars {
   position: absolute;
   inset: 0;
@@ -2308,34 +2308,26 @@ dialog.history-native-dialog::backdrop {
   opacity: 0.72;
 }
 
-.muscle-hero-dark .muscle-hero-left,
-.muscle-hero-dark .muscle-hero-badge {
-  position: relative;
-  z-index: 1;
-}
-
 .muscle-hero-left {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   min-inline-size: 0;
+  flex: 1;
 }
 
 .muscle-snapshot-box {
   position: relative;
-  inline-size: 66px;
-  block-size: 66px;
-  border-radius: 13px;
-  border: 1.5px solid #38bdf8;
-  background: #060b19;
-  color: #58c7f3;
+  inline-size: 48px;
+  block-size: 48px;
+  border-radius: 8px;
+  background: #14253e;
+  color: #73cbf4;
   display: grid;
   place-items: center;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.2);
 }
-
 .muscle-snapshot-img {
   inline-size: 100%;
   block-size: 100%;
@@ -2343,97 +2335,84 @@ dialog.history-native-dialog::backdrop {
   display: block;
 }
 
-.muscle-snapshot-cat-badge {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  inline-size: 20px;
-  block-size: 20px;
-  border-radius: 6px;
-  background: rgba(6, 11, 25, 0.86);
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  display: grid;
-  place-items: center;
-}
-
 .muscle-hero-meta {
   min-inline-size: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-
-.muscle-hero-eyebrow {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #58c7f3;
+  gap: 4px;
 }
 
 .muscle-hero-title {
   margin: 0;
-  font-size: 0.96rem;
-  font-weight: 800;
-  line-height: 1.15;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .muscle-hero-cat-row {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.7rem;
-  color: #94a3b8;
+  font-size: 0.75rem;
+  color: #c0cede;
 }
 
 .muscle-hero-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.69rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  white-space: nowrap;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #d5e2ef;
 }
 
 .hero-status-dot {
   inline-size: 6px;
   block-size: 6px;
-  border-radius: 999px;
+  border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 8px currentColor;
 }
 
-.panel-tab-pills {
+
+@container (max-width: 320px) {
+  .muscle-hero-left { flex-basis: 100%; }
+  .muscle-hero-badge { margin-inline-start: 60px; }
+  .muscle-hero-dark { gap: 8px; }
+}
+
+.muscle-panel-card .panel-tab-pills {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 3px;
-  border-radius: 12px;
-  background: var(--bg-subtle);
+  gap: 16px;
+  border-bottom: 1px solid var(--border-color);
 }
-
-.panel-tab-btn {
+.muscle-panel-card .panel-tab-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  border: none;
+  gap: 6px;
+  min-block-size: 44px;
+  border: 0;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 7px 6px;
-  border-radius: 9px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 8px 4px;
   cursor: pointer;
 }
-
-.panel-tab-btn.active {
-  background: var(--bg-surface);
-  color: var(--text-main);
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+.muscle-panel-card .panel-tab-btn:hover {
+  color: var(--accent-text);
+  background: var(--bg-elevated);
 }
+
+.muscle-panel-card .panel-tab-btn.active {
+  border-bottom-color: var(--accent);
+  color: var(--text-main);
+  box-shadow: none;
+}
+
 
 @keyframes muscleStageIn {
   from {
@@ -2453,44 +2432,22 @@ dialog.history-native-dialog::backdrop {
 .muscle-readonly-stack {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 20px;
 }
 
-/* Síntomas reportados */
+
+/* Reported facts stay compact; the assessment gets the reading space. */
 .symptom-report-box {
-  position: relative;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  padding: 12px 11px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.symptom-report-box.has-report {
-  border-color: color-mix(in oklab, var(--srb-accent, #f59e0b) 42%, var(--border-color));
-  background: linear-gradient(
-    to bottom var(--in-oklab),
-    color-mix(in oklab, var(--srb-accent, #f59e0b) 8%, var(--bg-surface)) 0%,
-    var(--bg-elevated) 100%
-  );
-}
-
-.srb-accent-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  block-size: 3px;
-  background: var(--srb-accent, #93deff);
+  gap: 12px;
 }
 
 .srb-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -2498,36 +2455,34 @@ dialog.history-native-dialog::backdrop {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.74rem;
-  font-weight: 800;
   color: var(--text-main);
 }
 
+.srb-title h3 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
 .srb-title-icon {
-  inline-size: 22px;
-  block-size: 22px;
-  border-radius: 7px;
   display: grid;
   place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
 .srb-date {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.64rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
   color: var(--text-muted);
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  font-variant-numeric: tabular-nums;
 }
 
 .srb-content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .srb-condition-row {
@@ -2539,8 +2494,8 @@ dialog.history-native-dialog::backdrop {
 }
 
 .srb-condition {
-  font-size: 0.86rem;
-  font-weight: 800;
+  font-size: 0.875rem;
+  font-weight: 600;
   color: var(--text-main);
 }
 
@@ -2548,8 +2503,8 @@ dialog.history-native-dialog::backdrop {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.68rem;
-  font-weight: 800;
+  font-size: 0.6875rem;
+  font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid transparent;
@@ -2558,50 +2513,46 @@ dialog.history-native-dialog::backdrop {
 .srb-severity-dot {
   inline-size: 6px;
   block-size: 6px;
-  border-radius: 999px;
+  border-radius: 50%;
+}
+
+.srb-pain {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.srb-pain strong {
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
 }
 
 .srb-metrics-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  gap: 16px;
 }
 
 .srb-metric-card {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 7px 9px;
-  border-radius: 11px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-}
-
-.srb-metric-card.is-alert {
-  background: rgba(245, 158, 11, 0.1);
-  border-color: rgba(245, 158, 11, 0.42);
-}
-
-.srb-metric-card.is-ok {
-  background: var(--bg-surface);
+  gap: 4px;
 }
 
 .srb-metric-head {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.64rem;
-  font-weight: 700;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 
-.srb-metric-card.is-alert .srb-metric-head {
-  color: #b45309;
-}
-
 .srb-metric-value {
-  font-size: 0.74rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-main);
 }
 
@@ -2611,250 +2562,329 @@ dialog.history-native-dialog::backdrop {
 
 .srb-note-box {
   display: flex;
-  align-items: flex-start;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--bg-surface);
-  border: 1px solid color-mix(in oklab, var(--srb-accent, #f59e0b) 28%, var(--border-color));
+  align-items: flex-start;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
 }
 
 .srb-note-icon {
-  margin-top: 1px;
-  color: var(--srb-accent, #f59e0b);
-  flex-shrink: 0;
+  display: none;
 }
 
 .srb-note-copy {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 4px;
   min-inline-size: 0;
 }
 
-.srb-note-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.srb-note-label, .srb-sublabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
-.srb-note,
-.srb-empty {
+.srb-note, .srb-empty {
   margin: 0;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  text-wrap: pretty;
+  font-size: 0.8125rem;
+  line-height: 1.6;
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .srb-general-symptoms {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-top: 5px;
-  border-top: 1px dashed var(--border-color);
+  gap: 6px;
 }
 
-.srb-sublabel {
-  font-size: 0.67rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
 
-/* Espacio reservado para IA — Copiloto Clínico Cósmico */
-.ai-slot-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid rgba(56, 189, 248, 0.36);
-  background: radial-gradient(
-      110% 140% at 100% 0%,
-      rgba(56, 189, 248, 0.16) 0%,
-      rgba(6, 11, 25, 0) 58%
-    ),
-    linear-gradient(145deg, #060b19 0%, #0b162d 58%, #0f203c 100%);
-  padding: 11px 12px;
+/* Assessment is a reading surface, with one primary action and inline sources. */
+.rag-assessment {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  color: #e2e8f0;
-  box-shadow: 0 10px 22px -16px rgba(6, 11, 25, 0.75);
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+  min-inline-size: 0;
 }
 
-.ai-copilot-wave {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  inline-size: 100%;
-  block-size: 38px;
-  pointer-events: none;
-  opacity: 0.7;
+.ai-slot-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--text-main);
 }
 
-.ai-slot-head,
-.ai-context-chips,
-.ai-slot-body {
-  position: relative;
-  z-index: 1;
-}
-
-.ai-slot-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.ai-slot-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ai-slot-icon-orb {
-  inline-size: 26px;
-  block-size: 26px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  background: rgba(56, 189, 248, 0.16);
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  color: #7dd3fc;
-  flex-shrink: 0;
-}
-
-.ai-slot-heading-copy {
+.rag-assessment-body, .rag-result, .rag-sources, .rag-controls {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-}
-
-.ai-slot-kicker {
-  font-size: 0.57rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #58c7f3;
-}
-
-.ai-slot-heading-copy strong {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #f8fafc;
-}
-
-.ai-slot-badge {
-  font-size: 0.62rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(56, 189, 248, 0.14);
-  border: 1px solid rgba(56, 189, 248, 0.38);
-  color: #7dd3fc;
-  white-space: nowrap;
-}
-
-.ai-context-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.ai-context-chip {
-  font-size: 0.62rem;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  color: #cbd5e1;
-}
-
-.ai-context-chip.warn {
-  background: rgba(245, 158, 11, 0.16);
-  border-color: rgba(245, 158, 11, 0.4);
-  color: #fcd34d;
-}
-
-.ai-context-chip.muted {
-  color: #94a3b8;
+  gap: 12px;
+  min-inline-size: 0;
 }
 
 .ai-slot-body p {
   margin: 0;
-  font-size: 0.72rem;
-  line-height: 1.42;
-  text-wrap: pretty;
-  color: #cbd5e1;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
-/* Ficha anatómica compacta */
-.anatomy-compact-card {
+.ai-slot-body .rag-scope, .ai-slot-body .rag-report-date, .ai-slot-body .rag-privacy {
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.rag-controls {
+  gap: 12px;
+}
+
+.rag-environment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.rag-environment select {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  min-block-size: 40px;
+  padding: 8px 12px;
+  font: inherit;
+  max-inline-size: 100%;
+}
+
+.rag-assess-button {
+  background: #0b162d;
+  color: #f8fafc;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  min-block-size: 44px;
+  padding: 12px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease-out;
+}
+
+.rag-assess-button:hover:not(:disabled) {
+  background: #183659;
+}
+
+.rag-assess-button:active:not(:disabled) {
+  background: #224b70;
+}
+
+.rag-assess-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.rag-assess-button.is-secondary {
   background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  padding: 9px 10px;
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
+.rag-assess-button.is-secondary:hover {
+  background: var(--accent-soft);
+}
+
+.rag-assessment a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rag-result h3 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.rag-result h4 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ai-slot-body .rag-answer-text {
+  color: var(--text-main);
+  font-size: 0.875rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.rag-sources {
+  gap: 0;
+  margin-top: 4px;
+}
+
+.rag-sources h4 {
+  margin-bottom: 8px;
+}
+
+.rag-sources details {
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 0;
+  scroll-margin-block: 16px;
+}
+
+.rag-sources summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  padding-block: 4px;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}
+
+.rag-sources summary:hover {
+  color: var(--accent-text);
+}
+
+.rag-sources blockquote {
+  margin: 12px 0;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.rag-sources a {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+}
+
+.rag-result, .rag-error {
+  overflow-wrap: anywhere;
+}
+
+.ai-slot-body .rag-error {
+  padding: 12px;
+  border-radius: 8px;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.ai-slot-body .rag-notice {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.rag-assessment [role="status"]:empty {
+  display: none;
+}
+
+.rag-loading {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+.rag-loading > span {
+  display: block;
+  block-size: 4px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.rag-loading > span::after {
+  content: '';
+  display: block;
+  inline-size: 35%;
+  block-size: 100%;
+  background: var(--accent);
+  animation: ragProgress 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes ragProgress { to { transform: translateX(185%); } }
+@media (prefers-reduced-motion: reduce) { .rag-loading > span::after { animation: none; } .muscle-detail-stage { animation: none; } }
+.muscle-panel-card ::selection {
+  background: var(--accent-soft);
+  color: var(--text-main);
+}
+
+
+/* Secondary anatomical context is available on demand. */
+.anatomy-compact-card {
+  border-top: 1px solid var(--border-color);
+}
+
+.anatomy-compact-card > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-block-size: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.anatomy-compact-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.anatomy-compact-card > summary:hover {
+  color: var(--accent-text);
+}
+
+.anatomy-compact-card[open] > summary svg {
+  transform: rotate(90deg);
+}
+
 .anatomy-dual-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  gap: 16px;
+  padding-block: 4px 16px;
 }
 
 .anatomy-info-tile {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 7px 8px;
-  border-radius: 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-}
-
-.anatomy-info-tile.spaceflight {
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.06) 0%, var(--bg-surface) 100%);
-  border-color: rgba(14, 165, 233, 0.24);
+  gap: 6px;
 }
 
 .anatomy-tile-head {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .anatomy-tile-icon {
-  inline-size: 20px;
-  block-size: 20px;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-soft);
+  display: inline-flex;
   color: var(--accent-text);
-  flex-shrink: 0;
-}
-
-.anatomy-tile-icon.orbit {
-  background: rgba(14, 165, 233, 0.14);
-  color: #0284c7;
 }
 
 .anatomy-tag {
-  font-size: 0.67rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-main);
 }
 
 .anatomy-info-tile p {
   margin: 0;
-  font-size: 0.7rem;
-  line-height: 1.38;
-  text-wrap: pretty;
+  font-size: 0.75rem;
+  line-height: 1.6;
   color: var(--text-secondary);
 }
 
@@ -2862,41 +2892,30 @@ dialog.history-native-dialog::backdrop {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-bottom: 8px;
 }
 
 .structures-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.6875rem;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
 .structures-pill-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 4px 12px;
 }
 
 .structure-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--bg-surface);
+  font-size: 0.75rem;
   color: var(--text-secondary);
-  border: 1px solid var(--border-color);
 }
 
 .structure-dot {
-  inline-size: 5px;
-  block-size: 5px;
-  border-radius: 999px;
-  background: #38bdf8;
+  display: none;
 }
+
 
 /* ==================== FOTOS / TIMELAPSE ==================== */
 .dossier-wrapper {
@@ -2976,7 +2995,7 @@ dialog.history-native-dialog::backdrop {
 .timelapse-photo {
   inline-size: 100%;
   block-size: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import type { InjuryPhoto, MuscleData } from '../types/dashboard';
+import React, { useEffect, useState } from 'react';
+import type { ConnectionEndpointStatus, InjuryPhoto } from '../types/dashboard';
 import {
   CameraIcon,
   PauseIcon,
@@ -9,9 +9,9 @@ import {
 
 interface InjuryPhotosDossierProps {
   photos: InjuryPhoto[];
-  muscles: MuscleData[];
-  selectedMuscleId: string | null;
-  onSelectMuscle: (muscleId: string) => void;
+  status: ConnectionEndpointStatus['photosStatus'];
+  error: string | null;
+  onReload: () => void;
 }
 
 function formatPhotoDateTime(iso: string): string {
@@ -27,30 +27,14 @@ function formatPhotoDateTime(iso: string): string {
 
 export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
   photos,
-  muscles,
-  selectedMuscleId,
-  onSelectMuscle,
+  status,
+  error,
+  onReload,
 }) => {
-  const hasSelectedPhotos = Boolean(
-    selectedMuscleId && photos.some((p) => p.muscleId === selectedMuscleId)
-  );
-  const [filterMode, setFilterMode] = useState<'all' | 'selected'>(
-    hasSelectedPhotos ? 'selected' : 'all'
-  );
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-
-  const filteredPhotos = useMemo(() => {
-    const base =
-      filterMode === 'selected' && selectedMuscleId
-        ? photos.filter((p) => p.muscleId === selectedMuscleId)
-        : photos;
-
-    return base.slice().sort((a, b) => {
-      if (a.dayNumber !== b.dayNumber) return a.dayNumber - b.dayNumber;
-      return new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime();
-    });
-  }, [photos, filterMode, selectedMuscleId]);
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const filteredPhotos = photos;
 
   const safeIndex =
     filteredPhotos.length > 0 ? Math.min(activeIndex, filteredPhotos.length - 1) : 0;
@@ -64,91 +48,46 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
     return () => window.clearInterval(timer);
   }, [isPlaying, filteredPhotos.length]);
 
-  const groupedZones = useMemo(() => {
-    const map = new Map<string, { muscleId: string; muscleName: string; count: number }>();
-    for (const p of photos) {
-      const existing = map.get(p.muscleId);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        map.set(p.muscleId, { muscleId: p.muscleId, muscleName: p.muscleName, count: 1 });
-      }
-    }
-    return Array.from(map.values());
-  }, [photos]);
-
-  const selectedMuscleObj = muscles.find((m) => m.id === selectedMuscleId) ?? null;
-  const selectedPhotoCount = selectedMuscleObj
-    ? photos.filter((p) => p.muscleId === selectedMuscleObj.id).length
-    : 0;
-
   return (
     <div className="dossier-wrapper">
       <div className="dossier-toolbar">
-        <div className="dossier-filter-pills">
-          {selectedMuscleObj && (
-            <button
-              type="button"
-              className={`dossier-pill ${filterMode === 'selected' ? 'active' : ''}`}
-              onClick={() => {
-                setFilterMode('selected');
-                setActiveIndex(0);
-                setIsPlaying(false);
-              }}
-            >
-              Zona ({selectedPhotoCount})
-            </button>
-          )}
-          <button
-            type="button"
-            className={`dossier-pill ${filterMode === 'all' ? 'active' : ''}`}
-            onClick={() => {
-              setFilterMode('all');
-              setActiveIndex(0);
-              setIsPlaying(false);
-            }}
-          >
-            Todas ({photos.length})
-          </button>
-        </div>
+        <span>{status === 'loading' ? 'Loading zone photos…' : `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'} for this zone`}</span>
+        <button type="button" className="dossier-pill" onClick={() => {
+          setFailedUri(null);
+          setIsPlaying(false);
+          onReload();
+        }} disabled={status === 'loading'}>
+          Reload photos
+        </button>
       </div>
-
-      {groupedZones.length > 1 && (
-        <div className="photo-zone-chips">
-          {groupedZones.map((gz) => (
-            <button
-              key={gz.muscleId}
-              type="button"
-              className={`zone-chip-sm ${selectedMuscleId === gz.muscleId ? 'active' : ''}`}
-              onClick={() => {
-                onSelectMuscle(gz.muscleId);
-                setFilterMode('selected');
-                setActiveIndex(0);
-              }}
-            >
-              {gz.muscleName} ({gz.count})
-            </button>
-          ))}
-        </div>
-      )}
-
-      {activePhoto ? (
+      {status === 'loading' ? (
+        <div className="dossier-empty-compact" role="status">Loading photos…</div>
+      ) : status === 'error' || status === 'unauthorized' ? (
+        <div className="dossier-empty-compact" role="alert">{error || 'Photos could not be loaded. Use Reload photos to try again.'}</div>
+      ) : activePhoto ? (
         <div className="timelapse-stage">
           <div className="timelapse-media-box">
-            <img
-              src={activePhoto.uri}
-              alt={`Actualización ${activePhoto.dayNumber} en ${activePhoto.muscleName}`}
-              className="timelapse-photo"
-            />
+            {failedUri === activePhoto.uri ? (
+              <div className="dossier-empty-compact" role="alert">
+                This photo could not be displayed. Use Reload photos to renew its link.
+              </div>
+            ) : (
+              <img
+                src={activePhoto.uri}
+                alt={`Reported discomfort in ${activePhoto.muscleName}, photo ${safeIndex + 1}`}
+                className="timelapse-photo"
+                onError={() => setFailedUri(activePhoto.uri)}
+              />
+            )}
             <span className="timelapse-day-badge">
-              ACTUALIZACIÓN {activePhoto.dayNumber} · {safeIndex + 1}/{filteredPhotos.length}
+              Photo {safeIndex + 1}/{filteredPhotos.length}
             </span>
           </div>
 
           <div className="timelapse-info-bar">
             <div className="timelapse-meta-col">
               <strong>{activePhoto.muscleName}</strong>
-              <span className="timelapse-date">{formatPhotoDateTime(activePhoto.capturedAt)}</span>
+              <span className="timelapse-date">{activePhoto.capturedAt ? formatPhotoDateTime(activePhoto.capturedAt) : 'Capture date not recorded'}</span>
             </div>
             <div className="timelapse-controls">
               <button
@@ -156,10 +95,10 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
                 className="ctrl-icon-btn"
                 onClick={() => setIsPlaying((p) => !p)}
                 disabled={filteredPhotos.length <= 1}
-                title={isPlaying ? 'Pausar' : 'Reproducir evolución'}
+                title={isPlaying ? 'Pause' : 'Play photo sequence'}
               >
                 {isPlaying ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
-                <span>{isPlaying ? 'Pausar' : 'Evolución'}</span>
+                <span>{isPlaying ? 'Pause' : 'Play sequence'}</span>
               </button>
               <button
                 type="button"
@@ -168,7 +107,7 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
                   setIsPlaying(false);
                   setActiveIndex(0);
                 }}
-                title="Actualización 1"
+                title="First photo"
               >
                 <RotateCcwIcon size={14} />
               </button>
@@ -177,7 +116,7 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
 
           {activePhoto.note && <p className="timelapse-note">“{activePhoto.note}”</p>}
 
-          <div className="timelapse-strip" role="list" aria-label="Miniaturas por actualización">
+          <div className="timelapse-strip" role="list" aria-label="Photo thumbnails">
             {filteredPhotos.map((p, idx) => (
               <button
                 key={p.id}
@@ -188,8 +127,8 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
                   setActiveIndex(idx);
                 }}
               >
-                <img src={p.uri} alt={`Actualización ${p.dayNumber}`} />
-                <span>Act. {p.dayNumber}</span>
+                <img src={p.uri} alt={`Photo ${idx + 1} of ${p.muscleName}`} />
+                <span>{idx + 1}</span>
               </button>
             ))}
           </div>
@@ -197,7 +136,7 @@ export const InjuryPhotosDossier: React.FC<InjuryPhotosDossierProps> = ({
       ) : (
         <div className="dossier-empty-compact">
           <CameraIcon size={19} />
-          <span>Sin fotos registradas desde móvil aún.</span>
+          <span>No photos have been uploaded for this zone.</span>
         </div>
       )}
     </div>
