@@ -80,6 +80,10 @@ export function App() {
 
   const [selectedMuscleId, setSelectedMuscleId] = useState<string | null>(null);
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
+  const [zoneThumbnails, setZoneThumbnails] = useState<Record<string, string>>({});
+  const handleZoneThumbnail = useCallback((zoneId: string, dataUrl: string) => {
+    setZoneThumbnails((previous) => ({ ...previous, [zoneId]: dataUrl }));
+  }, []);
 
   const [connectionStatus, setConnectionStatus] = useState<ConnectionEndpointStatus>({
     healthOk: false,
@@ -373,6 +377,7 @@ export function App() {
               muscles={muscles}
               selectedMuscleId={selectedMuscle?.id ?? null}
               onSelectMuscle={handleSelectMuscle}
+              onZoneThumbnail={handleZoneThumbnail}
               onZoneSnapshot={(zoneId, dataUrl) =>
                 setZoneSnapshots((prev) => ({ ...prev, [zoneId]: dataUrl }))
               }
@@ -387,46 +392,50 @@ export function App() {
           >
             <MuscleDetailAndAiPanel
               muscle={selectedMuscle}
-              allMuscles={muscles}
               latestHealthCheck={latestHealthCheck}
               environment={selectedAstronaut.environment}
               photos={musclePhotos.photos}
               photosStatus={musclePhotos.status}
               photosError={musclePhotos.error}
               onReloadPhotos={musclePhotos.reload}
-              snapshotUri={selectedMuscle ? zoneSnapshots[selectedMuscle.id] : undefined}
+              snapshotUri={selectedMuscle ? zoneSnapshots[selectedMuscle.id] || zoneThumbnails[selectedMuscle.id] : undefined}
               resolvedRecord={selectedResolvedRecord}
-              onSelectMuscle={handleSelectMuscle}
               onSaveUpdate={handleSaveMuscleUpdate}
               onCureMuscle={handleCureMuscle}
             />
 
-            <section className="panel-card compact-card-block" aria-label="Zonas con síntomas reportados">
-              <div className="compact-card-header">
-                <span className="compact-card-title">
-                  {symptomsViewTab === 'active' ? 'Zonas con Síntomas' : 'Historial de Malestares'}
-                </span>
-                <div className="symptoms-tab-switch" role="tablist" aria-label="Filtrar zonas">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={symptomsViewTab === 'active'}
-                    className={`symptoms-tab-btn ${symptomsViewTab === 'active' ? 'active' : ''}`}
-                    onClick={() => setSymptomsViewTab('active')}
-                  >
-                    Activos ({activeLesions.length})
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={symptomsViewTab === 'history'}
-                    className={`symptoms-tab-btn ${symptomsViewTab === 'history' ? 'active' : ''}`}
-                    onClick={() => setSymptomsViewTab('history')}
-                  >
-                    Historial ({resolvedHistory.length})
-                  </button>
-                </div>
+            <section className="panel-card muscle-records-panel" aria-labelledby="muscle-records-title">
+              <header className="muscle-records-heading">
+                <h2 id="muscle-records-title">Seguimiento muscular</h2>
+                <p>{selectedMuscle
+                  ? 'Consulta otra zona o revisa los reportes resueltos.'
+                  : 'Selecciona una zona para consultar sus síntomas, fotos y evolución.'}</p>
+              </header>
+              <div className="symptoms-tab-switch muscle-records-tabs" role="tablist" aria-label="Filtrar zonas"
+                onKeyDown={(event) => {
+                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                  event.preventDefault();
+                  const next = event.key === 'Home' ? 'active' : event.key === 'End' ? 'history'
+                    : symptomsViewTab === 'active' ? 'history' : 'active';
+                  setSymptomsViewTab(next);
+                  event.currentTarget.querySelector<HTMLButtonElement>(`#muscle-records-${next}-tab`)?.focus();
+                }}
+              >
+                <button type="button" role="tab" id="muscle-records-active-tab"
+                  aria-selected={symptomsViewTab === 'active'} aria-controls="muscle-records-content"
+                  tabIndex={symptomsViewTab === 'active' ? 0 : -1}
+                  className={`symptoms-tab-btn ${symptomsViewTab === 'active' ? 'active' : ''}`}
+                  onClick={() => setSymptomsViewTab('active')}
+                >Activos <span>{activeLesions.length}</span></button>
+                <button type="button" role="tab" id="muscle-records-history-tab"
+                  aria-selected={symptomsViewTab === 'history'} aria-controls="muscle-records-content"
+                  tabIndex={symptomsViewTab === 'history' ? 0 : -1}
+                  className={`symptoms-tab-btn ${symptomsViewTab === 'history' ? 'active' : ''}`}
+                  onClick={() => setSymptomsViewTab('history')}
+                >Historial <span>{resolvedHistory.length}</span></button>
               </div>
+              <div id="muscle-records-content" role="tabpanel"
+                aria-labelledby={`muscle-records-${symptomsViewTab}-tab`} tabIndex={0}>
 
               {symptomsViewTab === 'active' ? (
                 activeLesions.length === 0 ? (
@@ -440,45 +449,32 @@ export function App() {
                       const pain = m.observation?.painIntensity ?? 0;
                       const painColor = getPainColorHex(pain);
                       const sevLabel = getSeverityTag(pain);
+                      const severityColor = pain >= 9 ? '#991b1b' : pain >= 7 ? '#b91c1c'
+                        : pain >= 4 ? '#9a3412' : '#854d0e';
                       const isSelected = selectedMuscle?.id === m.id;
                       return (
                         <button
                           key={m.id}
                           type="button"
                           className={`active-record-row ${isSelected ? 'selected' : ''}`}
-                          style={{
-                            borderColor: isSelected ? painColor : undefined,
-                            boxShadow: isSelected ? `0 8px 18px -12px ${painColor}88` : undefined,
-                          }}
+                          aria-pressed={isSelected}
                           onClick={() => handleSelectMuscle(m.id)}
                         >
-                          <span
-                            className="record-icon-box"
-                            style={{
-                              backgroundColor: `${painColor}18`,
-                              borderColor: `${painColor}45`,
-                              color: painColor,
-                            }}
-                          >
-                            <RegionCategoryIcon category={m.category} size={15} />
+                          <span className="record-anatomy-preview" aria-hidden="true">
+                            {zoneThumbnails[m.id] ? (
+                              <img src={zoneThumbnails[m.id]} alt="" width={84} height={84} />
+                            ) : <RegionCategoryIcon category={m.category} size={32} />}
                           </span>
                           <div className="record-text-col">
-                            <div className="record-title-row">
-                              <strong>{m.name}</strong>
-                              <span
-                                className="record-severity-pill"
-                                style={{
-                                  backgroundColor: `${painColor}16`,
-                                  borderColor: `${painColor}40`,
-                                  color: painColor,
-                                }}
-                              >
+                            <strong>{m.name}</strong>
+                            <span className="record-condition">{m.observation?.conditionName || 'Con reporte'}</span>
+                            <div className="record-pain-summary">
+                              <span className="record-severity-pill" style={{ color: severityColor,
+                                backgroundColor: `${painColor}16`, borderColor: `${painColor}40` }}>
                                 {sevLabel}
                               </span>
+                              <span className="record-pain-value">Dolor <b>{pain}/10</b></span>
                             </div>
-                            <span className="record-subtext">
-                              {m.category} · {m.observation?.conditionName || 'Sin detalle'}
-                            </span>
                             {(m.observation?.swelling || m.observation?.functionalLimitation) && (
                               <div className="record-mini-flags">
                                 {m.observation?.swelling && (
@@ -494,7 +490,7 @@ export function App() {
                               </div>
                             )}
                           </div>
-                          <ChevronRightIcon size={14} />
+                          <ChevronRightIcon size={14} className="record-open-icon" />
                         </button>
                       );
                     })}
@@ -520,22 +516,28 @@ export function App() {
                       photos: recPhotos,
                     });
                     const curedDate = formatShortUpdateDate(rec.resolvedAt ?? rec.updatedAt);
+                    const recordMuscle = muscles.find((m) => m.id.toLowerCase() === rec.muscleId.trim().toLowerCase());
+                    const thumbnail = zoneThumbnails[recordMuscle?.id ?? rec.muscleId];
 
                     return (
                       <button
                         key={rec.id || rec.muscleId}
                         type="button"
                         className={`active-record-row resolved-history-row ${isSelected ? 'selected' : ''}`}
+                        aria-pressed={isSelected}
                         onClick={() => handleSelectMuscle(rec.muscleId)}
                       >
-                        <span className="record-icon-box resolved-icon-box">
-                          <CheckIcon size={15} />
+                        <span className="record-anatomy-preview" aria-hidden="true">
+                          {thumbnail ? <img src={thumbnail} alt="" width={84} height={84} />
+                            : recordMuscle ? <RegionCategoryIcon category={recordMuscle.category} size={32} />
+                            : <CheckIcon size={32} />}
                         </span>
                         <div className="record-text-col">
                           <div className="record-title-row">
                             <strong>{rec.muscleName}</strong>
                             <span className="record-severity-pill resolved-pill">Curado</span>
                           </div>
+                          <span className="record-condition">{rec.conditionName || 'Reporte resuelto'}</span>
                           <span className="record-subtext">
                             {updates.length} {updates.length === 1 ? 'actualización' : 'actualizaciones'}
                             {isSelected && musclePhotos.status === 'ok' && (
@@ -544,12 +546,13 @@ export function App() {
                             {curedDate ? ` · ${curedDate}` : ''}
                           </span>
                         </div>
-                        <ChevronRightIcon size={14} />
+                        <ChevronRightIcon size={14} className="record-open-icon" />
                       </button>
                     );
                   })}
                 </div>
               )}
+              </div>
             </section>
           </div>
         </main>
