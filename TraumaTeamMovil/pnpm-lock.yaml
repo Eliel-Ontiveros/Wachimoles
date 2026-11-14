@@ -14,6 +14,9 @@ importers:
       '@expo/vector-icons':
         specifier: ^15.0.2
         version: 15.1.1(expo-font@58.0.12)(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+      '@lottiefiles/dotlottie-react':
+        specifier: ^0.13.5
+        version: 0.13.5(react@19.3.0)
       expo:
         specifier: ~58.0.23
         version: 58.0.25(b8d180504e92945d7b93c589b8a1136e)
@@ -29,6 +32,9 @@ importers:
       expo-glass-effect:
         specifier: ~58.0.5
         version: 58.0.5(expo@58.0.25)(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+      expo-haptics:
+        specifier: ~58.0.8
+        version: 58.0.8(expo@58.0.25)
       expo-image:
         specifier: ~58.0.18
         version: 58.0.18(expo@58.0.25)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -41,6 +47,12 @@ importers:
       expo-router:
         specifier: ~58.0.30
         version: 58.0.31(efb31107a88e4bbaee88ea70f7d466e8)
+      expo-speech:
+        specifier: ~58.0.4
+        version: 58.0.4(expo@58.0.25)
+      expo-speech-recognition:
+        specifier: ^58.0.1
+        version: 58.0.1(expo@58.0.25)(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       expo-splash-screen:
         specifier: ~58.0.13
         version: 58.0.14(expo@58.0.25)(supports-color@8.1.1)(typescript@6.0.3)
@@ -56,6 +68,9 @@ importers:
       expo-web-browser:
         specifier: ~58.0.7
         version: 58.0.8(expo@58.0.25)(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))
+      lottie-react-native:
+        specifier: ~7.5.0
+        version: 7.5.1(@lottiefiles/dotlottie-react@0.13.5(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       lottie-web:
         specifier: ^5.13.0
         version: 5.13.0
@@ -74,6 +89,9 @@ importers:
       react-native:
         specifier: 0.88.1
         version: 0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
+      react-native-css-interop:
+        specifier: 0.2.7
+        version: 0.2.7(ad20e5fff9085ee3ee2456a43cbc756e)
       react-native-gesture-handler:
         specifier: ~3.3.0
         version: 3.3.0(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -833,6 +851,14 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@lottiefiles/dotlottie-react@0.13.5':
+    resolution: {integrity: sha512-4U5okwjRqDPkjB572hfZtLXJ/LGfCo6vDwUB2KIPEUoSgqbIlw+UrbnaqVp3GS+dRvhMD27F2JObpHpYRlpF0Q==}
+    peerDependencies:
+      react: ^17 || ^18 || ^19
+
+  '@lottiefiles/dotlottie-web@0.44.0':
+    resolution: {integrity: sha512-IUWKVciDJI/BMWDWnh7j0Ngd0N8q9ySRAwm84aDqIE07qpmdZ7x1rkIpBaU1yHSNqNYHeh1Rxsl+LC3CY4f0KA==}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -2085,6 +2111,11 @@ packages:
       react: '*'
       react-native: '*'
 
+  expo-haptics@58.0.8:
+    resolution: {integrity: sha512-hxW9LoJQhAJ4hRlGx0DZ10ncs2NFqC/0nfKSnGy1PcpH6e8dJ4/oJO9eOcAG/vFg8k5oonbZkWL7RK9G3729Tg==}
+    peerDependencies:
+      expo: '*'
+
   expo-image-loader@58.0.3:
     resolution: {integrity: sha512-zlHudxC8OObyqCHmvdxJqURI7886KJ0cUJyn7R/a8FOD9fP837xKDN+u4SIt7XsSSVPNXzMd4Y7mN0pmup8NGA==}
     peerDependencies:
@@ -2190,6 +2221,18 @@ packages:
   expo-server@58.1.0:
     resolution: {integrity: sha512-jo7I6uHnP5OQYKx3+7lbpdVVnOEwFj2ryDkQdauUQSwgh2HuMUkiFXWUIVe01ts6DLRoff5U0Tv+uNb3CMq/kw==}
     engines: {node: ^22.13.0 || ^24.3.0 || ^26.0.0 || >=27.0.0}
+
+  expo-speech-recognition@58.0.1:
+    resolution: {integrity: sha512-ycDe1BxXblqFGsXxedjBKn3tVQO8Vnj/BtBIycdMjXkXueTYto1LaenkjeBGycJmnS/6mOWC8oQcyBSbZsueFg==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+
+  expo-speech@58.0.4:
+    resolution: {integrity: sha512-AOwi6VkWfLh4OVUlK1bpvMqTgXHVMqcb+sqBu+mHfiCp4DZpsdDC7JGJEterXz7jdF9qPFwqwrtIarA2EaDHuQ==}
+    peerDependencies:
+      expo: '*'
 
   expo-splash-screen@58.0.14:
     resolution: {integrity: sha512-Z05ihk8LoBX3GeUd1EiV8yG9hd1Pw9wa5AaiAFQx4c81laMVo0LX6x+0o5fXFKnBA9VjlMe5CYWQqUtZf3BCIw==}
@@ -2898,6 +2941,19 @@ packages:
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
+
+  lottie-react-native@7.5.1:
+    resolution: {integrity: sha512-HNEk3HvDRPLmBqMdZEvnvmUTXI0dAt82Ot+0BUPRTrYYw9TuAAZ4Xb4VinwjBOSuHXA2cpEZxJXENZ1VVa0RGQ==}
+    peerDependencies:
+      '@lottiefiles/dotlottie-react': ^0.13.5
+      react: '>=19.2'
+      react-native: '>=0.84'
+      react-native-windows: '>=0.63.x'
+    peerDependenciesMeta:
+      '@lottiefiles/dotlottie-react':
+        optional: true
+      react-native-windows:
+        optional: true
 
   lottie-web@5.13.0:
     resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
@@ -5107,6 +5163,13 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.3
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  '@lottiefiles/dotlottie-react@0.13.5(react@19.3.0)':
+    dependencies:
+      '@lottiefiles/dotlottie-web': 0.44.0
+      react: 19.3.0
+
+  '@lottiefiles/dotlottie-web@0.44.0': {}
+
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
       '@nodelib/fs.stat': 2.0.5
@@ -6543,6 +6606,10 @@ snapshots:
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
 
+  expo-haptics@58.0.8(expo@58.0.25):
+    dependencies:
+      expo: 58.0.25(b8d180504e92945d7b93c589b8a1136e)
+
   expo-image-loader@58.0.3(expo@58.0.25):
     dependencies:
       expo: 58.0.25(b8d180504e92945d7b93c589b8a1136e)
@@ -6654,6 +6721,16 @@ snapshots:
       - '@types/react-dom'
 
   expo-server@58.1.0: {}
+
+  expo-speech-recognition@58.0.1(expo@58.0.25)(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
+    dependencies:
+      expo: 58.0.25(b8d180504e92945d7b93c589b8a1136e)
+      react: 19.3.0
+      react-native: 0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
+
+  expo-speech@58.0.4(expo@58.0.25):
+    dependencies:
+      expo: 58.0.25(b8d180504e92945d7b93c589b8a1136e)
 
   expo-splash-screen@58.0.14(expo@58.0.25)(supports-color@8.1.1)(typescript@6.0.3):
     dependencies:
@@ -7339,6 +7416,13 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
+
+  lottie-react-native@7.5.1(@lottiefiles/dotlottie-react@0.13.5(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-native: 0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
+    optionalDependencies:
+      '@lottiefiles/dotlottie-react': 0.13.5(react@19.3.0)
 
   lottie-web@5.13.0: {}
 

@@ -69,8 +69,10 @@ export async function askAssistant(body: { question: string; environment: Assist
       throw new Error('The backend returned an invalid source.');
     }
     const url = new URL(citation.url);
-    if (url.protocol !== 'https:' || !['www.nasa.gov', 'www.asc-csa.gc.ca', 'www.csa-asc.gc.ca'].includes(url.hostname)) {
-      throw new Error('The backend returned a source outside the curated agency collection.');
+    if (url.protocol !== 'https:' || url.username || url.password || url.port ||
+        !['www.nasa.gov', 'www.asc-csa.gc.ca', 'www.csa-asc.gc.ca',
+          'pmc.ncbi.nlm.nih.gov', 'link.springer.com', 'www.frontiersin.org'].includes(url.hostname)) {
+      throw new Error('The backend returned a source outside the curated collection.');
     }
   }
   return value as unknown as AssistantAnswer;

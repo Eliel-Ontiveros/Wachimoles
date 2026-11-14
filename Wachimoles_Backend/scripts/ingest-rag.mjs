@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, rename } from 'node:fs/promises';
+import { readReviewedText, reuseIndexedSource } from './reviewed-rag.mjs';
 
 const root = new URL('../', import.meta.url);
 const allowedHosts = new Set(['www.nasa.gov', 'www.asc-csa.gc.ca', 'www.csa-asc.gc.ca']);
@@ -30,42 +31,58 @@ function extractText(html) {
 }
 
 const sources = JSON.parse(await readFile(new URL('knowledge/sources.json', root), 'utf8'));
+const offline = process.argv.includes('--offline');
+if (process.argv.slice(2).some((arg) => arg !== '--offline')) throw new Error('Only --offline is supported.');
+if (new Set(sources.map((source) => source.id)).size !== sources.length) throw new Error('Duplicate source IDs');
+const previous = offline ? JSON.parse(await readFile(new URL('src/rag/corpus.json', root), 'utf8')) : null;
 const indexedSources = [];
 const chunks = [];
 for (const source of sources) {
-  verifyUrl(source.url);
-  // Follow redirects explicitly so an unexpected host is never downloaded.
+  let text;
   let url = source.url;
-  let response;
-  for (let redirects = 0; redirects <= 5; redirects++) {
-    verifyUrl(url);
-    response = await fetch(url, {
-      redirect: 'manual',
-      headers: { 'User-Agent': 'TraumaTeam-RAG/0.1 (educational hackathon resource indexing)' },
-      signal: AbortSignal.timeout(30000),
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (!location) throw new Error(`Missing redirect location: ${source.id}`);
-      url = new URL(location, url).href;
-      continue;
+  if (source.reviewedFile) {
+    text = await readReviewedText(source, root);
+  } else if (offline) {
+    const cached = reuseIndexedSource(source, previous);
+    indexedSources.push(cached.metadata);
+    chunks.push(...cached.chunks);
+    console.log(`${source.id}: verified existing snapshot (${cached.metadata.retrievedAt})`);
+    continue;
+  } else {
+    verifyUrl(source.url);
+    // Follow redirects explicitly so an unexpected host is never downloaded.
+    let response;
+    for (let redirects = 0; redirects <= 5; redirects++) {
+      verifyUrl(url);
+      response = await fetch(url, {
+        redirect: 'manual',
+        headers: { 'User-Agent': 'TraumaTeam-RAG/0.1 (educational hackathon resource indexing)' },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) throw new Error(`Missing redirect location: ${source.id}`);
+        url = new URL(location, url).href;
+        continue;
+      }
+      break;
     }
-    break;
+    if (!response?.ok) throw new Error(`Could not download ${source.id}: HTTP ${response?.status}`);
+    if (!response.headers.get('content-type')?.includes('text/html')) {
+      throw new Error(`Expected HTML for ${source.id}; PDFs require a separate text extraction step.`);
+    }
+    const html = await response.text();
+    if (html.length > 5_000_000) throw new Error(`Unexpectedly large document: ${source.id}`);
+    text = extractText(html);
   }
-  if (!response?.ok) throw new Error(`Could not download ${source.id}: HTTP ${response?.status}`);
-  if (!response.headers.get('content-type')?.includes('text/html')) {
-    throw new Error(`Expected HTML for ${source.id}; PDFs require a separate text extraction step.`);
-  }
-  const html = await response.text();
-  if (html.length > 5_000_000) throw new Error(`Unexpectedly large document: ${source.id}`);
-  const text = extractText(html);
   const words = text.split(/\s+/);
-  if (words.length < 80 || !/space|astronaut|radiation/i.test(text)) {
+  if (words.length < 80 || (!source.reviewedFile && !/space|astronaut|radiation/i.test(text))) {
     throw new Error(`Unexpected content for ${source.id}; refusing to replace the index.`);
   }
   const metadata = {
     ...source,
     resolvedUrl: url,
+    // For summaries this is the local indexing time, not a full-paper download time.
     retrievedAt: new Date().toISOString(),
     contentHash: createHash('sha256').update(text).digest('hex'),
     wordCount: words.length,

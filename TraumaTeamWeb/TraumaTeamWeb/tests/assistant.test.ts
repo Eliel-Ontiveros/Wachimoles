@@ -68,6 +68,14 @@ test('rejects fabricated, missing or duplicate references and untrusted source U
   ]) assert.throws(() => parseAssistantAnswer(invalid));
 });
 
+test('accepts selected scientific source hosts while rejecting lookalike hosts', () => {
+  for (const host of ['pmc.ncbi.nlm.nih.gov', 'link.springer.com', 'www.frontiersin.org']) {
+    const value = { ...generated, citations: [{ ...citation, url: `https://${host}/article`, contentKind: 'reviewed_summary' }] };
+    assert.equal(parseAssistantAnswer(value).citations[0].url, `https://${host}/article`);
+    assert.throws(() => parseAssistantAnswer({ ...value, citations: [{ ...citation, url: `https://${host}.evil.test/article` }] }));
+  }
+});
+
 test('calls the existing authenticated RAG endpoint with cancellation and a longer deadline', async (context) => {
   updateBackendConfig({ apiBaseUrl: 'https://backend.test', apiToken: 'test-dashboard-token' });
   const abort = new AbortController();

@@ -13,6 +13,10 @@ The environment is selected by the user, not measured navigation telemetry.
 Explain general research findings; do not diagnose the user, prescribe medications, invent thresholds,
 or recommend treatment. If the passages cannot answer the question, abstain.
 Do not claim a source proves a diagnosis or that an Earth finding applies unchanged to the Moon or Mars.
+Some passages are curator-authored reviewed summaries, not complete publications. Preserve that scope.
+Respect each source's evidence context, population, mission phase and applicability limits.
+Never claim these sources validate Amazfit Active 2, infer unprovided readings, or turn a
+proprietary stress score into a clinical assessment. Atrophy alone does not explain acute swelling.
 Return JSON only with this exact shape:
 {"statements":[{"text":"A concise explanation supported by the passage.","sourceIds":[1]}]}
 Every statement needs one or more numeric sourceIds from the supplied evidence.
@@ -64,7 +68,7 @@ export class RagService {
       indexedPassages: this.corpus.chunks.length,
       retrieval: "bm25",
       generationConfigured: this.generationEnabled && Boolean(this.apiKey) && Boolean(this.model),
-      sources: this.corpus.sources.map(({ id, title, url, retrievedAt }) => ({ id, title, url, retrievedAt }))
+      sources: this.corpus.sources.map(({ id, title, url, retrievedAt, contentKind, reviewedAt }) => ({ id, title, url, retrievedAt, contentKind, reviewedAt }))
     };
   }
 
@@ -92,7 +96,9 @@ export class RagService {
               question: body.question,
               selectedEnvironment: body.environment,
               reportedBodyZone: body.bodyZone ?? null,
-              evidence: citations.map(({ citationId, title, excerpt }) => ({ sourceId: citationId, title, passage: excerpt }))
+              evidence: citations.map(({ citationId, title, excerpt, contentKind, evidenceContext, sourceSections, reviewStatus }) => ({
+                sourceId: citationId, title, passage: excerpt, contentKind, evidenceContext, sourceSections, reviewStatus
+              }))
             }) }
           ],
           thinking: { type: "disabled" },

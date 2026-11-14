@@ -38,7 +38,7 @@ describe("Assistant HTTP API", () => {
     const response = await fetch(`${base}/status`, { headers: { Authorization: `Bearer ${TOKEN}` } });
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toMatchObject({ indexedSources: 5, generationConfigured: false, retrieval: "bm25" });
+    expect(await response.json()).toMatchObject({ indexedSources: 17, generationConfigured: false, retrieval: "bm25" });
   });
 
   it("returns real evidence through the POST endpoint", async () => {
