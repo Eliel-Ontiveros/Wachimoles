@@ -11,7 +11,64 @@ export type VoiceIntent =
   | { type: "toggle-treadmill" }
   | { type: "read-vitals" }
   | { type: "help" }
-  | { type: "stop" };
+  | { type: "stop" }
+  | {
+      type: "register-observation";
+      muscleId: string;
+      painIntensity?: number;
+      swelling?: boolean;
+      functionalLimitation?: boolean;
+      notes?: string;
+    }
+  | { type: "zone-detail"; muscleId: string }
+  | { type: "zone-photos"; muscleId: string }
+  | { type: "set-environment"; environment: Environment }
+  | { type: "open-mission-setup" }
+  | { type: "arrive-early" }
+  | { type: "complete-mission"; missionId: MissionId }
+  | {
+      type: "fill-health-check";
+      bloodSugarMgDl?: number;
+      systolicBp?: number;
+      diastolicBp?: number;
+      temperatureC?: number;
+      sleepHours?: number;
+      mood?: number;
+      symptoms?: string[];
+      notes?: string;
+    }
+  | { type: "vital-history"; metric: VitalMetric }
+  | { type: "dismiss-alert" };
+
+export type Environment = "tierra" | "nave" | "luna" | "marte";
+export type VitalMetric = "heart_rate" | "spo2" | "stress" | "sleep";
+export type MissionId =
+  | "daily-checkin"
+  | "treadmill-steps"
+  | "env-tierra-cardio"
+  | "env-tierra-core"
+  | "env-nave-ared"
+  | "env-nave-stretch"
+  | "env-luna-eva"
+  | "env-luna-balance"
+  | "env-marte-load"
+  | "env-marte-resp";
+
+export const ENVIRONMENTS = ["tierra", "nave", "luna", "marte"] as const;
+export const VITAL_METRICS = ["heart_rate", "spo2", "stress", "sleep"] as const;
+export const MISSION_IDS = [
+  "daily-checkin",
+  "treadmill-steps",
+  "env-tierra-cardio",
+  "env-tierra-core",
+  "env-nave-ared",
+  "env-nave-stretch",
+  "env-luna-eva",
+  "env-luna-balance",
+  "env-marte-load",
+  "env-marte-resp"
+] as const;
+export const SYMPTOMS = ["Ninguno", "Mareo 0g", "Congestión", "Fatiga", "Cefalea"] as const;
 
 export const ROUTES: Record<string, string> = {
   "/": "Monitoreo Vital",
@@ -73,8 +130,28 @@ const SIMPLE = new Set([
   "toggle-treadmill",
   "read-vitals",
   "help",
-  "stop"
+  "stop",
+  "open-mission-setup",
+  "arrive-early",
+  "dismiss-alert"
 ]);
+
+function num(v: unknown, min: number, max: number, int = false): number | undefined {
+  if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+  if (v < min || v > max) return undefined;
+  if (int && !Number.isInteger(v)) return undefined;
+  return v;
+}
+
+function notesOf(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim().slice(0, 300);
+  return t ? t : undefined;
+}
+
+function oneOf<T extends string>(list: readonly T[], v: unknown): T | undefined {
+  return typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : undefined;
+}
 
 /**
  * Valida y reconstruye la intención del LLM contra una lista blanca.
@@ -108,6 +185,67 @@ export function sanitizeIntent(raw: unknown): VoiceIntent | null {
     Object.hasOwn(MUSCLES, r.muscleId)
   ) {
     return { type, muscleId: r.muscleId, muscleName: MUSCLES[r.muscleId] };
+  }
+  if (
+    (type === "zone-detail" || type === "zone-photos") &&
+    typeof r.muscleId === "string" &&
+    Object.hasOwn(MUSCLES, r.muscleId)
+  ) {
+    return { type, muscleId: r.muscleId };
+  }
+  if (type === "register-observation") {
+    if (typeof r.muscleId !== "string" || !Object.hasOwn(MUSCLES, r.muscleId)) return null;
+    const out: Extract<VoiceIntent, { type: "register-observation" }> = {
+      type,
+      muscleId: r.muscleId
+    };
+    const pain = num(r.painIntensity, 1, 10, true);
+    if (pain !== undefined) out.painIntensity = pain;
+    if (typeof r.swelling === "boolean") out.swelling = r.swelling;
+    if (typeof r.functionalLimitation === "boolean") out.functionalLimitation = r.functionalLimitation;
+    const notes = notesOf(r.notes);
+    if (notes !== undefined) out.notes = notes;
+    return out;
+  }
+  if (type === "set-environment") {
+    const environment = oneOf(ENVIRONMENTS, r.environment);
+    return environment ? { type, environment } : null;
+  }
+  if (type === "complete-mission") {
+    const missionId = oneOf(MISSION_IDS, r.missionId);
+    return missionId ? { type, missionId } : null;
+  }
+  if (type === "vital-history") {
+    const metric = oneOf(VITAL_METRICS, r.metric);
+    return metric ? { type, metric } : null;
+  }
+  if (type === "fill-health-check") {
+    const out: Extract<VoiceIntent, { type: "fill-health-check" }> = { type };
+    const bs = num(r.bloodSugarMgDl, 20, 600);
+    if (bs !== undefined) out.bloodSugarMgDl = bs;
+    const sys = num(r.systolicBp, 50, 260);
+    if (sys !== undefined) out.systolicBp = sys;
+    const dia = num(r.diastolicBp, 30, 160);
+    if (dia !== undefined) out.diastolicBp = dia;
+    const temp = num(r.temperatureC, 30, 45);
+    if (temp !== undefined) out.temperatureC = temp;
+    const sleep = num(r.sleepHours, 0, 24);
+    if (sleep !== undefined) out.sleepHours = sleep;
+    const mood = num(r.mood, 1, 5, true);
+    if (mood !== undefined) out.mood = mood;
+    if (Array.isArray(r.symptoms)) {
+      const symptoms = [
+        ...new Set(
+          r.symptoms.filter(
+            (x): x is string => typeof x === "string" && (SYMPTOMS as readonly string[]).includes(x)
+          )
+        )
+      ];
+      if (symptoms.length) out.symptoms = symptoms;
+    }
+    const notes = notesOf(r.notes);
+    if (notes !== undefined) out.notes = notes;
+    return Object.keys(out).length > 1 ? out : null;
   }
   return null;
 }

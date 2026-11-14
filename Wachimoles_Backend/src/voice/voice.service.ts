@@ -5,7 +5,7 @@ import {
   ServiceUnavailableException
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { MUSCLES, sanitizeIntent, VoiceIntent } from "./voice-intent";
+import { MISSION_IDS, MUSCLES, sanitizeIntent, VoiceIntent } from "./voice-intent";
 
 export interface InterpretResult {
   intent: VoiceIntent | null;
@@ -32,6 +32,14 @@ Responde SOLO con un objeto JSON, sin texto adicional. Acciones permitidas:
 - {"type":"body-zone","muscleId":"<id>"}    ir a una zona del cuerpo, o el usuario dice que le duele algo ahí
 - {"type":"open-menu"} {"type":"close-menu"} {"type":"open-alerts"} {"type":"ack-alerts"} (marcar alertas como leídas)
 - {"type":"toggle-treadmill"} {"type":"read-vitals"} (leer en voz alta sus signos vitales) {"type":"help"} {"type":"stop"}
+- {"type":"register-observation","muscleId":"<id>","painIntensity":1-10,"swelling":bool,"functionalLimitation":bool,"notes":"<texto>"} registrar/anotar una molestia, dolor o lesión en una zona (abre el formulario; solo muscleId es obligatorio). painIntensity solo si dice un número o palabras: "leve"=3, "moderado"=5, "fuerte"=8. swelling=true si dice hinchado/inflamado; functionalLimitation=true si no puede moverlo.
+- {"type":"zone-detail","muscleId":"<id>"} detalles/información de una zona; {"type":"zone-photos","muscleId":"<id>"} fotos de una zona
+- {"type":"fill-health-check", ...} llenar el cuestionario diario con los datos dichos (abre el formulario; incluye solo los que mencione): "bloodSugarMgDl" 20-600 (glucosa), "systolicBp" 50-260 y "diastolicBp" 30-160 (presión "120 80"), "temperatureC" 30-45, "sleepHours" 0-24 (horas dormidas), "mood" entero 1-5, "symptoms" lista de: Ninguno, Mareo 0g, Congestión, Fatiga, Cefalea, "notes" texto. Ej: "mi glucosa es 110, presión 120 80, dormí 7 horas".
+- {"type":"set-environment","environment":"tierra|nave|luna|marte"} cambiar el entorno/destino de misión
+- {"type":"complete-mission","missionId":"<id>"} completar una misión. missionId: ${MISSION_IDS.join(", ")} (cardio de Tierra=env-tierra-cardio, caminadora/pasos=treadmill-steps, chequeo diario=daily-checkin).
+- {"type":"open-mission-setup"} configurar la misión; {"type":"arrive-early"} "llegué antes"/adelantar la llegada
+- {"type":"vital-history","metric":"heart_rate|spo2|stress|sleep"} historial/gráfica de un signo vital (pulso, oxígeno, estrés, sueño)
+- {"type":"dismiss-alert"} cerrar/descartar la alerta actual
 - {"type":"unknown","message":"<pregunta o aclaración breve>"} si no corresponde a ninguna acción o falta un dato (p. ej. el lado derecho/izquierdo).
 IDs válidos de muscleId: ${Object.keys(MUSCLES).join(", ")}.
 "Espalda" = dorsal_*, "hombro" = deltoides_*, "pantorrilla" = gemelo_*, "muslo/cuádriceps" = muslo_*, "cadera" = abductor_*.

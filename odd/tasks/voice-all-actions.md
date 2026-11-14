@@ -16,7 +16,7 @@ Branch feat/voice-commands. Voice (local parser + DeepSeek fallback) must reach 
 - S4 The LLM reply is whitelisted: out-of-range numbers / unknown ids are dropped (field) or reject the intent (required ids).
 
 ## Tasks
-- T1 S3,S4 backend intent whitelist + prompt — worker — commit pending
+- T1 S3,S4 backend intent whitelist + prompt — worker — done (backend commit "feat(voice): whitelist every app action for the LLM")
 - T2 S1-S3 app parser + UI channels + components — worker — commit pending
 
 ## Log
