@@ -160,13 +160,21 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     clearTimer();
     setListening(false);
     const silent = e.error === 'aborted' || e.error === 'no-speech';
+    const known: Record<string, string> = {
+      'not-allowed': 'Permiso de micrófono denegado. Actívalo en los ajustes del navegador o del teléfono.',
+      'service-not-allowed':
+        'El servicio de voz no está permitido. Usa Chrome/Edge/Safari (no un navegador embebido) y permite el micrófono.',
+      network:
+        'El reconocimiento de voz necesita conexión a internet (el navegador usa un servicio en la nube). Revisa tu red o prueba en Chrome.',
+      'audio-capture': 'No se detectó ningún micrófono. Conéctalo o revisa los permisos.',
+      'language-not-supported': 'Idioma de voz no disponible en este dispositivo.',
+    };
+    if (!silent) console.warn('[voice] recognition error', e.error, e.message);
     report({
       kind: silent ? 'info' : 'error',
       text: silent
         ? 'No te escuché. Toca el micrófono y vuelve a intentar.'
-        : e.error === 'not-allowed'
-          ? 'Permiso de micrófono denegado. Actívalo en los ajustes.'
-          : `Error de voz: ${e.message}`,
+        : (known[e.error] ?? `Error de voz (${e.error})${e.message ? `: ${e.message}` : ''}`),
     });
   });
 
