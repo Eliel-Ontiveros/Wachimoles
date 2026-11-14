@@ -763,6 +763,151 @@ export function getMissionsForEnvironment(
   ];
 }
 
+// Endpoint para consultar misiones rotadas y aleatorias con dificultad desde el backend
+export async function fetchDailyMissionsFromBackend(
+  env: EnvironmentType,
+  currentSteps = 0,
+  checkedInToday = false,
+  treadmillActive = false,
+  dateIso?: string
+): Promise<DailyMission[]> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+  }
+
+  const queryParams = new URLSearchParams({
+    entorno: env,
+    pasosActuales: String(currentSteps),
+    checkinRealizado: String(checkedInToday),
+    caminadoraActiva: String(treadmillActive),
+  });
+  if (dateIso) {
+    queryParams.set('fecha', dateIso);
+  }
+
+  const path = `/dashboard/missions/daily?${queryParams.toString()}`;
+  try {
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'GET',
+        headers: { ...headers, Accept: 'application/json' },
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (!response || !response.ok) {
+      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+    }
+
+    const data: unknown = await response.json();
+    if (!Array.isArray(data)) {
+      return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+    }
+
+    return data.map((item: any) => ({
+      id: String(item.id),
+      title: String(item.title || item.titulo || 'Misión diaria'),
+      description: String(item.description || item.descripcion || ''),
+      category: item.category || item.categoria || 'exercise',
+      targetValue: Number(item.targetValue ?? item.valorObjetivo ?? 1),
+      currentValue: Number(item.currentValue ?? item.valorActual ?? 0),
+      unit: String(item.unit || item.unidad || 'min'),
+      completed: Boolean(item.completed ?? item.completada ?? false),
+      environment: item.environment || item.entorno || env,
+    }));
+  } catch {
+    return getMissionsForEnvironment(env, currentSteps, checkedInToday, treadmillActive);
+  }
+}
+
+export interface AstronautMissionStatePayload {
+  origen: SpaceLocation;
+  destino: SpaceLocation;
+  fechaSalida: string;
+  fechaLlegadaEstimada?: string | null;
+  diasTotales: number;
+  diaActual: number;
+  porcentajeProgresoRelativo?: number;
+  entornoActual: EnvironmentType;
+  estado?: 'scheduled' | 'in_transit' | 'arrived';
+}
+
+// Guarda la ubicación relativa del astronauta en el backend en perspectiva de los días de misión
+export async function syncAstronautMissionStateToBackend(
+  payload: AstronautMissionStatePayload
+): Promise<boolean> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return false;
+  }
+
+  const path = '/dashboard/mission-state';
+  try {
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'PUT',
+        headers: {
+          ...baseHeaders,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          origen: payload.origen,
+          destino: payload.destino,
+          fechaSalida: payload.fechaSalida,
+          fechaLlegadaEstimada: payload.fechaLlegadaEstimada ?? undefined,
+          diasTotales: payload.diasTotales,
+          diaActual: payload.diaActual,
+          porcentajeProgresoRelativo: payload.porcentajeProgresoRelativo,
+          entornoActual: payload.entornoActual,
+          estado: payload.estado,
+        }),
+      });
+      if (response.status !== 401) break;
+    }
+    return Boolean(response?.ok);
+  } catch (err) {
+    console.warn('[mission-api] No se pudo sincronizar ubicación de misión con backend:', err);
+    return false;
+  }
+}
+
+// Endpoint para que el astronauta le pique al botón "Llegué antes" y se guarde en backend
+export async function markEarlyArrivalInBackend(
+  fechaLlegadaReal?: string
+): Promise<boolean> {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (authHeadersList.length === 0 || (!API_CONFIG.apiBaseUrl && typeof window === 'undefined')) {
+    return false;
+  }
+
+  const path = '/dashboard/mission-state/arrive-early';
+  try {
+    let response: Response | null = null;
+    for (const baseHeaders of authHeadersList) {
+      response = await fetchBackendWithFallback(path, {
+        method: 'POST',
+        headers: {
+          ...baseHeaders,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          fechaLlegadaReal: fechaLlegadaReal || getTodayIsoDate(),
+        }),
+      });
+      if (response.status !== 401) break;
+    }
+    return Boolean(response?.ok);
+  } catch (err) {
+    console.warn('[mission-api] No se pudo registrar llegada anticipada en backend:', err);
+    return false;
+  }
+}
+
 // Endpoint listo para guardar entorno seleccionado en el backend
 export async function syncEnvironmentToBackend(environment: EnvironmentType): Promise<void> {
   const baseUrl = API_CONFIG.localUrls[0];
