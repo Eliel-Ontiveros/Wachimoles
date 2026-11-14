@@ -21,6 +21,7 @@ import { MuscleDetailAndAiPanel } from './components/MuscleDetailAndAiPanel';
 import { RealtimeEcgMonitor } from './components/RealtimeEcgMonitor';
 import { StartupSplashAnimation } from './components/StartupSplashAnimation';
 import { SymptomPulseCards } from './components/SymptomPulseCards';
+import { useInjuryPhotos } from './hooks/use-injury-photos';
 import {
   INITIAL_MUSCLES,
   PRIMARY_ASTRONAUT,
@@ -31,10 +32,8 @@ import {
   checkBackendHealth,
   cureBodyConditionWithHistoryInBackend,
   extractLatestVitals,
-  fetchBodyConditionImagesFromBackend,
   fetchBodyConditionsFromBackend,
   fetchDailyHealthChecksFromBackend,
-  fetchInjuryPhotosFromBackend,
   fetchSamplesFromBackend,
   getInitialEmptyVitals,
   saveBodyConditionToBackend,
@@ -51,7 +50,6 @@ import type {
   ConnectionEndpointStatus,
   DailyHealthCheck,
   DashboardSample,
-  InjuryPhoto,
   MuscleData,
   VitalSignsData,
 } from './types/dashboard';
@@ -79,7 +77,6 @@ export function App() {
   const [vitals, setVitals] = useState<VitalSignsData>(() => getInitialEmptyVitals());
   const [conditions, setConditions] = useState<BodyConditionRecord[]>([]);
   const [healthChecks, setHealthChecks] = useState<DailyHealthCheck[]>([]);
-  const [photos, setPhotos] = useState<InjuryPhoto[]>([]);
 
   const [selectedMuscleId, setSelectedMuscleId] = useState<string | null>(null);
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
@@ -97,11 +94,10 @@ export function App() {
   const performSync = useCallback(async () => {
     const healthOk = await checkBackendHealth();
 
-    const [samplesRes, condRes, checksRes, photosRes] = await Promise.allSettled([
+    const [samplesRes, condRes, checksRes] = await Promise.allSettled([
       fetchSamplesFromBackend(500),
       fetchBodyConditionsFromBackend(500),
       fetchDailyHealthChecksFromBackend(100),
-      fetchInjuryPhotosFromBackend(),
     ]);
 
     let nextSamplesStatus: ConnectionEndpointStatus['samplesStatus'] = 'ok';
@@ -113,10 +109,8 @@ export function App() {
     }
 
     let nextCondStatus: ConnectionEndpointStatus['bodyConditionsStatus'] = 'ok';
-    let syncedConditions: BodyConditionRecord[] = [];
     if (condRes.status === 'fulfilled') {
-      syncedConditions = condRes.value;
-      setConditions(syncedConditions);
+      setConditions(condRes.value);
     } else {
       nextCondStatus = 'error';
     }
@@ -128,61 +122,12 @@ export function App() {
       nextChecksStatus = 'error';
     }
 
-    // Cargar fotos subidas por zona en Supabase Storage (/dashboard/body-conditions/:muscleId/images)
-    const storagePhotos: InjuryPhoto[] = [];
-    if (syncedConditions.length > 0) {
-      const uniqueZones = new Map<string, string>();
-      for (const rec of syncedConditions) {
-        if (!uniqueZones.has(rec.muscleId)) {
-          uniqueZones.set(rec.muscleId, rec.muscleName);
-        }
-      }
-      const imageEntries = Array.from(uniqueZones.entries());
-      const imageResults = await Promise.allSettled(
-        imageEntries.map(([mId]) => fetchBodyConditionImagesFromBackend(mId))
-      );
-
-      imageResults.forEach((result, idx) => {
-        if (result.status !== 'fulfilled') return;
-        const [mId, mName] = imageEntries[idx];
-        const chronological = result.value.slice().reverse();
-        chronological.forEach((img, photoIndex) => {
-          storagePhotos.push({
-            id: img.path,
-            muscleId: mId,
-            muscleName: mName,
-            uri: img.signedUrl,
-            dayNumber: photoIndex + 1,
-            capturedAt: img.expiresAt,
-            note: `Actualización ${photoIndex + 1}`,
-          });
-        });
-      });
-    }
-
-    let nextPhotosStatus: ConnectionEndpointStatus['photosStatus'] = 'ok';
-    const basePhotos = photosRes.status === 'fulfilled' ? photosRes.value.photos : [];
-    if (photosRes.status === 'fulfilled') {
-      if (!photosRes.value.available && storagePhotos.length === 0) {
-        nextPhotosStatus = 'unavailable';
-      }
-    } else if (storagePhotos.length === 0) {
-      nextPhotosStatus = 'error';
-    }
-
-    const storagePhotoIds = new Set(storagePhotos.map((p) => p.id));
-    const mergedPhotos = [
-      ...storagePhotos,
-      ...basePhotos.filter((p) => !storagePhotoIds.has(p.id)),
-    ];
-    setPhotos(mergedPhotos);
-
     setConnectionStatus({
       healthOk,
       samplesStatus: nextSamplesStatus,
       bodyConditionsStatus: nextCondStatus,
       healthChecksStatus: nextChecksStatus,
-      photosStatus: nextPhotosStatus,
+      photosStatus: 'idle',
       lastSyncIso: new Date().toISOString(),
       errorMessages: [],
     });
@@ -240,6 +185,7 @@ export function App() {
             minute: '2-digit',
           }),
           recordedAtIso: rec.recordedAt,
+          updatedAtIso: rec.updatedAt,
         },
       };
     });
@@ -249,6 +195,9 @@ export function App() {
     () => (selectedMuscleId ? muscles.find((m) => m.id === selectedMuscleId) ?? null : null),
     [muscles, selectedMuscleId]
   );
+
+  const musclePhotos = useInjuryPhotos(selectedMuscleId, selectedMuscle?.name);
+  const reloadMusclePhotos = musclePhotos.reload;
 
   const activeLesions = useMemo(
     () =>
@@ -330,8 +279,9 @@ export function App() {
       }
 
       await performSync();
+      reloadMusclePhotos();
     },
-    [performSync]
+    [performSync, reloadMusclePhotos]
   );
 
   const handleCureMuscle = useCallback(
@@ -361,7 +311,7 @@ export function App() {
           astronauts={astronauts}
           selectedAstronautId={selectedAstronautId}
           onSelectAstronaut={(id) => setSelectedAstronautId(id)}
-          connectionStatus={connectionStatus}
+          connectionStatus={{ ...connectionStatus, photosStatus: musclePhotos.status }}
         />
 
       <div className="dashboard-shell">
@@ -439,7 +389,11 @@ export function App() {
               muscle={selectedMuscle}
               allMuscles={muscles}
               latestHealthCheck={latestHealthCheck}
-              photos={photos}
+              environment={selectedAstronaut.environment}
+              photos={musclePhotos.photos}
+              photosStatus={musclePhotos.status}
+              photosError={musclePhotos.error}
+              onReloadPhotos={musclePhotos.reload}
               snapshotUri={selectedMuscle ? zoneSnapshots[selectedMuscle.id] : undefined}
               resolvedRecord={selectedResolvedRecord}
               onSelectMuscle={handleSelectMuscle}
@@ -556,7 +510,7 @@ export function App() {
                   {resolvedHistory.map((rec) => {
                     const isSelected =
                       selectedMuscle?.id.toLowerCase() === rec.muscleId.trim().toLowerCase();
-                    const recPhotos = photos.filter(
+                    const recPhotos = musclePhotos.photos.filter(
                       (p) => p.muscleId.trim().toLowerCase() === rec.muscleId.trim().toLowerCase()
                     );
                     const updates = parseConditionUpdates({
@@ -583,8 +537,10 @@ export function App() {
                             <span className="record-severity-pill resolved-pill">Curado</span>
                           </div>
                           <span className="record-subtext">
-                            {updates.length} {updates.length === 1 ? 'actualización' : 'actualizaciones'} ·{' '}
-                            {recPhotos.length} {recPhotos.length === 1 ? 'foto' : 'fotos'}
+                            {updates.length} {updates.length === 1 ? 'actualización' : 'actualizaciones'}
+                            {isSelected && musclePhotos.status === 'ok' && (
+                              <> · {recPhotos.length} {recPhotos.length === 1 ? 'foto' : 'fotos'}</>
+                            )}
                             {curedDate ? ` · ${curedDate}` : ''}
                           </span>
                         </div>
