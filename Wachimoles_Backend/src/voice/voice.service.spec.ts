@@ -30,6 +30,17 @@ describe("VoiceService", () => {
     expect(init.headers.Authorization).toBe("Bearer k");
   });
 
+  it("asks the model to answer in the app language (Spanish by default)", async () => {
+    const fetchMock = reply('{"type":"help"}');
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await make().interpret("hola");
+    await make().interpret("hello", "en");
+    const system = (i: number) =>
+      JSON.parse(fetchMock.mock.calls[i][1].body).messages[0].content as string;
+    expect(system(0)).toContain("siempre en español");
+    expect(system(1)).toContain("siempre en inglés");
+  });
+
   it("returns the clarification message when the model has no action", async () => {
     global.fetch = reply('{"type":"unknown","message":"¿Qué lado?"}') as unknown as typeof fetch;
     expect(await make().interpret("bíceps")).toEqual({ intent: null, message: "¿Qué lado?" });

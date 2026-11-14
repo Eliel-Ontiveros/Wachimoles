@@ -1,39 +1,62 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { Animated, Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 
 import { useDrawer } from '@/components/trauma/drawer-context';
 import { useMission } from '@/components/trauma/mission-context';
-
+import { useI18n } from '@/i18n/I18nProvider';
+import type { MessageKey } from '@/i18n/messages';
 import { interpretWithLlm } from '@/services/voice-api';
 
-import { parseCommand, type VoiceIntent } from './parser';
+import { haptic } from './haptics';
+import { parseCommand, type ParseResult, type VoiceIntent } from './parser';
 import { VoiceContext, type BodyIntent, type VoiceFeedback } from './voice-context';
+import { WarpTransition, type WarpTrip } from './WarpTransition';
 
-const LANG = 'es-ES';
 const LISTEN_TIMEOUT_MS = 12000;
+
+const ERROR_KEYS: Record<string, MessageKey> = {
+  'not-allowed': 'error.notAllowed',
+  'service-not-allowed': 'error.serviceNotAllowed',
+  network: 'error.network',
+  'audio-capture': 'error.audioCapture',
+  'language-not-supported': 'error.language',
+};
+
+const LLM_KEYS: Record<'not-configured' | 'unreachable' | 'disabled' | 'failed', MessageKey> = {
+  'not-configured': 'llm.notConfigured',
+  unreachable: 'llm.unreachable',
+  disabled: 'llm.disabled',
+  failed: 'llm.failed',
+};
 
 /**
  * Motor de voz: STT (nativo en iOS/Android, Web Speech API en web) →
- * intérprete de lenguaje natural → acciones reales sobre la app.
+ * intérprete local / LLM → acciones reales sobre la app, con transición espacial.
  */
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const drawer = useDrawer();
   const mission = useMission();
+  const { t, locale, speech } = useI18n();
   const [listening, setListening] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [mode, setMode] = useState<'command' | 'dictation' | null>(null);
   const [transcript, setTranscript] = useState('');
   const [feedback, setFeedback] = useState<VoiceFeedback | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [bodyIntent, setBodyIntent] = useState<BodyIntent | null>(null);
+  const [trip, setTrip] = useState<WarpTrip | null>(null);
+  const [voiceId, setVoiceId] = useState<string | undefined>(undefined);
+  const [level] = useState(() => new Animated.Value(0));
 
   const modeRef = useRef<'command' | 'dictation' | null>(null);
   const dictationCb = useRef<((t: string) => void) | null>(null);
   const finalText = useRef('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nonce = useRef(0);
+  const tripActions = useRef(new Map<number, () => void>());
   const missionRef = useRef(mission);
   useEffect(() => {
     missionRef.current = mission;
@@ -47,19 +70,68 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const say = useCallback((text: string) => {
-    try {
-      Speech.stop();
-      Speech.speak(text, { language: LANG, rate: 1.05 });
-    } catch {
-      // La confirmación hablada es opcional: el feedback visual siempre se muestra.
-    }
-  }, []);
+  // Elige una voz nativa del idioma activo (mejor calidad primero), para que no
+  // hable con la voz por defecto del sistema en otro idioma.
+  useEffect(() => {
+    let alive = true;
+    Speech.getAvailableVoicesAsync()
+      .then((voices) => {
+        if (!alive) return;
+        const own = voices.filter((v) => v.language?.toLowerCase().startsWith(speech.voicePrefix));
+        const exact = own.filter((v) => v.language?.toLowerCase() === speech.lang.toLowerCase());
+        const pool = exact.length ? exact : own;
+        const best = pool.find((v) => String(v.quality).toLowerCase() === 'enhanced') ?? pool[0];
+        setVoiceId(best?.identifier);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [speech]);
 
-  const report = useCallback((fb: VoiceFeedback, speak = false) => {
-    setFeedback(fb);
-    if (speak) say(fb.text);
-  }, [say]);
+  const say = useCallback(
+    (text: string) => {
+      try {
+        Speech.stop();
+        Speech.speak(text, { language: speech.lang, voice: voiceId, rate: 1.0, pitch: 1.0 });
+      } catch {
+        // La confirmación hablada es opcional: el feedback visual siempre se muestra.
+      }
+    },
+    [speech.lang, voiceId]
+  );
+
+  const report = useCallback(
+    (fb: VoiceFeedback, speak = false) => {
+      setFeedback(fb);
+      if (fb.kind === 'success') haptic.success();
+      if (fb.kind === 'error') haptic.error();
+      if (speak) say(fb.text);
+    },
+    [say]
+  );
+
+  /** Cierra el panel, lanza el salto espacial y navega en el pico de la animación. */
+  const warpTo = useCallback(
+    (label: string, action: () => void) => {
+      nonce.current += 1;
+      const id = nonce.current;
+      tripActions.current.set(id, action);
+      drawer.close();
+      setPanelOpen(false);
+      haptic.warp();
+      setTrip({ id, label, heading: t('warp.heading') });
+    },
+    [drawer, t]
+  );
+
+  const onWarpPeak = useCallback((id: number) => {
+    tripActions.current.get(id)?.();
+    tripActions.current.delete(id);
+  }, []);
+  const onWarpDone = useCallback((id: number) => {
+    setTrip((cur) => (cur?.id === id ? null : cur));
+  }, []);
 
   const pushBodyIntent = useCallback((partial: Omit<BodyIntent, 'nonce'>) => {
     nonce.current += 1;
@@ -70,72 +142,82 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     (intent: VoiceIntent) => {
       const m = missionRef.current;
       switch (intent.type) {
-        case 'navigate':
-          drawer.close();
-          router.navigate(intent.route);
-          report({ kind: 'success', text: `Abriendo ${intent.label}` }, true);
+        case 'navigate': {
+          const label = t(`route.${intent.route}` as MessageKey);
+          report({ kind: 'success', text: t('action.opening', { label }) }, true);
+          warpTo(label, () => router.navigate(intent.route));
+          return;
+        }
+        case 'start-checkin':
+          report({ kind: 'success', text: t('action.checkin') }, true);
+          warpTo(t('tab.health'), () => {
+            pushBodyIntent({ tab: 'health' });
+            router.navigate('/explore');
+          });
+          return;
+        case 'body-tab': {
+          const label = t(`tab.${intent.tab}` as MessageKey);
+          report({ kind: 'success', text: t('action.opening', { label }) }, true);
+          warpTo(label, () => {
+            pushBodyIntent({ tab: intent.tab });
+            router.navigate('/explore');
+          });
+          return;
+        }
+        case 'body-zone':
+          report({ kind: 'success', text: t('action.zone', { name: intent.muscleName }) }, true);
+          warpTo(intent.muscleName, () => {
+            pushBodyIntent({ tab: 'body', muscleId: intent.muscleId });
+            router.navigate('/explore');
+          });
           return;
         case 'open-menu':
+          setPanelOpen(false);
           drawer.open();
-          report({ kind: 'success', text: 'Menú abierto' });
+          report({ kind: 'success', text: t('action.menuOpened') });
           return;
         case 'close-menu':
           drawer.close();
-          report({ kind: 'success', text: 'Menú cerrado' });
+          report({ kind: 'success', text: t('action.menuClosed') });
           return;
         case 'open-alerts':
-          router.navigate('/');
-          report({ kind: 'info', text: `Tienes ${m.unreadAlertCount} alertas sin leer. Toca la campana para verlas.` }, true);
+          report({ kind: 'info', text: t('action.alerts', { count: m.unreadAlertCount }) }, true);
           return;
         case 'ack-alerts':
           m.acknowledgeAllAlerts();
-          report({ kind: 'success', text: 'Alertas marcadas como leídas' }, true);
-          return;
-        case 'start-checkin':
-          drawer.close();
-          pushBodyIntent({ tab: 'health' });
-          router.navigate('/explore');
-          report({ kind: 'success', text: 'Iniciando chequeo diario' }, true);
-          return;
-        case 'body-tab':
-          drawer.close();
-          pushBodyIntent({ tab: intent.tab });
-          router.navigate('/explore');
-          report({ kind: 'success', text: `Abriendo ${intent.label}` }, true);
-          return;
-        case 'body-zone':
-          drawer.close();
-          pushBodyIntent({ tab: 'body', muscleId: intent.muscleId });
-          router.navigate('/explore');
-          report({ kind: 'success', text: `Zona: ${intent.muscleName}` }, true);
+          report({ kind: 'success', text: t('action.alertsAck') }, true);
           return;
         case 'toggle-treadmill':
           m.toggleTreadmillRoutine();
-          report({ kind: 'success', text: 'Rutina de cinta alternada' }, true);
+          report({ kind: 'success', text: t('action.treadmill') }, true);
           return;
         case 'read-vitals': {
           const v = m.vitals;
           const parts = [
-            v.heartRate !== null ? `pulso ${v.heartRate} latidos por minuto` : null,
-            v.spo2 !== null ? `oxígeno ${v.spo2} por ciento` : null,
-            v.stress !== null ? `estrés ${v.stress}` : null,
+            v.heartRate !== null ? t('vitals.pulse', { value: v.heartRate }) : null,
+            v.spo2 !== null ? t('vitals.spo2', { value: v.spo2 }) : null,
+            v.stress !== null ? t('vitals.stress', { value: v.stress }) : null,
           ].filter(Boolean);
-          router.navigate('/');
-          report(
-            { kind: 'info', text: parts.length ? parts.join(', ') : 'Aún no hay datos del reloj.' },
-            true
-          );
+          report({ kind: 'info', text: parts.length ? parts.join(', ') : t('vitals.none') }, true);
           return;
         }
         case 'help':
-          report({ kind: 'info', text: 'Prueba: "abre signos vitales", "iniciar chequeo diario", "ve al bíceps derecho".' });
+          report({ kind: 'info', text: t('action.help') });
           return;
         case 'stop':
-          report({ kind: 'info', text: 'Cancelado' });
+          report({ kind: 'info', text: t('action.cancelled') });
           return;
       }
     },
-    [drawer, pushBodyIntent, report]
+    [drawer, pushBodyIntent, report, t, warpTo]
+  );
+
+  const failureText = useCallback(
+    (result: Extract<ParseResult, { ok: false }>) =>
+      result.reason === 'ambiguous'
+        ? t('parse.ambiguous', { zone: result.zone })
+        : t(result.reason === 'empty' ? 'parse.empty' : 'parse.unknown'),
+    [t]
   );
 
   const runText = useCallback(
@@ -146,30 +228,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (result.reason !== 'unknown') {
-        report({ kind: 'error', text: result.hint }, result.reason !== 'empty');
+        report({ kind: 'error', text: failureText(result) }, result.reason !== 'empty');
         return;
       }
       // El intérprete local no lo entendió: se consulta al LLM (DeepSeek vía backend).
-      report({ kind: 'info', text: 'Pensando…' });
-      void interpretWithLlm(text).then((llm) => {
-        if (llm.ok && llm.intent) {
-          execute(llm.intent);
-          return;
-        }
-        if (llm.ok) {
-          report({ kind: 'error', text: llm.message ?? result.hint }, true);
-          return;
-        }
-        const why: Record<typeof llm.reason, string> = {
-          'not-configured': 'IA no configurada: falta EXPO_PUBLIC_API_BASE_URL / EXPO_PUBLIC_DASHBOARD_API_TOKEN en la app.',
-          unreachable: 'IA no disponible: no se pudo contactar el backend (¿está corriendo? ¿CORS_ORIGINS incluye este origen?).',
-          disabled: 'IA no disponible: el backend no tiene DEEPSEEK_API_KEY.',
-          failed: 'La IA no pudo procesar la frase. Intenta de nuevo.',
-        };
-        report({ kind: 'error', text: `${why[llm.reason]} ${result.hint}` });
+      setThinking(true);
+      report({ kind: 'info', text: t('voice.thinking') });
+      void interpretWithLlm(text, locale).then((llm) => {
+        setThinking(false);
+        if (llm.ok && llm.intent) execute(llm.intent);
+        else if (llm.ok) report({ kind: 'error', text: llm.message ?? failureText(result) }, true);
+        else report({ kind: 'error', text: `${t(LLM_KEYS[llm.reason])} ${failureText(result)}` });
       });
     },
-    [execute, report]
+    [execute, failureText, locale, report, t]
   );
 
   const clearTimer = () => {
@@ -181,33 +253,35 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     const text = e.results[0]?.transcript ?? '';
     setTranscript(text);
     if (e.isFinal) finalText.current = text;
+    // En web no hay evento de volumen: cada fragmento reconocido "late" la esfera.
+    if (Platform.OS === 'web') {
+      level.setValue(1);
+      Animated.timing(level, { toValue: 0.15, duration: 450, useNativeDriver: true }).start();
+    }
+  });
+
+  useSpeechRecognitionEvent('volumechange', (e) => {
+    // value va de -2 a 10; < 0 es silencio.
+    level.setValue(Math.max(0, Math.min(1, e.value / 10)));
   });
 
   useSpeechRecognitionEvent('error', (e) => {
     clearTimer();
     setListening(false);
+    level.setValue(0);
     const silent = e.error === 'aborted' || e.error === 'no-speech';
-    const known: Record<string, string> = {
-      'not-allowed': 'Permiso de micrófono denegado. Actívalo en los ajustes del navegador o del teléfono.',
-      'service-not-allowed':
-        'El servicio de voz no está permitido. Usa Chrome/Edge/Safari (no un navegador embebido) y permite el micrófono.',
-      network:
-        'El reconocimiento de voz necesita conexión a internet (el navegador usa un servicio en la nube). Revisa tu red o prueba en Chrome.',
-      'audio-capture': 'No se detectó ningún micrófono. Conéctalo o revisa los permisos.',
-      'language-not-supported': 'Idioma de voz no disponible en este dispositivo.',
-    };
     if (!silent) console.warn('[voice] recognition error', e.error, e.message);
+    const key = ERROR_KEYS[e.error];
     report({
       kind: silent ? 'info' : 'error',
-      text: silent
-        ? 'No te escuché. Toca el micrófono y vuelve a intentar.'
-        : (known[e.error] ?? `Error de voz (${e.error})${e.message ? `: ${e.message}` : ''}`),
+      text: silent ? t('error.silent') : key ? t(key) : t('error.generic', { code: e.error }),
     });
   });
 
   useSpeechRecognitionEvent('end', () => {
     clearTimer();
     setListening(false);
+    level.setValue(0);
     const text = finalText.current.trim();
     finalText.current = '';
     const current = modeRef.current;
@@ -218,7 +292,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       dictationCb.current?.(text);
       dictationCb.current = null;
       setPanelOpen(false);
-      setFeedback({ kind: 'success', text: 'Texto dictado. Revísalo antes de guardar.' });
+      report({ kind: 'success', text: t('action.dictated') });
     } else if (current === 'command') {
       runText(text);
     }
@@ -227,17 +301,18 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const begin = useCallback(
     async (next: 'command' | 'dictation') => {
       if (!supported) {
-        report({ kind: 'error', text: 'Este dispositivo o navegador no soporta reconocimiento de voz.' });
+        report({ kind: 'error', text: t('error.unsupported') });
         return;
       }
       // En web no hay API de permisos: el navegador pide el micrófono al iniciar.
       const perm =
         Platform.OS === 'web' ? { granted: true } : await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!perm.granted) {
-        report({ kind: 'error', text: 'Permiso de micrófono denegado. Actívalo en los ajustes.' });
+        report({ kind: 'error', text: t('error.notAllowed') });
         return;
       }
       Speech.stop();
+      haptic.listen();
       finalText.current = '';
       modeRef.current = next;
       setMode(next);
@@ -245,15 +320,16 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       setFeedback(null);
       setListening(true);
       ExpoSpeechRecognitionModule.start({
-        lang: LANG,
+        lang: speech.lang,
         interimResults: true,
         continuous: false,
         addsPunctuation: next === 'dictation',
+        volumeChangeEventOptions: { enabled: true, intervalMillis: 80 },
         contextualStrings: ['signos vitales', 'chequeo diario', 'bíceps', 'isquiotibiales', 'misiones'],
       });
       timer.current = setTimeout(() => ExpoSpeechRecognitionModule.stop(), LISTEN_TIMEOUT_MS);
     },
-    [supported, report]
+    [supported, report, t, speech.lang]
   );
 
   const startCommand = useCallback(() => {
@@ -279,34 +355,42 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  useEffect(() => () => {
-    clearTimer();
-    try {
-      ExpoSpeechRecognitionModule.abort();
-      Speech.stop();
-    } catch {
-      // nada que limpiar
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      clearTimer();
+      try {
+        ExpoSpeechRecognitionModule.abort();
+        Speech.stop();
+      } catch {
+        // nada que limpiar
+      }
+    },
+    []
+  );
 
   const consumeBodyIntent = useCallback(
     (n: number) => setBodyIntent((cur) => (cur && cur.nonce === n ? null : cur)),
     []
   );
 
+  const openPanel = useCallback(() => setPanelOpen(true), []);
+  const closePanel = useCallback(() => {
+    stop();
+    setPanelOpen(false);
+  }, [stop]);
+
   const value = useMemo(
     () => ({
       supported,
       listening,
+      thinking,
+      level,
       mode,
       transcript,
       feedback,
       panelOpen,
-      openPanel: () => setPanelOpen(true),
-      closePanel: () => {
-        stop();
-        setPanelOpen(false);
-      },
+      openPanel,
+      closePanel,
       startCommand,
       startDictation,
       stop,
@@ -314,8 +398,13 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       bodyIntent,
       consumeBodyIntent,
     }),
-    [supported, listening, mode, transcript, feedback, panelOpen, startCommand, startDictation, stop, runText, bodyIntent, consumeBodyIntent]
+    [supported, listening, thinking, level, mode, transcript, feedback, panelOpen, openPanel, closePanel, startCommand, startDictation, stop, runText, bodyIntent, consumeBodyIntent]
   );
 
-  return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;
+  return (
+    <VoiceContext.Provider value={value}>
+      {children}
+      <WarpTransition trip={trip} onPeak={onWarpPeak} onDone={onWarpDone} />
+    </VoiceContext.Provider>
+  );
 }

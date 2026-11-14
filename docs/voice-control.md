@@ -27,3 +27,9 @@ When the local parser returns `unknown`, the app calls `POST /voice/interpret` o
 - If the key is missing, the service is down or it times out (8 s), the app silently falls back to the local hint.
 - Config (backend env): `DEEPSEEK_API_KEY` (enables it), optional `DEEPSEEK_MODEL`, `DEEPSEEK_BASE_URL`.
 - Web needs the app origin in `CORS_ORIGINS`.
+
+## i18n, voice and UI
+- `src/i18n/`: `I18nProvider` + `useI18n()` (`t`, `locale`, `speech`). Spanish is the default; English ships as the second dictionary. Adding a locale = add it to `LOCALES`, `SPEECH` and a dictionary (a test checks every locale has every key). STT language, TTS voice and the LLM reply language all follow the active locale (`locale` is sent to `POST /voice/interpret`).
+- TTS picks a native voice of the active language (enhanced quality first) instead of the system default.
+- `WarpTransition`: navigation by voice plays a hyperspace jump (stars stretching from the center, "Rumbo a …"), navigates at the peak and fades into the new screen; reduced-motion users get a plain fade. Light haptics on mobile.
+- `VoiceOrb` / `VoiceFab`: Siri-like sphere that reacts to voice level (native `volumechange`; on web it pulses with each recognized fragment), transcript shown above it.

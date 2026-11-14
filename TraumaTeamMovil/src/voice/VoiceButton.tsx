@@ -1,115 +1,218 @@
-import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Easing, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Mic, MicOff, X } from 'lucide-react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { Mic, X } from 'lucide-react-native';
 
-import { VOICE_EXAMPLES } from './parser';
+import { useI18n } from '../i18n/I18nProvider';
 import { useVoice } from './voice-context';
+import { VoiceOrb } from './VoiceOrb';
 
-/** Botón flotante + panel de escucha con transcripción y feedback visible. */
+const ORB_BIG = 120;
+const ORB_SMALL = 58;
+
+/** Botón flotante (esfera) + overlay espacial estilo Siri con transcripción arriba de la esfera. */
 export function VoiceFab() {
   const v = useVoice();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const [typed, setTyped] = useState('');
+  const [enter] = useState(() => new Animated.Value(0));
 
-  const tone =
-    v.feedback?.kind === 'error'
-      ? 'border-red-200 bg-red-50 text-red-700'
-      : v.feedback?.kind === 'success'
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-        : 'border-slate-200 bg-slate-50 text-slate-700';
+  useEffect(() => {
+    if (!v.panelOpen) return;
+    enter.setValue(0);
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 380,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [v.panelOpen, enter]);
+
+  const status = v.thinking
+    ? t('voice.thinking')
+    : v.listening
+      ? v.mode === 'dictation'
+        ? t('voice.dictating')
+        : t('voice.listening')
+      : t('voice.tapToTalk');
+
+  const fb = v.feedback;
+  const pill =
+    fb?.kind === 'error'
+      ? { bg: 'rgba(239,68,68,0.18)', border: 'rgba(248,113,113,0.5)', text: '#fecaca' }
+      : fb?.kind === 'success'
+        ? { bg: 'rgba(16,185,129,0.18)', border: 'rgba(52,211,153,0.5)', text: '#a7f3d0' }
+        : { bg: 'rgba(88,213,247,0.14)', border: 'rgba(125,211,252,0.4)', text: '#bae6fd' };
+
+  const examples = t('examples').split('|').slice(0, 4);
+  const idle = !v.listening && !v.thinking && v.transcript === '' && !fb;
+
+  if (!v.panelOpen) {
+    return (
+      <Pressable
+        onPress={v.startCommand}
+        accessibilityRole="button"
+        accessibilityLabel={t('voice.talk')}
+        style={{ position: 'absolute', right: 16 - ORB_SMALL * 0.35, bottom: insets.bottom + 20 - ORB_SMALL * 0.35 }}>
+        <VoiceOrb size={ORB_SMALL} listening={false} thinking={false} level={v.level} />
+      </Pressable>
+    );
+  }
 
   return (
-    <>
-      {v.panelOpen && (
-        <View
-          pointerEvents="box-none"
-          style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 88 }}>
-          <View
-            accessibilityLiveRegion="polite"
-            className="rounded-3xl border border-slate-200 bg-white p-4 shadow-xl">
-            <View className="mb-2 flex-row items-center justify-between">
-              <Text className="font-mono text-xs font-bold text-slate-900">
-                {v.listening
-                  ? v.mode === 'dictation'
-                    ? 'Dictando… habla ahora'
-                    : 'Escuchando…'
-                  : 'Control por voz'}
-              </Text>
-              <Pressable onPress={v.closePanel} accessibilityLabel="Cerrar control por voz" hitSlop={10}>
-                <X size={16} color="#475569" />
-              </Pressable>
-            </View>
-
-            {v.transcript !== '' && (
-              <Text className="mb-2 font-mono text-sm text-slate-900">“{v.transcript}”</Text>
-            )}
-
-            {v.feedback && (
-              <View className={`mb-2 rounded-xl border px-3 py-2 ${tone}`}>
-                <Text className={`font-mono text-[11px] font-bold ${tone.split(' ').pop()}`}>
-                  {v.feedback.text}
-                </Text>
-              </View>
-            )}
-
-            {!v.listening && !v.feedback && (
-              <View className="mb-2">
-                {VOICE_EXAMPLES.slice(0, 5).map((e) => (
-                  <Text key={e} className="font-mono text-[10.5px] text-slate-500">
-                    • {e}
-                  </Text>
-                ))}
-              </View>
-            )}
-
-            {(!v.supported || !v.listening) && (
-              <TextInput
-                value={typed}
-                onChangeText={setTyped}
-                onSubmitEditing={() => {
-                  v.runText(typed);
-                  setTyped('');
-                }}
-                returnKeyType="send"
-                placeholder={v.supported ? 'O escribe un comando…' : 'Sin micrófono: escribe un comando…'}
-                placeholderTextColor="#94a3b8"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[11px] text-slate-700"
-              />
-            )}
-          </View>
-        </View>
-      )}
+    <Animated.View
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, opacity: enter }}>
+      <Pressable
+        onPress={v.closePanel}
+        accessibilityLabel={t('voice.close')}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="voiceBackdrop" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#05070f" stopOpacity={0} />
+              <Stop offset="1" stopColor="#05070f" stopOpacity={0.92} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#voiceBackdrop)" />
+        </Svg>
+      </Pressable>
 
       <Pressable
-        onPress={v.listening ? v.stop : v.startCommand}
+        onPress={v.closePanel}
         accessibilityRole="button"
-        accessibilityLabel={v.listening ? 'Detener escucha' : 'Hablar con la app'}
-        style={{ position: 'absolute', right: 16, bottom: insets.bottom + 20 }}
-        className={`h-14 w-14 items-center justify-center rounded-full border shadow-lg active:opacity-80 ${
-          v.listening ? 'border-red-300 bg-red-500' : 'border-sky-300 bg-sky-500'
-        }`}>
-        {v.supported ? <Mic size={24} color="#ffffff" /> : <MicOff size={24} color="#ffffff" />}
+        accessibilityLabel={t('voice.close')}
+        hitSlop={12}
+        style={{
+          position: 'absolute',
+          top: insets.top + 12,
+          right: 16,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(255,255,255,0.1)',
+        }}>
+        <X size={18} color="#e2e8f0" />
       </Pressable>
-    </>
+
+      <View
+        pointerEvents="box-none"
+        style={{
+          flex: 1,
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          paddingHorizontal: 24,
+          paddingBottom: insets.bottom + 20,
+        }}>
+        <View accessibilityLiveRegion="polite" style={{ alignItems: 'center', marginBottom: 12 }} pointerEvents="none">
+          {v.transcript !== '' && (
+            <Text
+              numberOfLines={4}
+              style={{ color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 10 }}>
+              {v.transcript}
+            </Text>
+          )}
+          <Text
+            style={{
+              color: '#7dd3fc',
+              fontSize: 11,
+              fontWeight: '700',
+              letterSpacing: 1.5,
+              textTransform: 'uppercase',
+              textAlign: 'center',
+            }}>
+            {status}
+          </Text>
+          {fb && (
+            <View
+              style={{
+                marginTop: 10,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: pill.border,
+                backgroundColor: pill.bg,
+                paddingHorizontal: 14,
+                paddingVertical: 6,
+              }}>
+              <Text style={{ color: pill.text, fontSize: 12, fontWeight: '600', textAlign: 'center' }}>{fb.text}</Text>
+            </View>
+          )}
+          {idle &&
+            examples.map((e) => (
+              <Text
+                key={e}
+                style={{ color: 'rgba(203,213,225,0.6)', fontSize: 13, fontStyle: 'italic', marginTop: 6 }}>
+                “{e}”
+              </Text>
+            ))}
+        </View>
+
+        <Animated.View
+          style={{
+            opacity: enter,
+            transform: [
+              { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) },
+              { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
+            ],
+          }}>
+          <Pressable
+            onPress={v.listening ? v.stop : v.startCommand}
+            accessibilityRole="button"
+            accessibilityLabel={v.listening ? t('voice.stopListening') : t('voice.talk')}>
+            <VoiceOrb size={ORB_BIG} listening={v.listening} thinking={v.thinking} level={v.level} />
+          </Pressable>
+        </Animated.View>
+
+        {!v.listening && (
+          <TextInput
+            value={typed}
+            onChangeText={setTyped}
+            onSubmitEditing={() => {
+              v.runText(typed);
+              setTyped('');
+            }}
+            returnKeyType="send"
+            placeholder={v.supported ? t('voice.typePlaceholder') : t('voice.typePlaceholderNoMic')}
+            placeholderTextColor="rgba(148,163,184,0.8)"
+            style={{
+              alignSelf: 'stretch',
+              marginTop: 4,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(125,211,252,0.25)',
+              backgroundColor: 'rgba(15,23,42,0.6)',
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              color: '#e2e8f0',
+              fontSize: 13,
+            }}
+          />
+        )}
+      </View>
+    </Animated.View>
   );
 }
 
 /** Mic compacto para dictar en un campo de texto; el usuario revisa antes de guardar. */
-export function DictationButton({ onText, label = 'Dictar' }: { onText: (text: string) => void; label?: string }) {
+export function DictationButton({ onText, label }: { onText: (text: string) => void; label?: string }) {
   const v = useVoice();
+  const { t } = useI18n();
+  const text = label ?? t('voice.dictate');
   const active = v.listening && v.mode === 'dictation';
   return (
     <Pressable
       onPress={() => (active ? v.stop() : v.startDictation(onText))}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={text}
       className={`flex-row items-center self-start rounded-full border px-3 py-1.5 active:opacity-70 ${
         active ? 'border-red-300 bg-red-50' : 'border-sky-200 bg-sky-50'
       }`}>
       <Mic size={13} color={active ? '#dc2626' : '#0284c7'} />
       <Text className={`ml-1.5 font-mono text-[10.5px] font-bold ${active ? 'text-red-600' : 'text-sky-700'}`}>
-        {active ? 'Escuchando…' : label}
+        {active ? t('voice.listening') : text}
       </Text>
     </Pressable>
   );

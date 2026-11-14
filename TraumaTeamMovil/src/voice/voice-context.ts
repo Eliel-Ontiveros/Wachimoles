@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react';
+import type { Animated } from 'react-native';
 
 import type { BodyTab } from './parser';
 
@@ -11,6 +12,10 @@ export type VoiceCtx = {
   /** El dispositivo/navegador puede reconocer voz. */
   supported: boolean;
   listening: boolean;
+  /** Esperando la respuesta del LLM. */
+  thinking: boolean;
+  /** Nivel de voz 0..1 para animar la esfera. */
+  level: Animated.Value;
   mode: 'command' | 'dictation' | null;
   /** Texto parcial/final en vivo mientras se escucha. */
   transcript: string;

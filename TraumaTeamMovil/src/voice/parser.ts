@@ -23,7 +23,8 @@ export type VoiceIntent =
 
 export type ParseResult =
   | { ok: true; intent: VoiceIntent; confidence: number }
-  | { ok: false; reason: 'empty' | 'unknown' | 'ambiguous'; hint: string };
+  | { ok: false; reason: 'empty' | 'unknown' }
+  | { ok: false; reason: 'ambiguous'; zone: string };
 
 export function normalize(input: string): string {
   return input
@@ -105,7 +106,7 @@ function parseZone(text: string): ParseResult | null {
   const right = hasAny(text, RIGHT);
   const left = hasAny(text, LEFT);
   if (right === left) {
-    return { ok: false, reason: 'ambiguous', hint: `¿${z.name} derecho o izquierdo?` };
+    return { ok: false, reason: 'ambiguous', zone: z.name };
   }
   const side = right ? 'der' : 'izq';
   const sideName = right ? 'derecho' : 'izquierdo';
@@ -121,7 +122,7 @@ const GO = ['ir', 've', 'vamos', 'llevame', 'abre', 'abrir', 'muestrame', 'mostr
 
 export function parseCommand(raw: string): ParseResult {
   const text = normalize(raw);
-  if (!text) return { ok: false, reason: 'empty', hint: 'No te escuché. Intenta de nuevo.' };
+  if (!text) return { ok: false, reason: 'empty' };
   const ok = (intent: VoiceIntent, confidence = 0.85): ParseResult => ({ ok: true, intent, confidence });
 
   if (hasAny(text, ['ayuda', 'que puedo decir', 'comandos', 'help', 'what can i say'])) return ok({ type: 'help' }, 1);
@@ -165,20 +166,5 @@ export function parseCommand(raw: string): ParseResult {
     return ok({ type: 'navigate', route: '/missions', label: 'Misiones y Viaje' });
   }
 
-  return {
-    ok: false,
-    reason: 'unknown',
-    hint: 'No entendí. Prueba: "abre signos vitales", "iniciar chequeo diario" o "ve al bíceps derecho".',
-  };
+  return { ok: false, reason: 'unknown' };
 }
-
-export const VOICE_EXAMPLES: string[] = [
-  'Abre signos vitales',
-  'Iniciar chequeo diario',
-  'Ve al bíceps derecho',
-  'Me duele la espalda izquierda',
-  'Ir a misiones',
-  'Ver mis alertas',
-  'Marcar alertas como leídas',
-  'Abrir menú',
-];

@@ -1,3 +1,4 @@
+import type { Locale } from '../i18n/messages';
 import type { VoiceIntent } from '../voice/parser';
 import { API_CONFIG } from './vital-signs-api';
 
@@ -11,7 +12,7 @@ const LLM_TIMEOUT_MS = 9000;
  * Respaldo con LLM (DeepSeek vía backend) para frases que el intérprete local
  * no reconoce. Si no está disponible devuelve el motivo, para mostrarlo en la UI.
  */
-export async function interpretWithLlm(text: string): Promise<LlmInterpretation> {
+export async function interpretWithLlm(text: string, locale: Locale): Promise<LlmInterpretation> {
   if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) return { ok: false, reason: 'not-configured' };
 
   const controller = new AbortController();
@@ -23,7 +24,7 @@ export async function interpretWithLlm(text: string): Promise<LlmInterpretation>
         Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text: text.slice(0, 300) }),
+      body: JSON.stringify({ text: text.slice(0, 300), locale }),
       signal: controller.signal,
     });
     if (response.status === 503) return { ok: false, reason: 'disabled' };

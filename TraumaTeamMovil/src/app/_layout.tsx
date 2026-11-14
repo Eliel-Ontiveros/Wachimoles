@@ -7,6 +7,7 @@ import { CriticalAlertToaster } from '@/components/trauma/CriticalAlertToaster';
 import { DrawerProvider } from '@/components/trauma/DrawerProvider';
 import { MissionOnboardingModal } from '@/components/trauma/MissionOnboardingModal';
 import { MissionProvider } from '@/components/trauma/MissionProvider';
+import { I18nProvider } from '@/i18n/I18nProvider';
 import { VoiceFab } from '@/voice/VoiceButton';
 import { VoiceProvider } from '@/voice/VoiceProvider';
 
@@ -18,15 +19,23 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <MissionProvider>
-      <DrawerProvider>
-        <VoiceProvider>
-          <Stack screenOptions={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
-          <MissionOnboardingModal />
-          <CriticalAlertToaster />
-          <VoiceFab />
-        </VoiceProvider>
-      </DrawerProvider>
-    </MissionProvider>
+    <I18nProvider>
+      <MissionProvider>
+        <DrawerProvider>
+          <VoiceProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: 'fade',
+                gestureEnabled: false,
+              }}
+            />
+            <MissionOnboardingModal />
+            <CriticalAlertToaster />
+            <VoiceFab />
+          </VoiceProvider>
+        </DrawerProvider>
+      </MissionProvider>
+    </I18nProvider>
   );
 }
