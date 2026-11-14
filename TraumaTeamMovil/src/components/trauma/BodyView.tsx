@@ -89,15 +89,15 @@ function ProblemDetailModal({
   onDelete: () => void;
   onOpenTimelapse: () => void;
 }) {
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const confirmingDelete = Boolean(visible && muscle && confirmingDeleteId === muscle.id);
 
   // Animaciones de entrada del modal y barra de dolor
-  const sheetAnim = useRef(new Animated.Value(0)).current;
-  const barAnim = useRef(new Animated.Value(0)).current;
+  const [sheetAnim] = useState(() => new Animated.Value(0));
+  const [barAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (visible && muscle?.observation) {
-      setConfirmingDelete(false);
       sheetAnim.setValue(0);
       barAnim.setValue(0);
 
@@ -127,6 +127,16 @@ function ProblemDetailModal({
   const painColor = getPainColorHex(intensity);
   const severityLabel = getPainSeverityLabel(intensity);
 
+  const handleClose = () => {
+    setConfirmingDeleteId(null);
+    onClose();
+  };
+
+  const handleConfirmDelete = () => {
+    setConfirmingDeleteId(null);
+    onDelete();
+  };
+
   const translateY = sheetAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [60, 0],
@@ -145,9 +155,9 @@ function ProblemDetailModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}>
+      onRequestClose={handleClose}>
       <Pressable
-        onPress={onClose}
+        onPress={handleClose}
         style={{
           flex: 1,
           backgroundColor: 'rgba(15,23,42,0.45)',
@@ -228,7 +238,7 @@ function ProblemDetailModal({
                   </View>
 
                   <Pressable
-                    onPress={onClose}
+                    onPress={handleClose}
                     className="h-8 w-8 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200">
                     <X size={15} color="#475569" strokeWidth={2.2} />
                   </Pressable>
@@ -323,7 +333,7 @@ function ProblemDetailModal({
                   </Pressable>
 
                   <Pressable
-                    onPress={() => setConfirmingDelete(true)}
+                    onPress={() => setConfirmingDeleteId(muscle.id)}
                     className="flex-row items-center justify-center rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 active:opacity-75">
                     <Trash2 size={13} color="#dc2626" strokeWidth={2.1} />
                     <Text className="ml-1.5 font-mono text-xs font-bold text-red-600">
@@ -338,14 +348,14 @@ function ProblemDetailModal({
                   </Text>
                   <View className="flex-row items-center gap-2">
                     <Pressable
-                      onPress={() => setConfirmingDelete(false)}
+                      onPress={() => setConfirmingDeleteId(null)}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 active:opacity-75">
                       <Text className="font-mono text-[10.5px] font-bold text-slate-600">
                         Cancelar
                       </Text>
                     </Pressable>
                     <Pressable
-                      onPress={onDelete}
+                      onPress={handleConfirmDelete}
                       className="rounded-lg bg-red-600 px-3 py-1.5 active:opacity-80">
                       <Text className="font-mono text-[10.5px] font-bold text-white">
                         Sí, borrar
@@ -385,9 +395,16 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
           currentMuscles.map((muscle) => {
             if (locallyEditedMuscleIds.current.has(muscle.id)) return muscle;
             const record = records.find(
-              (item) => item.muscleId === muscle.id && item.status === 'active'
+              (item) =>
+                item.muscleId.trim().toLowerCase() === muscle.id.toLowerCase() &&
+                item.status === 'active'
             );
-            if (!record) return muscle;
+            if (!record || record.painIntensity <= 0) return muscle;
+
+            const normalizedDate = new Date(record.recordedAt.replace(' ', 'T'));
+            const updatedAt = Number.isNaN(normalizedDate.getTime())
+              ? record.recordedAt
+              : normalizedDate.toLocaleString();
 
             return {
               ...muscle,
@@ -397,7 +414,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
                 swelling: record.swelling,
                 functionalLimitation: record.functionalLimitation,
                 notes: record.description ?? '',
-                updatedAt: new Date(record.recordedAt).toLocaleString(),
+                updatedAt,
               },
             };
           })

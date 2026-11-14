@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { MUSCLE_MODEL_BASE64 } from '@/assets/images/muscle-model-base64';
 
@@ -442,81 +442,15 @@ export const INITIAL_MUSCLES: MuscleData[] = [
 let NativeWebView: any = null;
 if (Platform.OS !== 'web') {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     NativeWebView = require('react-native-webview').WebView;
-  } catch (e) {}
+  } catch {
+    NativeWebView = null;
+  }
 }
 
-export function BodyModelViewer({
-  muscles,
-  selectedMuscle,
-  onSelectMuscle,
-  isLocked = false,
-  onTouchStateChange,
-  onZoneSnapshot,
-}: BodyModelViewerProps) {
-  const webViewRef = useRef<any>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const onZoneSnapshotRef = useRef(onZoneSnapshot);
-  onZoneSnapshotRef.current = onZoneSnapshot;
-
-  // Sincroniza cambios de estado (músculo seleccionado, bloqueo de vista, intensidad de dolor) con la escena 3D
-  useEffect(() => {
-    const payload = JSON.stringify({
-      type: 'SYNC_STATE',
-      selected: selectedMuscle,
-      locked: isLocked,
-      muscles: muscles.map((m) => ({
-        id: m.id,
-        name: m.name,
-        status: m.status,
-        painIntensity: m.observation?.painIntensity ?? 0,
-      })),
-    });
-
-    if (Platform.OS === 'web') {
-      iframeRef.current?.contentWindow?.postMessage(payload, '*');
-    } else {
-      webViewRef.current?.injectJavaScript(`
-        if (window.onParentMessage) {
-          window.onParentMessage(${payload});
-        }
-        true;
-      `);
-    }
-  }, [selectedMuscle, isLocked, muscles]);
-
-  // Escucha eventos desde el iframe cuando se ejecuta en navegador Web
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const onWebMsg = (event: MessageEvent) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data?.type === 'SELECT_MUSCLE' && data.name) {
-          onSelectMuscle(data.name);
-        } else if (data?.type === 'ZONE_SNAPSHOT' && data.zoneId && data.dataUrl) {
-          onZoneSnapshotRef.current?.(data.zoneId, data.dataUrl);
-        } else if (data?.type === 'TOUCH_START') {
-          onTouchStateChange?.(true);
-        } else if (data?.type === 'TOUCH_END') {
-          onTouchStateChange?.(false);
-        }
-      } catch (e) {}
-    };
-    window.addEventListener('message', onWebMsg);
-    return () => window.removeEventListener('message', onWebMsg);
-  }, [onSelectMuscle, onTouchStateChange]);
-
-  const initialZonesJson = useRef(
-    JSON.stringify(
-      muscles.map((m) => ({
-        ...m,
-        painIntensity: m.observation?.painIntensity ?? 0,
-      }))
-    )
-  ).current;
-  const initialSelected = useRef(selectedMuscle).current;
-
-  const htmlContent = useRef(`
+function buildBodyViewerHtml(initialZonesJson: string, initialSelected: string): string {
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -590,9 +524,9 @@ export function BodyModelViewer({
       width: 23px;
       height: 23px;
       transform: translate(-50%, -50%) scale(1.18);
-      background: #38bdf8 !important;
-      border-color: #0284c7 !important;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.85) !important;
+      background: #38bdf8;
+      border-color: #0284c7;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.85);
       z-index: 25;
     }
     .zone-pin.active svg {
@@ -689,6 +623,20 @@ export function BodyModelViewer({
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
     }
   }
+  </script>
+  <script>
+    window.__latestSyncData = null;
+    window.onParentMessage = function(data) {
+      if (data && data.type === 'SYNC_STATE') {
+        window.__latestSyncData = data;
+      }
+    };
+    window.addEventListener('message', function(event) {
+      try {
+        var d = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (window.onParentMessage) window.onParentMessage(d);
+      } catch (err) {}
+    });
   </script>
 </head>
 <body>
@@ -897,13 +845,15 @@ export function BodyModelViewer({
         btn.className = 'zone-pin' + (hasPain ? ' has-pain' : '') + (isActive ? ' active' : '');
         btn.innerHTML = getPinSvg(hasPain, isActive);
 
-        if (hasPain && !isActive) {
+        if (hasPain) {
           const col = getGradualPainColor(z.painIntensity || 5);
           const hex = '#' + col.getHexString();
           btn.style.backgroundColor = hex;
           btn.style.borderColor = '#ffffff';
-          btn.style.boxShadow = '0 0 8px ' + hex;
-        } else if (!isActive) {
+          btn.style.boxShadow = isActive
+            ? '0 0 0 2px #38bdf8, 0 0 12px ' + hex
+            : '0 0 8px ' + hex;
+        } else {
           btn.style.backgroundColor = '';
           btn.style.borderColor = '';
           btn.style.boxShadow = '';
@@ -1178,16 +1128,21 @@ export function BodyModelViewer({
           }
         });
         scene.add(model);
+        if (window.__latestSyncData) {
+          applySyncData(window.__latestSyncData);
+          window.__latestSyncData = null;
+        }
+        refreshPinsDOM();
         updateMeshZoneColors();
 
         const initZn = zones.find((z) => z.name.toLowerCase() === (selectedName || '').toLowerCase());
         if (initZn) {
-          focusCameraOnZone(initZn);
           captureZoneSnapshot(initZn);
         }
 
         loadingEl.style.opacity = '0';
         setTimeout(() => { loadingEl.style.display = 'none'; }, 350);
+        postMsg({ type: 'VIEWER_READY' });
       },
       undefined,
       (err) => {
@@ -1242,8 +1197,8 @@ export function BodyModelViewer({
       }
     });
 
-    // Sincronización desde React Native
-    window.onParentMessage = function(data) {
+    // Sincronización desde React Native / Web
+    function applySyncData(data) {
       if (!data || data.type !== 'SYNC_STATE') return;
       let changed = false;
 
@@ -1275,14 +1230,13 @@ export function BodyModelViewer({
         const activeZn = zones.find((z) => z.name.toLowerCase() === (selectedName || '').toLowerCase());
         if (activeZn) captureZoneSnapshot(activeZn);
       }
-    };
+    }
 
-    window.addEventListener('message', (event) => {
-      try {
-        const d = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        window.onParentMessage(d);
-      } catch (e) {}
-    });
+    window.onParentMessage = applySyncData;
+    if (window.__latestSyncData) {
+      applySyncData(window.__latestSyncData);
+      window.__latestSyncData = null;
+    }
 
     const tempVec = new THREE.Vector3();
     const tempNormal = new THREE.Vector3();
@@ -1350,19 +1304,124 @@ export function BodyModelViewer({
   </script>
 </body>
 </html>
-  `).current;
+  `;
+}
+
+export function BodyModelViewer({
+  muscles,
+  selectedMuscle,
+  onSelectMuscle,
+  isLocked = false,
+  onTouchStateChange,
+  onZoneSnapshot,
+}: BodyModelViewerProps) {
+  const webViewRef = useRef<any>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const onZoneSnapshotRef = useRef(onZoneSnapshot);
+  const onSelectMuscleRef = useRef(onSelectMuscle);
+  const onTouchStateChangeRef = useRef(onTouchStateChange);
+  const [viewerReady, setViewerReady] = useState(false);
+
+  const [htmlContent] = useState(() =>
+    buildBodyViewerHtml(
+      JSON.stringify(
+        muscles.map((m) => ({
+          ...m,
+          painIntensity: m.observation?.painIntensity ?? 0,
+        }))
+      ),
+      selectedMuscle
+    )
+  );
+
+  useEffect(() => {
+    onZoneSnapshotRef.current = onZoneSnapshot;
+  }, [onZoneSnapshot]);
+
+  useEffect(() => {
+    onSelectMuscleRef.current = onSelectMuscle;
+  }, [onSelectMuscle]);
+
+  useEffect(() => {
+    onTouchStateChangeRef.current = onTouchStateChange;
+  }, [onTouchStateChange]);
+
+  const sendSyncState = useCallback(() => {
+    const payload = JSON.stringify({
+      type: 'SYNC_STATE',
+      selected: selectedMuscle,
+      locked: isLocked,
+      muscles: muscles.map((m) => ({
+        id: m.id,
+        name: m.name,
+        status: m.status,
+        painIntensity: m.observation?.painIntensity ?? 0,
+      })),
+    });
+
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage(payload, '*');
+    } else {
+      webViewRef.current?.injectJavaScript(`
+        if (window.onParentMessage) {
+          window.onParentMessage(${payload});
+        }
+        true;
+      `);
+    }
+  }, [selectedMuscle, isLocked, muscles]);
+
+  const sendSyncStateRef = useRef(sendSyncState);
+  useEffect(() => {
+    sendSyncStateRef.current = sendSyncState;
+  }, [sendSyncState]);
+
+  // Sincroniza cambios de estado (músculo seleccionado, bloqueo de vista, intensidad de dolor) con la escena 3D
+  useEffect(() => {
+    void viewerReady;
+    sendSyncState();
+  }, [sendSyncState, viewerReady]);
+
+  // Escucha eventos desde el iframe cuando se ejecuta en navegador Web
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onWebMsg = (event: MessageEvent) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data?.type === 'VIEWER_READY') {
+          setViewerReady(true);
+          sendSyncStateRef.current();
+        } else if (data?.type === 'SELECT_MUSCLE' && data.name) {
+          onSelectMuscleRef.current(data.name);
+        } else if (data?.type === 'ZONE_SNAPSHOT' && data.zoneId && data.dataUrl) {
+          onZoneSnapshotRef.current?.(data.zoneId, data.dataUrl);
+        } else if (data?.type === 'TOUCH_START') {
+          onTouchStateChangeRef.current?.(true);
+        } else if (data?.type === 'TOUCH_END') {
+          onTouchStateChangeRef.current?.(false);
+        }
+      } catch {
+        // Ignorar mensajes externos
+      }
+    };
+    window.addEventListener('message', onWebMsg);
+    return () => window.removeEventListener('message', onWebMsg);
+  }, []);
 
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'SELECT_MUSCLE' && data.name) {
-        onSelectMuscle(data.name);
+      if (data.type === 'VIEWER_READY') {
+        setViewerReady(true);
+        sendSyncStateRef.current();
+      } else if (data.type === 'SELECT_MUSCLE' && data.name) {
+        onSelectMuscleRef.current(data.name);
       } else if (data.type === 'ZONE_SNAPSHOT' && data.zoneId && data.dataUrl) {
         onZoneSnapshotRef.current?.(data.zoneId, data.dataUrl);
       } else if (data.type === 'TOUCH_START') {
-        onTouchStateChange?.(true);
+        onTouchStateChangeRef.current?.(true);
       } else if (data.type === 'TOUCH_END') {
-        onTouchStateChange?.(false);
+        onTouchStateChangeRef.current?.(false);
       }
     } catch (e) {
       console.warn('Error parsing 3D viewer message', e);
@@ -1384,6 +1443,7 @@ export function BodyModelViewer({
         <iframe
           ref={iframeRef as any}
           srcDoc={htmlContent}
+          onLoad={() => sendSyncStateRef.current()}
           // Anterior claro: backgroundColor: '#f8fafc'
           style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#060b19' }}
           title="Visor 3D de Anatomía Muscular"
@@ -1399,6 +1459,7 @@ export function BodyModelViewer({
         originWhitelist={['*']}
         source={{ html: htmlContent }}
         style={styles.webView}
+        onLoadEnd={() => sendSyncStateRef.current()}
         onMessage={handleMessage}
         scrollEnabled={false}
         nestedScrollEnabled={false}

@@ -47,27 +47,112 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isBodyConditionRecord(value: unknown): value is BodyConditionRecord {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.id === 'string' &&
-    typeof value.muscleId === 'string' &&
-    typeof value.bodyRegion === 'string' &&
-    typeof value.muscleName === 'string' &&
-    typeof value.conditionName === 'string' &&
-    (typeof value.description === 'string' || value.description === null) &&
-    typeof value.painIntensity === 'number' &&
-    Number.isInteger(value.painIntensity) &&
-    value.painIntensity >= 1 &&
-    value.painIntensity <= 10 &&
-    typeof value.swelling === 'boolean' &&
-    typeof value.functionalLimitation === 'boolean' &&
-    (value.status === 'active' || value.status === 'resolved') &&
-    typeof value.recordedAt === 'string' &&
-    typeof value.createdAt === 'string' &&
-    typeof value.updatedAt === 'string' &&
-    (typeof value.resolvedAt === 'string' || value.resolvedAt === null)
-  );
+function encodeBase64Ascii(input: string): string {
+  if (typeof globalThis.btoa === 'function') {
+    const bytes = new TextEncoder().encode(input);
+    let binary = '';
+    bytes.forEach((b) => {
+      binary += String.fromCharCode(b);
+    });
+    return globalThis.btoa(binary);
+  }
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const bytes = new TextEncoder().encode(input);
+  let output = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    const triplet = (b0 << 16) | (b1 << 8) | b2;
+    output += chars[(triplet >> 18) & 0x3f];
+    output += chars[(triplet >> 12) & 0x3f];
+    output += i + 1 < bytes.length ? chars[(triplet >> 6) & 0x3f] : '=';
+    output += i + 2 < bytes.length ? chars[triplet & 0x3f] : '=';
+  }
+  return output;
+}
+
+function getMobileFallbackAuthHeaders(): Record<string, string>[] {
+  const headersList: Record<string, string>[] = [];
+  if (API_CONFIG.dashboardApiToken) {
+    headersList.push({
+      Accept: 'application/json',
+      Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
+    });
+  }
+  const webUser = (process.env.EXPO_PUBLIC_WEB_USER || '').trim();
+  const webPassword = (process.env.EXPO_PUBLIC_WEB_PASSWORD || '').trim();
+  if (webUser && webPassword) {
+    headersList.push({
+      Accept: 'application/json',
+      Authorization: `Basic ${encodeBase64Ascii(`${webUser}:${webPassword}`)}`,
+    });
+  }
+  return headersList;
+}
+
+function normalizeBodyConditionRecord(
+  value: unknown
+): BodyConditionRecord | null {
+  if (!isRecord(value)) return null;
+
+  const id = value.id;
+  const muscleId = value.muscleId ?? value.muscle_id;
+  const bodyRegion = value.bodyRegion ?? value.body_region;
+  const muscleName = value.muscleName ?? value.muscle_name;
+  const conditionName =
+    value.conditionName ?? value.condition_name ?? 'Dolor muscular';
+  const rawDescription = value.description;
+  const rawPain = value.painIntensity ?? value.pain_intensity;
+  const painIntensity =
+    typeof rawPain === 'number' ? rawPain : Number(rawPain);
+  const swelling = value.swelling;
+  const functionalLimitation =
+    value.functionalLimitation ?? value.functional_limitation;
+  const status = value.status;
+  const recordedAt = value.recordedAt ?? value.recorded_at ?? '';
+  const createdAt = value.createdAt ?? value.created_at ?? recordedAt;
+  const updatedAt = value.updatedAt ?? value.updated_at ?? recordedAt;
+  const resolvedAt = value.resolvedAt ?? value.resolved_at ?? null;
+
+  if (
+    typeof id !== 'string' ||
+    typeof muscleId !== 'string' ||
+    typeof bodyRegion !== 'string' ||
+    typeof muscleName !== 'string' ||
+    typeof conditionName !== 'string' ||
+    (typeof rawDescription !== 'string' && rawDescription !== null) ||
+    !Number.isFinite(painIntensity) ||
+    painIntensity < 0 ||
+    painIntensity > 10 ||
+    typeof swelling !== 'boolean' ||
+    typeof functionalLimitation !== 'boolean' ||
+    (status !== 'active' && status !== 'resolved') ||
+    typeof recordedAt !== 'string' ||
+    typeof createdAt !== 'string' ||
+    typeof updatedAt !== 'string' ||
+    (typeof resolvedAt !== 'string' && resolvedAt !== null)
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    muscleId,
+    bodyRegion,
+    muscleName,
+    conditionName,
+    description: rawDescription,
+    painIntensity: Math.round(painIntensity),
+    swelling,
+    functionalLimitation,
+    status,
+    recordedAt,
+    createdAt,
+    updatedAt,
+    resolvedAt,
+  };
 }
 
 function isNullableFiniteNumber(value: unknown): value is number | null {
@@ -570,7 +655,8 @@ export async function syncObservationToBackend(
 }
 
 export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecord[]> {
-  if (!API_CONFIG.apiBaseUrl || !API_CONFIG.dashboardApiToken) {
+  const authHeadersList = getMobileFallbackAuthHeaders();
+  if (!API_CONFIG.apiBaseUrl || authHeadersList.length === 0) {
     console.warn(
       'No se pudieron cargar los padecimientos: falta configurar EXPO_PUBLIC_API_BASE_URL y EXPO_PUBLIC_DASHBOARD_API_TOKEN.'
     );
@@ -590,28 +676,37 @@ export async function getBodyConditionsFromBackend(): Promise<BodyConditionRecor
 
     const url = new URL('/dashboard/body-conditions', baseUrl);
     url.searchParams.set('limit', '500');
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${API_CONFIG.dashboardApiToken}`,
-      },
-      signal: controller.signal,
-    });
 
-    if (!response.ok) {
+    let response: Response | null = null;
+    for (const headers of authHeadersList) {
+      response = await fetch(url.toString(), {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+      if (response.status !== 401) break;
+    }
+
+    if (!response || !response.ok) {
+      const status = response?.status ?? 0;
       throw new Error(
-        response.status === 401
+        status === 401
           ? 'El backend rechazó el token al cargar los padecimientos (401).'
-          : `No se pudieron cargar los padecimientos (${response.status}).`
+          : `No se pudieron cargar los padecimientos (${status}).`
       );
     }
 
     const body: unknown = await response.json();
-    if (!Array.isArray(body) || !body.every(isBodyConditionRecord)) {
+    if (!Array.isArray(body)) {
       throw new Error('El backend devolvió registros anatómicos con formato inválido.');
     }
-    return body;
+    const normalized = body
+      .map(normalizeBodyConditionRecord)
+      .filter((item): item is BodyConditionRecord => item !== null);
+    if (body.length > 0 && normalized.length === 0) {
+      throw new Error('El backend devolvió registros anatómicos con formato inválido.');
+    }
+    return normalized;
   } finally {
     clearTimeout(timeout);
   }

@@ -18,6 +18,7 @@ function getSeverityTag(intensity: number): string {
 }
 import { MuscleDetailAndAiPanel } from './components/MuscleDetailAndAiPanel';
 import { RealtimeEcgMonitor } from './components/RealtimeEcgMonitor';
+import { StartupSplashAnimation } from './components/StartupSplashAnimation';
 import { SymptomPulseCards } from './components/SymptomPulseCards';
 import {
   INITIAL_MUSCLES,
@@ -48,6 +49,7 @@ import type {
 type ResponsiveStage = 'all' | 'signos' | 'visor' | 'musculo';
 
 export function App() {
+  const [introFinished, setIntroFinished] = useState<boolean>(false);
   const [astronauts] = useState<AstronautProfile[]>([PRIMARY_ASTRONAUT]);
   const [selectedAstronautId, setSelectedAstronautId] = useState<string>(PRIMARY_ASTRONAUT.id);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
@@ -237,6 +239,14 @@ export function App() {
   const handleSelectMuscle = useCallback((muscleId: string | null) => {
     setSelectedMuscleId(muscleId);
   }, []);
+
+  const handleIntroComplete = useCallback(() => {
+    setIntroFinished(true);
+  }, []);
+
+  if (!introFinished) {
+    return <StartupSplashAnimation onComplete={handleIntroComplete} />;
+  }
 
   return (
     <div className={`app-root theme-${themeMode}`}>

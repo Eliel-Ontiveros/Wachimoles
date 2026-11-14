@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import Svg, { Line, Path, Polyline, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { router } from 'expo-router';
+import { Image } from 'expo-image';
 import {
-  PersonStanding,
   Footprints,
   Heart,
   Activity,
@@ -51,9 +51,9 @@ function RealtimeEcgChart({
   const grid = 16;
 
   // Desplazamiento continuo del trazado
-  const scrollAnim = useRef(new Animated.Value(0)).current;
+  const [scrollAnim] = useState(() => new Animated.Value(0));
   // Pulso de brillo del trazado cuando el complejo QRS cruza el sensor
-  const waveGlowAnim = useRef(new Animated.Value(1)).current;
+  const [waveGlowAnim] = useState(() => new Animated.Value(1));
 
   // Tiempo exacto de 1 latido = 60000 / BPM (ej: 60 Lpm = 1000 ms, 120 Lpm = 500 ms)
   const effectiveBpm = bpm && bpm >= 30 && bpm <= 220 ? bpm : 60;
@@ -380,7 +380,7 @@ const METRIC_META: Record<
 
 // Esqueleto animado de carga mientras obtiene historial de métricas
 function HistorySkeleton() {
-  const pulseAnim = useRef(new Animated.Value(0.45)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(0.45));
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -548,15 +548,13 @@ function VitalHistoryModal({
                   <Pressable
                     key={mKey}
                     onPress={() => onSelectMetric(mKey)}
-                    className={`flex-1 items-center rounded-xl border py-2 ${
-                      active
-                        ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-                        : 'border-slate-200 bg-[#f8fafc]'
-                    }`}>
-                    <Text
-                      className={`font-mono text-[10.5px] font-bold ${
-                        active ? 'text-trauma-ink' : 'text-slate-500'
+                    className={`flex-1 items-center rounded-xl border py-2 ${active
+                      ? 'border-trauma-cyanEdge bg-trauma-cyanSoft'
+                      : 'border-slate-200 bg-[#f8fafc]'
                       }`}>
+                    <Text
+                      className={`font-mono text-[10.5px] font-bold ${active ? 'text-trauma-ink' : 'text-slate-500'
+                        }`}>
                       {METRIC_META[mKey].tabLabel}
                     </Text>
                   </Pressable>
@@ -569,179 +567,179 @@ function VitalHistoryModal({
                 <HistorySkeleton />
               ) : (
                 <>
-              {/* Tarjetas de Estadísticas Generales */}
-              <View className="flex-row justify-between gap-2">
-                <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                  <Text className="font-mono text-[9px] uppercase text-slate-400">Actual</Text>
-                  <Text className="font-mono text-lg font-extrabold text-slate-900">
-                    {stats.latest ? formatMetricValue(metric, stats.latest) : '--'}
-                  </Text>
-                  <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
-                </View>
-
-                <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                  <Text className="font-mono text-[9px] uppercase text-slate-400">Promedio</Text>
-                  <Text className="font-mono text-lg font-extrabold text-sky-600">
-                    {stats.avg ? formatMetricValue(metric, stats.avg) : '--'}
-                  </Text>
-                  <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
-                </View>
-
-                <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
-                  <Text className="font-mono text-[9px] uppercase text-slate-400">Mín / Máx</Text>
-                  <Text className="mt-0.5 font-mono text-sm font-extrabold text-slate-900">
-                    {stats.min && stats.max
-                      ? `${formatMetricValue(metric, stats.min)} - ${formatMetricValue(metric, stats.max)}`
-                      : '--'}
-                  </Text>
-                  <Text className="font-mono text-[8.5px] text-slate-500">Rango</Text>
-                </View>
-              </View>
-
-              {/* Gráfica de tendencia */}
-              {validSamples.length >= 2 && (
-                <View className="mt-3.5 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs">
-                  <View className="mb-2 flex-row items-center justify-between">
-                    <View className="flex-row items-center">
-                      <TrendingUp size={13} color={meta.accent} />
-                      <Text className="ml-1.5 font-mono text-xs font-bold text-slate-800">
-                        Tendencia reciente
+                  {/* Tarjetas de Estadísticas Generales */}
+                  <View className="flex-row justify-between gap-2">
+                    <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
+                      <Text className="font-mono text-[9px] uppercase text-slate-400">Actual</Text>
+                      <Text className="font-mono text-lg font-extrabold text-slate-900">
+                        {stats.latest ? formatMetricValue(metric, stats.latest) : '--'}
                       </Text>
+                      <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
                     </View>
-                    <Text className="font-mono text-[9.5px] text-slate-400">
-                      Últimas {Math.min(18, validSamples.length)} lecturas
-                    </Text>
+
+                    <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
+                      <Text className="font-mono text-[9px] uppercase text-slate-400">Promedio</Text>
+                      <Text className="font-mono text-lg font-extrabold text-sky-600">
+                        {stats.avg ? formatMetricValue(metric, stats.avg) : '--'}
+                      </Text>
+                      <Text className="font-mono text-[8.5px] text-slate-500">{meta.unit}</Text>
+                    </View>
+
+                    <View className="flex-1 items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-3">
+                      <Text className="font-mono text-[9px] uppercase text-slate-400">Mín / Máx</Text>
+                      <Text className="mt-0.5 font-mono text-sm font-extrabold text-slate-900">
+                        {stats.min && stats.max
+                          ? `${formatMetricValue(metric, stats.min)} - ${formatMetricValue(metric, stats.max)}`
+                          : '--'}
+                      </Text>
+                      <Text className="font-mono text-[8.5px] text-slate-500">Rango</Text>
+                    </View>
                   </View>
 
-                  <View
-                    style={{ height: 100, width: '100%' }}
-                    onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
-                    {chartWidth > 0 && chartPoints && (
-                      <Svg width={chartWidth} height={100}>
-                        <Defs>
-                          <LinearGradient id="pulseLineGrad" x1="0" y1="0" x2="0" y2="1">
-                            <Stop offset="0%" stopColor={meta.accent} stopOpacity="0.4" />
-                            <Stop offset="100%" stopColor={meta.accent} stopOpacity="0" />
-                          </LinearGradient>
-                        </Defs>
-                        <Line x1={0} y1={22} x2={chartWidth} y2={22} stroke="#f1f5f9" strokeWidth={1} />
-                        <Line x1={0} y1={50} x2={chartWidth} y2={50} stroke="#f1f5f9" strokeWidth={1} />
-                        <Line x1={0} y1={78} x2={chartWidth} y2={78} stroke="#f1f5f9" strokeWidth={1} />
-
-                        <Polyline
-                          points={chartPoints}
-                          fill="none"
-                          stroke={meta.accent}
-                          strokeWidth={2.4}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </Svg>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Resumen agrupado por día */}
-              <View className="mt-4 pb-10">
-                <View className="mb-2.5 flex-row items-center">
-                  <History size={13} color="#64748b" />
-                  <Text className="ml-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                    Resumen por día ({dailySummaries.length} días)
-                  </Text>
-                </View>
-
-                {dailySummaries.length === 0 ? (
-                  <View className="items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-6">
-                    <Text className="font-mono text-xs text-slate-400">
-                      No hay registros de {meta.tabLabel.toLowerCase()} guardados aún.
-                    </Text>
-                  </View>
-                ) : (
-                  dailySummaries.map((day) => (
-                    <View
-                      key={day.dateKey}
-                      className="mb-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
-                      <View className="mb-2.5 flex-row items-center justify-between border-b border-slate-100 pb-2">
-                        <Text className="font-mono text-xs font-extrabold text-slate-800">
-                          {day.dateLabel}
-                        </Text>
-                        <View className="rounded-md bg-slate-100 px-2 py-0.5">
-                          <Text className="font-mono text-[9px] font-bold text-slate-500">
-                            {day.count} {metric === 'sleep'
-                              ? day.count === 1 ? 'registro' : 'registros'
-                              : day.count === 1 ? 'lectura' : 'lecturas'}
+                  {/* Gráfica de tendencia */}
+                  {validSamples.length >= 2 && (
+                    <View className="mt-3.5 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs">
+                      <View className="mb-2 flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                          <TrendingUp size={13} color={meta.accent} />
+                          <Text className="ml-1.5 font-mono text-xs font-bold text-slate-800">
+                            Tendencia reciente
                           </Text>
                         </View>
+                        <Text className="font-mono text-[9.5px] text-slate-400">
+                          Últimas {Math.min(18, validSamples.length)} lecturas
+                        </Text>
                       </View>
 
-                      {metric === 'sleep' ? (
-                        <View className="flex-row items-center justify-between rounded-xl border border-violet-100 bg-violet-50/60 p-3">
-                          <View className="flex-row items-center">
-                            <Moon size={16} color="#7c3aed" />
-                            <Text className="ml-2 font-mono text-xs font-bold text-violet-800">
-                              Duración total
-                            </Text>
-                          </View>
-                          <Text className="font-mono text-lg font-extrabold text-violet-800">
-                            {formatMetricValue(metric, day.max)} h
-                          </Text>
-                        </View>
-                      ) : (
-                        <View className="flex-row gap-2">
-                          <View className="flex-1 rounded-xl border border-red-100 bg-red-50/40 p-2.5">
-                            <View className="flex-row items-center">
-                              <ArrowUpRight size={12} color="#dc2626" />
-                              <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-red-600">
-                                Pico más alto
-                              </Text>
-                            </View>
-                            <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
-                              {formatMetricValue(metric, day.max)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
-                            </Text>
-                            <View className="mt-1 flex-row items-center">
-                              <Clock size={10} color="#64748b" />
-                              <Text className="ml-1 font-mono text-[9px] text-slate-500">
-                                {day.maxTime}
-                              </Text>
-                            </View>
-                          </View>
+                      <View
+                        style={{ height: 100, width: '100%' }}
+                        onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
+                        {chartWidth > 0 && chartPoints && (
+                          <Svg width={chartWidth} height={100}>
+                            <Defs>
+                              <LinearGradient id="pulseLineGrad" x1="0" y1="0" x2="0" y2="1">
+                                <Stop offset="0%" stopColor={meta.accent} stopOpacity="0.4" />
+                                <Stop offset="100%" stopColor={meta.accent} stopOpacity="0" />
+                              </LinearGradient>
+                            </Defs>
+                            <Line x1={0} y1={22} x2={chartWidth} y2={22} stroke="#f1f5f9" strokeWidth={1} />
+                            <Line x1={0} y1={50} x2={chartWidth} y2={50} stroke="#f1f5f9" strokeWidth={1} />
+                            <Line x1={0} y1={78} x2={chartWidth} y2={78} stroke="#f1f5f9" strokeWidth={1} />
 
-                          <View className="flex-1 items-center justify-center rounded-xl border border-sky-100 bg-sky-50/50 p-2.5">
-                            <Text className="font-mono text-[8.5px] font-bold uppercase text-sky-700">
-                              Promedio
-                            </Text>
-                            <Text className="mt-1 font-mono text-base font-extrabold text-sky-700">
-                              {formatMetricValue(metric, day.avg)}
-                            </Text>
-                            <Text className="mt-0.5 font-mono text-[8.5px] text-slate-500">
-                              {meta.unit} del día
-                            </Text>
-                          </View>
-
-                          <View className="flex-1 rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5">
-                            <View className="flex-row items-center">
-                              <ArrowDownRight size={12} color="#059669" />
-                              <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-emerald-700">
-                                Más bajo
-                              </Text>
-                            </View>
-                            <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
-                              {formatMetricValue(metric, day.min)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
-                            </Text>
-                            <View className="mt-1 flex-row items-center">
-                              <Clock size={10} color="#64748b" />
-                              <Text className="ml-1 font-mono text-[9px] text-slate-500">
-                                {day.minTime}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                      )}
+                            <Polyline
+                              points={chartPoints}
+                              fill="none"
+                              stroke={meta.accent}
+                              strokeWidth={2.4}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </Svg>
+                        )}
+                      </View>
                     </View>
-                  ))
-                )}
-              </View>
+                  )}
+
+                  {/* Resumen agrupado por día */}
+                  <View className="mt-4 pb-10">
+                    <View className="mb-2.5 flex-row items-center">
+                      <History size={13} color="#64748b" />
+                      <Text className="ml-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                        Resumen por día ({dailySummaries.length} días)
+                      </Text>
+                    </View>
+
+                    {dailySummaries.length === 0 ? (
+                      <View className="items-center rounded-2xl border border-slate-100 bg-[#f8fafc] p-6">
+                        <Text className="font-mono text-xs text-slate-400">
+                          No hay registros de {meta.tabLabel.toLowerCase()} guardados aún.
+                        </Text>
+                      </View>
+                    ) : (
+                      dailySummaries.map((day) => (
+                        <View
+                          key={day.dateKey}
+                          className="mb-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
+                          <View className="mb-2.5 flex-row items-center justify-between border-b border-slate-100 pb-2">
+                            <Text className="font-mono text-xs font-extrabold text-slate-800">
+                              {day.dateLabel}
+                            </Text>
+                            <View className="rounded-md bg-slate-100 px-2 py-0.5">
+                              <Text className="font-mono text-[9px] font-bold text-slate-500">
+                                {day.count} {metric === 'sleep'
+                                  ? day.count === 1 ? 'registro' : 'registros'
+                                  : day.count === 1 ? 'lectura' : 'lecturas'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {metric === 'sleep' ? (
+                            <View className="flex-row items-center justify-between rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+                              <View className="flex-row items-center">
+                                <Moon size={16} color="#7c3aed" />
+                                <Text className="ml-2 font-mono text-xs font-bold text-violet-800">
+                                  Duración total
+                                </Text>
+                              </View>
+                              <Text className="font-mono text-lg font-extrabold text-violet-800">
+                                {formatMetricValue(metric, day.max)} h
+                              </Text>
+                            </View>
+                          ) : (
+                            <View className="flex-row gap-2">
+                              <View className="flex-1 rounded-xl border border-red-100 bg-red-50/40 p-2.5">
+                                <View className="flex-row items-center">
+                                  <ArrowUpRight size={12} color="#dc2626" />
+                                  <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-red-600">
+                                    Pico más alto
+                                  </Text>
+                                </View>
+                                <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
+                                  {formatMetricValue(metric, day.max)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
+                                </Text>
+                                <View className="mt-1 flex-row items-center">
+                                  <Clock size={10} color="#64748b" />
+                                  <Text className="ml-1 font-mono text-[9px] text-slate-500">
+                                    {day.maxTime}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View className="flex-1 items-center justify-center rounded-xl border border-sky-100 bg-sky-50/50 p-2.5">
+                                <Text className="font-mono text-[8.5px] font-bold uppercase text-sky-700">
+                                  Promedio
+                                </Text>
+                                <Text className="mt-1 font-mono text-base font-extrabold text-sky-700">
+                                  {formatMetricValue(metric, day.avg)}
+                                </Text>
+                                <Text className="mt-0.5 font-mono text-[8.5px] text-slate-500">
+                                  {meta.unit} del día
+                                </Text>
+                              </View>
+
+                              <View className="flex-1 rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5">
+                                <View className="flex-row items-center">
+                                  <ArrowDownRight size={12} color="#059669" />
+                                  <Text className="ml-0.5 font-mono text-[8.5px] font-bold uppercase text-emerald-700">
+                                    Más bajo
+                                  </Text>
+                                </View>
+                                <Text className="mt-1 font-mono text-sm font-extrabold text-slate-900">
+                                  {formatMetricValue(metric, day.min)} <Text className="text-[9px] font-normal text-slate-500">{meta.unit}</Text>
+                                </Text>
+                                <View className="mt-1 flex-row items-center">
+                                  <Clock size={10} color="#64748b" />
+                                  <Text className="ml-1 font-mono text-[9px] text-slate-500">
+                                    {day.minTime}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      ))
+                    )}
+                  </View>
                 </>
               )}
             </ScrollView>
@@ -809,7 +807,7 @@ export function VitalMonitorView() {
 
   const completedMissions = missions.filter((m) => m.completed).length;
 
-  const heartBeatAnim = useRef(new Animated.Value(1)).current;
+  const [heartBeatAnim] = useState(() => new Animated.Value(1));
 
   // Latido del icono sincronizado con los LPM reales
   useEffect(() => {
@@ -1006,9 +1004,8 @@ export function VitalMonitorView() {
         <View className="mb-5 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-xs">
           <View className="flex-1 flex-row items-center pr-3">
             <View
-              className={`mr-2.5 h-8 w-8 items-center justify-center rounded-xl ${
-                treadmillRoutineActive ? 'bg-sky-50' : 'bg-slate-100'
-              }`}>
+              className={`mr-2.5 h-8 w-8 items-center justify-center rounded-xl ${treadmillRoutineActive ? 'bg-sky-50' : 'bg-slate-100'
+                }`}>
               <Footprints size={16} color={treadmillRoutineActive ? '#0284c7' : '#64748b'} />
             </View>
             <View className="flex-1">
@@ -1025,11 +1022,10 @@ export function VitalMonitorView() {
 
           <Pressable
             onPress={toggleTreadmillRoutine}
-            className={`rounded-xl border px-3 py-1.5 active:opacity-75 ${
-              treadmillRoutineActive
-                ? 'border-slate-200 bg-slate-100'
-                : 'border-trauma-cyanEdge bg-trauma-cyanSoft'
-            }`}>
+            className={`rounded-xl border px-3 py-1.5 active:opacity-75 ${treadmillRoutineActive
+              ? 'border-slate-200 bg-slate-100'
+              : 'border-trauma-cyanEdge bg-trauma-cyanSoft'
+              }`}>
             <Text className="font-mono text-[10px] font-bold text-trauma-ink">
               {treadmillRoutineActive ? 'Finalizar' : 'Caminadora'}
             </Text>
@@ -1063,10 +1059,9 @@ export function VitalMonitorView() {
         <Pressable
           onPress={() => router.navigate('/explore')}
           accessibilityLabel="Reportar molestia"
-          className="h-20 w-20 items-center justify-center rounded-full border-2 border-trauma-cyanEdge bg-trauma-cyan shadow-md active:opacity-70">
-          <PersonStanding size={44} color="#0284c7" strokeWidth={1.5} />
+          className="h-20 w-20 items-center justify-center rounded-full border-2 shadow-md active:opacity-70">
+          <Image source={require('@/assets/images/App Icono.svg')} style={{ width: 100, height: 100 }} />
         </Pressable>
-        <Text className="mt-2 font-mono text-[11px] text-trauma-ink">Reportar Molestia</Text>
       </View>
 
       {/* Modal interactivo con el historial agrupado por día (Pulso, Oxígeno y Estrés) */}

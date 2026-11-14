@@ -1,13 +1,14 @@
 import '../global.css';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
 
 import { CriticalAlertToaster } from '@/components/trauma/CriticalAlertToaster';
 import { DrawerProvider } from '@/components/trauma/DrawerProvider';
 import { MissionOnboardingModal } from '@/components/trauma/MissionOnboardingModal';
 import { MissionProvider } from '@/components/trauma/MissionProvider';
+import { StartupSplashAnimation } from '@/components/trauma/StartupSplashAnimation';
 
 LogBox.ignoreLogs(['ImageBackground is deprecated']);
 
@@ -25,6 +26,8 @@ console.warn = (...args: unknown[]) => {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [splashDone, setSplashDone] = useState(false);
+
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
@@ -33,8 +36,14 @@ export default function RootLayout() {
     <MissionProvider>
       <DrawerProvider>
         <Stack screenOptions={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
-        <MissionOnboardingModal />
-        <CriticalAlertToaster />
+        {splashDone ? (
+          <>
+            <MissionOnboardingModal />
+            <CriticalAlertToaster />
+          </>
+        ) : (
+          <StartupSplashAnimation onComplete={() => setSplashDone(true)} />
+        )}
       </DrawerProvider>
     </MissionProvider>
   );
