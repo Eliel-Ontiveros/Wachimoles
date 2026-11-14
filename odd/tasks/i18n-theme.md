@@ -13,9 +13,9 @@ Branch feat/i18n-theme (from main 698493a). App: TraumaTeamMovil (Expo SDK 58, N
 
 ## Tasks
 - T1 S3-S8 infrastructure: SettingsProvider (locale + theme, persisted), theme tokens (`useAppTheme()` palette for style-prop colors + NativeWind `dark:` for classes), status bar, drawer settings UI, split dictionaries, voice set-theme/set-locale (app + backend) — worker — done
-- T2 S2,S4 migrate group A: VitalMonitorView, TraumaHeader, CriticalAlertToaster, HexDrawer (remaining strings), StartupSplashAnimation, streak/* — worker
-- T3 S2,S4 migrate group B: BodyView, BodyModelViewer, RegisterObservationModal, InjuryTimelapseModal, HealthQuestionnaireSection — worker
-- T4 S2,S4 migrate group C: MissionsView, SpaceJourneyTimeline, EnvironmentSelector, MissionOnboardingModal, MissionProvider/mission-api user-facing texts, types/mission labels, voice UI dark adjustments — worker
+- T2 S2,S4 migrate group A: VitalMonitorView, TraumaHeader, CriticalAlertToaster, HexDrawer (remaining strings), StartupSplashAnimation, streak/* — worker — done
+- T3 S2,S4 migrate group B: BodyView, BodyModelViewer, RegisterObservationModal, InjuryTimelapseModal, HealthQuestionnaireSection — worker — done
+- T4 S2,S4 migrate group C: MissionsView, SpaceJourneyTimeline, EnvironmentSelector, MissionOnboardingModal, MissionProvider/mission-api user-facing texts, types/mission labels, voice UI dark adjustments — worker — done
 
 ## Log
 - L1 "implementa i18n y modo claro y oscuro"

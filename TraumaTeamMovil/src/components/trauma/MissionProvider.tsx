@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatDate, formatTime } from '@/i18n/format';
+import { translate, type Locale, type MessageKey, type TranslateParams } from '@/i18n/messages';
 import { useVitalSigns } from '../../hooks/use-vital-signs';
 import {
   calculateMissionStateFromDeparture,
@@ -25,27 +28,43 @@ import {
 } from '../../types/mission';
 import { MissionContext } from './mission-context';
 
-function formatNowLabel() {
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  return `Hoy · ${hh}:${mm}`;
+// Alerta guardada con claves de texto (no texto ya traducido) para que cambiar de idioma la actualice.
+type StoredAlert = {
+  id: string;
+  metric: CriticalAlert['metric'];
+  titleKey: MessageKey;
+  messageKey?: MessageKey;
+  messageText?: string;
+  valueKey: MessageKey;
+  valueParams?: TranslateParams;
+  severity: CriticalAlert['severity'];
+  at: number;
+  acknowledged: boolean;
+};
+
+type NewStoredAlert = Omit<StoredAlert, 'id' | 'at' | 'acknowledged'>;
+
+function formatNowLabel(locale: Locale, at: number = Date.now()) {
+  return translate(locale, 'missions.today', { time: formatTime(at, locale) });
 }
 
-function formatHealthCheckRecordedAt(recordedAt: string, dateIso: string) {
+function formatHealthCheckRecordedAt(recordedAt: string, dateIso: string, locale: Locale) {
   const date = new Date(recordedAt);
   if (Number.isNaN(date.getTime())) return recordedAt;
 
-  const time = date.toLocaleTimeString('es-MX', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const time = formatTime(date, locale);
   if (dateIso === getTodayIsoDate()) return time;
-  return `${date.toLocaleDateString('es-MX')} · ${time}`;
+  return `${formatDate(date, locale, { dateStyle: 'short' })} · ${time}`;
 }
 
 export function MissionProvider({ children }: { children: ReactNode }) {
   const { vitals, getFullHistory } = useVitalSigns(5000);
+  const { locale } = useI18n();
+  // Los textos que se guardan en estado (fechas, avisos) usan el idioma vigente al crearse.
+  const localeRef = useRef(locale);
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
 
   const [origin, setOrigin] = useState<SpaceLocation>('tierra');
   const [destination, setDestination] = useState<SpaceLocation>('luna');
@@ -60,8 +79,8 @@ export function MissionProvider({ children }: { children: ReactNode }) {
   const [treadmillRoutineActive, setTreadmillRoutineActive] = useState<boolean>(false);
   const [completedOverrides, setCompletedOverrides] = useState<Record<string, boolean>>({});
 
-  const [alerts, setAlerts] = useState<CriticalAlert[]>([]);
-  const [activeToasterAlert, setActiveToasterAlert] = useState<CriticalAlert | null>(null);
+  const [storedAlerts, setAlerts] = useState<StoredAlert[]>([]);
+  const [activeStoredToaster, setActiveToasterAlert] = useState<StoredAlert | null>(null);
   const [injuryPhotos, setInjuryPhotos] = useState<Record<string, InjuryPhoto[]>>({});
   const [healthChecks, setHealthChecks] = useState<DailyHealthCheck[]>([]);
 
@@ -78,7 +97,8 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           ...check,
           recordedAt: formatHealthCheckRecordedAt(
             check.recordedAt,
-            check.dateIso
+            check.dateIso,
+            localeRef.current
           ),
         }));
         setHealthChecks((currentChecks) => {
@@ -99,8 +119,8 @@ export function MissionProvider({ children }: { children: ReactNode }) {
         if (!isMounted) return;
         console.warn('No se pudieron cargar los cuestionarios diarios.', error);
         Alert.alert(
-          'No se pudo cargar el cuestionario',
-          'Revisa la conexión con el backend e inténtalo de nuevo.'
+          translate(localeRef.current, 'missions.healthLoad.title'),
+          translate(localeRef.current, 'missions.healthLoad.msg')
         );
       });
 
@@ -110,17 +130,17 @@ export function MissionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pushCriticalAlert = useCallback(
-    (alertData: Omit<CriticalAlert, 'id' | 'timestamp' | 'acknowledged'>) => {
+    (alertData: NewStoredAlert & { metric: CriticalAlert['metric'] }) => {
       const now = Date.now();
       const prevTime = lastAlertTimeRef.current[alertData.metric] ?? 0;
       // Evita repetir el mismo pop-up cada 5s mientras persiste la lectura
       if (now - prevTime < 60000) return;
 
       lastAlertTimeRef.current[alertData.metric] = now;
-      const newAlert: CriticalAlert = {
+      const newAlert: StoredAlert = {
         ...alertData,
         id: `${alertData.metric}-${now}`,
-        timestamp: formatNowLabel(),
+        at: now,
         acknowledged: false,
       };
       setAlerts((prev) => [newAlert, ...prev]);
@@ -135,17 +155,19 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       if (vitals.heartRate >= 120) {
         pushCriticalAlert({
           metric: 'heart_rate',
-          title: 'Pico de ritmo cardíaco',
-          message: 'Frecuencia cardíaca elevada detectada por el reloj.',
-          valueLabel: `${vitals.heartRate} Lpm`,
+          titleKey: 'missions.alert.hrHigh.title',
+          messageKey: 'missions.alert.hrHigh.msg',
+          valueKey: 'missions.alert.bpm',
+          valueParams: { n: vitals.heartRate },
           severity: 'critical',
         });
       } else if (vitals.heartRate > 0 && vitals.heartRate <= 45) {
         pushCriticalAlert({
           metric: 'heart_rate',
-          title: 'Bradicardia detectada',
-          message: 'Frecuencia cardíaca por debajo del umbral seguro.',
-          valueLabel: `${vitals.heartRate} Lpm`,
+          titleKey: 'missions.alert.hrLow.title',
+          messageKey: 'missions.alert.hrLow.msg',
+          valueKey: 'missions.alert.bpm',
+          valueParams: { n: vitals.heartRate },
           severity: 'critical',
         });
       }
@@ -161,9 +183,10 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       if (vitals.stress >= 85 || highStressCountRef.current >= 3) {
         pushCriticalAlert({
           metric: 'stress',
-          title: 'Estrés prolongado crítico',
-          message: 'Nivel de estrés sostenido. Se recomienda pausa de respiración.',
-          valueLabel: `${vitals.stress}/100`,
+          titleKey: 'missions.alert.stress.title',
+          messageKey: 'missions.alert.stress.msg',
+          valueKey: 'missions.alert.value',
+          valueParams: { text: `${vitals.stress}/100` },
           severity: 'warning',
         });
       }
@@ -172,9 +195,10 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     if (vitals.spo2 !== null && vitals.spo2 > 0 && vitals.spo2 < 90) {
       pushCriticalAlert({
         metric: 'spo2',
-        title: 'Desaturación de oxígeno',
-        message: 'SpO2 por debajo del 90%. Verificar suministro o sensor.',
-        valueLabel: `${vitals.spo2}%`,
+        titleKey: 'missions.alert.spo2.title',
+        messageKey: 'missions.alert.spo2.msg',
+        valueKey: 'missions.alert.value',
+          valueParams: { text: `${vitals.spo2}%` },
         severity: 'critical',
       });
     }
@@ -326,7 +350,8 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       environment,
       vitals.steps,
       checkedInToday,
-      treadmillRoutineActive
+      treadmillRoutineActive,
+      locale
     ).map((m) => {
       if (m.category === 'exercise' && completedOverrides[m.id] !== undefined) {
         const done = completedOverrides[m.id];
@@ -334,7 +359,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       }
       return m;
     });
-  }, [environment, vitals.steps, checkedInToday, treadmillRoutineActive, completedOverrides]);
+  }, [environment, vitals.steps, checkedInToday, treadmillRoutineActive, completedOverrides, locale]);
 
   const submitHealthCheck = useCallback(
     (checkData: Omit<DailyHealthCheck, 'id' | 'dateIso' | 'recordedAt'>): DailyHealthCheck => {
@@ -346,7 +371,8 @@ export function MissionProvider({ children }: { children: ReactNode }) {
         dateIso: todayIso,
         recordedAt: formatHealthCheckRecordedAt(
           new Date().toISOString(),
-          todayIso
+          todayIso,
+          localeRef.current
         ),
       };
       setHealthChecks((prev) => {
@@ -362,8 +388,8 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       void syncHealthCheckToBackend(entry).then(({ synced }) => {
         if (!synced) {
           Alert.alert(
-            'No se guardó el cuestionario',
-            'El cuestionario se actualizó en pantalla, pero no pudo guardarse en el servidor. Revisa la conexión antes de cerrar la app.'
+            translate(localeRef.current, 'missions.healthSave.title'),
+            translate(localeRef.current, 'missions.healthSave.msg')
           );
         }
       });
@@ -371,9 +397,9 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       if (entry.overallStatus === 'critical') {
         pushCriticalAlert({
           metric: 'health_check',
-          title: 'Revisión médica prioritaria',
-          message: entry.recommendation,
-          valueLabel: 'Crítico',
+          titleKey: 'missions.alert.health.title',
+          messageText: entry.recommendation,
+          valueKey: 'missions.alert.health.value',
           severity: 'critical',
         });
       }
@@ -412,7 +438,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
         muscleName,
         uri: uploadedImage.signedUrl,
         dayNumber: nextDay,
-        capturedAt: formatNowLabel(),
+        capturedAt: formatNowLabel(localeRef.current),
         painIntensity: photo.painIntensity,
         note: photo.note,
       };
@@ -437,7 +463,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           muscleName,
           uri: image.signedUrl,
           dayNumber: index + 1,
-          capturedAt: 'Imagen guardada en Supabase',
+          capturedAt: translate(localeRef.current, 'missions.photo.saved'),
         }));
       setInjuryPhotos((prev) => ({ ...prev, [muscleId]: photos }));
       return photos;
@@ -445,9 +471,29 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  // Traduce al vuelo: cambiar de idioma actualiza también las alertas ya generadas.
+  const localizeAlert = useCallback(
+    (a: StoredAlert): CriticalAlert => ({
+      id: a.id,
+      metric: a.metric,
+      title: translate(locale, a.titleKey),
+      message: a.messageKey ? translate(locale, a.messageKey) : (a.messageText ?? ''),
+      valueLabel: translate(locale, a.valueKey, a.valueParams),
+      severity: a.severity,
+      timestamp: formatNowLabel(locale, a.at),
+      acknowledged: a.acknowledged,
+    }),
+    [locale]
+  );
+  const alerts = useMemo(() => storedAlerts.map(localizeAlert), [storedAlerts, localizeAlert]);
+  const activeToasterAlert = useMemo(
+    () => (activeStoredToaster ? localizeAlert(activeStoredToaster) : null),
+    [activeStoredToaster, localizeAlert]
+  );
+
   const unreadAlertCount = useMemo(
-    () => alerts.filter((a) => !a.acknowledged).length,
-    [alerts]
+    () => storedAlerts.filter((a) => !a.acknowledged).length,
+    [storedAlerts]
   );
 
   const openMissionSetup = useCallback(() => setMissionSetupOpen(true), []);

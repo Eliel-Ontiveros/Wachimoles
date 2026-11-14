@@ -5,15 +5,17 @@ import { EnvironmentSelector } from './EnvironmentSelector';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
 import { useI18n } from '@/i18n/I18nProvider';
+import { formatNumber } from '@/i18n/format';
+import { useAppTheme } from '@/theme';
+import { getEnvironmentText } from '../../services/mission-api';
 import { useVoice } from '@/voice/voice-context';
 import { DailyMission } from '../../types/mission';
 import { StreakCheckinHost } from '../streak/StreakCheckinHost';
 import { playStreakCheckin } from '../streak/streak-checkin';
 
-const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
 function MissionIcon({ category, completed }: { category: DailyMission['category']; completed: boolean }) {
-  const color = completed ? '#0284c7' : '#64748b';
+  const { colors } = useAppTheme();
+  const color = completed ? colors.accentDeep : colors.textMuted;
   if (category === 'steps' || category === 'treadmill') return <Footprints size={16} color={color} />;
   if (category === 'checkin') return <Sparkles size={16} color={color} />;
   return <Dumbbell size={16} color={color} />;
@@ -30,7 +32,10 @@ export function MissionsView() {
     toggleMission,
   } = useMission();
 
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const { colors, scheme } = useAppTheme();
+  const weekDays = t('missions.week.initials').split(',');
+  const routineSummary = getEnvironmentText(locale, environmentConfig.id).routineSummary;
   const { missionsIntent, consumeMissionsIntent, announce } = useVoice();
   const [pulse] = useState(() => new Animated.Value(0));
   const handledNonce = useRef(0);
@@ -101,18 +106,18 @@ export function MissionsView() {
       </View>
 
       {/* Tarjeta de racha estilo Duolingo */}
-      <View className="mb-4 rounded-2xl border border-trauma-line bg-white p-4 shadow-sm">
+      <View className="mb-4 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200">
+            <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
               <Flame size={22} color="#f97316" fill="#fb923c" />
             </View>
             <View>
-              <Text className="font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
-                Racha de Check-ins
+              <Text className="font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
+                {t('missions.streak.title')}
               </Text>
-              <Text className="font-mono text-2xl font-extrabold text-trauma-ink">
-                {streakDays} días
+              <Text className="font-mono text-2xl font-extrabold text-trauma-ink dark:text-trauma-nightInk">
+                {t(streakDays === 1 ? 'missions.streak.day' : 'missions.streak.days', { n: streakDays })}
               </Text>
             </View>
           </View>
@@ -138,39 +143,41 @@ export function MissionsView() {
             disabled={checkedInToday}
             className={`flex-row items-center rounded-xl border px-3.5 py-2.5 ${
               checkedInToday
-                ? 'border-emerald-200 bg-emerald-50'
-                : 'border-trauma-cyanEdge bg-trauma-cyanSoft active:opacity-75'
+                ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950'
+                : 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt active:opacity-75'
             }`}>
-            <Check size={14} color={checkedInToday ? '#059669' : '#0f172a'} strokeWidth={2.5} />
+            <Check size={14} color={checkedInToday ? colors.success : scheme === 'dark' ? colors.text : '#0f172a'} strokeWidth={2.5} />
             <Text
               className={`ml-1.5 font-mono text-xs font-bold ${
-                checkedInToday ? 'text-emerald-700' : 'text-trauma-ink'
+                checkedInToday
+                  ? 'text-emerald-700 dark:text-emerald-300'
+                  : 'text-trauma-ink dark:text-trauma-nightInk'
               }`}>
-              {checkedInToday ? 'Completado' : 'Check-in hoy'}
+              {checkedInToday ? t('missions.checkin.done') : t('missions.checkin.today')}
             </Text>
           </Pressable>
           </View>
         </View>
 
         {/* Indicador semanal */}
-        <View className="mt-4 flex-row justify-between border-t border-slate-100 pt-3">
-          {WEEK_DAYS.map((day, idx) => {
+        <View className="mt-4 flex-row justify-between border-t border-slate-100 dark:border-trauma-nightLine pt-3">
+          {weekDays.map((day, idx) => {
             const active = idx < Math.min(6, streakDays) || (idx === 6 && checkedInToday);
             return (
               <View key={idx} className="items-center">
                 <View
                   className={`h-7 w-7 items-center justify-center rounded-full border ${
                     active
-                      ? 'border-amber-300 bg-amber-100'
-                      : 'border-slate-200 bg-slate-50'
+                      ? 'border-amber-300 dark:border-amber-700 bg-amber-100 dark:bg-amber-900'
+                      : 'border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt'
                   }`}>
                   {active ? (
                     <Flame size={13} color="#ea580c" fill="#fb923c" />
                   ) : (
-                    <View className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                    <View className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
                   )}
                 </View>
-                <Text className="mt-1 font-mono text-[9px] text-slate-400">{day}</Text>
+                <Text className="mt-1 font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{day}</Text>
               </View>
             );
           })}
@@ -185,15 +192,15 @@ export function MissionsView() {
       {/* Misiones diarias adaptadas al entorno */}
       <View className="mb-2.5 flex-row items-center justify-between">
         <View>
-          <Text className="font-mono text-sm font-bold text-trauma-ink">
-            Misiones del día
+          <Text className="font-mono text-sm font-bold text-trauma-ink dark:text-trauma-nightInk">
+            {t('missions.daily.title')}
           </Text>
-          <Text className="font-mono text-[9.5px] text-slate-400">
-            {environmentConfig.routineSummary}
+          <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+            {routineSummary}
           </Text>
         </View>
-        <View className="rounded-lg bg-slate-100 px-2.5 py-1">
-          <Text className="font-mono text-[10px] font-bold text-slate-700">
+        <View className="rounded-lg bg-slate-100 dark:bg-trauma-nightAlt px-2.5 py-1">
+          <Text className="font-mono text-[10px] font-bold text-slate-700 dark:text-trauma-nightMuted">
             {completedCount}/{missions.length}
           </Text>
         </View>
@@ -205,12 +212,12 @@ export function MissionsView() {
           const isAutoSteps = mission.category === 'steps';
           const isTreadmill = mission.category === 'treadmill';
           const statusHint = isAutoSteps
-            ? 'Sincronizado con reloj'
+            ? t('missions.hint.sync')
             : isTreadmill
               ? treadmillRoutineActive
-                ? 'Caminadora activa · Toca para finalizar'
-                : 'Opcional en 0g · Toca para contar pasos'
-              : 'Toca para marcar';
+                ? t('missions.hint.treadmillOn')
+                : t('missions.hint.treadmillOff')
+              : t('missions.hint.toggle');
 
           return (
             <Pressable
@@ -218,45 +225,47 @@ export function MissionsView() {
               onPress={() => toggleMission(mission.id)}
               className={`rounded-2xl border p-3.5 shadow-xs active:opacity-85 ${
                 mission.completed
-                  ? 'border-trauma-cyanEdge bg-sky-50/40'
-                  : 'border-trauma-line bg-white'
+                  ? 'border-trauma-cyanEdge bg-sky-50/40 dark:bg-sky-950/40'
+                  : 'border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night'
               }`}>
               <View className="flex-row items-center justify-between">
                 <View className="flex-1 flex-row items-center pr-2">
                   <View
                     className={`mr-3 h-9 w-9 items-center justify-center rounded-xl ${
-                      mission.completed ? 'bg-trauma-cyanSoft' : 'bg-slate-100'
+                      mission.completed
+                        ? 'bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
+                        : 'bg-slate-100 dark:bg-trauma-nightAlt'
                     }`}>
                     <MissionIcon category={mission.category} completed={mission.completed} />
                   </View>
                   <View className="flex-1">
-                    <Text className="font-mono text-xs font-bold text-trauma-ink">
+                    <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
                       {mission.title}
                     </Text>
-                    <Text className="font-mono text-[9.5px] text-slate-500">
+                    <Text className="font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted">
                       {mission.description}
                     </Text>
                   </View>
                 </View>
 
                 {mission.completed ? (
-                  <CheckCircle2 size={20} color="#0284c7" />
+                  <CheckCircle2 size={20} color={colors.accentDeep} />
                 ) : (
-                  <Circle size={20} color="#cbd5e1" />
+                  <Circle size={20} color={scheme === 'dark' ? colors.border : '#cbd5e1'} />
                 )}
               </View>
 
               <View className="mt-3">
                 <View className="mb-1 flex-row justify-between">
-                  <Text className="font-mono text-[9px] text-slate-400">
+                  <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
                     {statusHint}
                   </Text>
-                  <Text className="font-mono text-[9.5px] font-bold text-slate-700">
-                    {mission.currentValue.toLocaleString()} / {mission.targetValue.toLocaleString()}{' '}
+                  <Text className="font-mono text-[9.5px] font-bold text-slate-700 dark:text-trauma-nightMuted">
+                    {formatNumber(mission.currentValue, locale)} / {formatNumber(mission.targetValue, locale)}{' '}
                     {mission.unit}
                   </Text>
                 </View>
-                <View className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <View className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-trauma-nightAlt">
                   <View
                     className="h-full rounded-full bg-trauma-cyan"
                     style={{ width: `${pct}%` }}

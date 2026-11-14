@@ -12,6 +12,7 @@ import {
   SpaceLocation,
 } from '../types/mission';
 import { Platform } from 'react-native';
+import { translate, type Locale, type MessageKey } from '../i18n/messages';
 
 // Servicio preparado para conectar misiones, entorno y fotos de lesiones con el backend
 
@@ -586,35 +587,60 @@ export const ENVIRONMENTS: Record<EnvironmentType, EnvironmentConfig> = {
   },
 };
 
+/** Textos visibles de un entorno (los `label` de ENVIRONMENTS son el respaldo en español). */
+export function getEnvironmentText(locale: Locale, id: EnvironmentType) {
+  const tr = (field: string) => translate(locale, `missions.env.${id}.${field}` as MessageKey);
+  return {
+    label: tr('label'),
+    shortLabel: tr('short'),
+    gravityLabel: tr('gravity'),
+    destinationLabel: tr('dest'),
+    routineSummary: tr('routine'),
+  };
+}
+
+/** Nombres visibles de una ubicación espacial. */
+export function getLocationText(locale: Locale, id: SpaceLocation) {
+  return {
+    label: translate(locale, `missions.loc.${id}.label` as MessageKey),
+    shortLabel: translate(locale, `missions.loc.${id}.short` as MessageKey),
+  };
+}
+
 export function getMissionsForEnvironment(
   env: EnvironmentType,
   currentSteps: number,
   checkedInToday: boolean,
-  treadmillActive = false
+  treadmillActive = false,
+  locale: Locale = 'es'
 ): DailyMission[] {
   const goal = ENVIRONMENTS[env].dailyStepsGoal;
+  const tx = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, `missions.mission.${key}` as MessageKey, params);
+  const unit = (u: 'min' | 'pasos' | 'check') =>
+    translate(locale, `missions.unit.${u}` as MessageKey);
 
   const envRoutines: Record<EnvironmentType, DailyMission[]> = {
     tierra: [
       {
         id: 'env-tierra-cardio',
-        title: 'Acondicionamiento aeróbico 1g',
-        description: 'Preparación cardiovascular pre-misión o readaptación en Tierra',
+        title: tx('env-tierra-cardio.title'),
+        description: tx('env-tierra-cardio.desc'),
         category: 'exercise',
         targetValue: 30,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'tierra',
       },
       {
         id: 'env-tierra-core',
-        title: 'Estabilidad vertebral y core',
-        description: 'Fortalecimiento postural bajo gravedad terrestre',
+        title: tx('env-tierra-core.title'),
+        description: tx('env-tierra-core.desc'),
         category: 'exercise',
         targetValue: 15,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'tierra',
       },
@@ -622,23 +648,23 @@ export function getMissionsForEnvironment(
     nave: [
       {
         id: 'env-nave-ared',
-        title: 'Rutina resistiva ARED',
-        description: 'Ejercicios de fuerza para evitar atrofia en 0g',
+        title: tx('env-nave-ared.title'),
+        description: tx('env-nave-ared.desc'),
         category: 'exercise',
         targetValue: 25,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'nave',
       },
       {
         id: 'env-nave-stretch',
-        title: 'Descompresión espinal',
-        description: 'Estiramiento lumbar y cervical en cabina',
+        title: tx('env-nave-stretch.title'),
+        description: tx('env-nave-stretch.desc'),
         category: 'exercise',
         targetValue: 10,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'nave',
       },
@@ -646,23 +672,23 @@ export function getMissionsForEnvironment(
     estacion: [
       {
         id: 'env-estacion-ared',
-        title: 'Resistencia ARED en EEI',
-        description: 'Carga axial y tonificación muscular en estación orbital',
+        title: tx('env-estacion-ared.title'),
+        description: tx('env-estacion-ared.desc'),
         category: 'exercise',
         targetValue: 25,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'estacion',
       },
       {
         id: 'env-estacion-sans',
-        title: 'Control cefálico y postura 0g',
-        description: 'Pausa visual y movilidad cervical en módulos orbitales',
+        title: tx('env-estacion-sans.title'),
+        description: tx('env-estacion-sans.desc'),
         category: 'exercise',
         targetValue: 10,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'estacion',
       },
@@ -670,23 +696,23 @@ export function getMissionsForEnvironment(
     luna: [
       {
         id: 'env-luna-eva',
-        title: 'Movilidad post-EVA',
-        description: 'Descarga de rodillas y hombros tras caminata lunar',
+        title: tx('env-luna-eva.title'),
+        description: tx('env-luna-eva.desc'),
         category: 'exercise',
         targetValue: 20,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'luna',
       },
       {
         id: 'env-luna-balance',
-        title: 'Control postural 0.16g',
-        description: 'Ejercicios de equilibrio y tobillo',
+        title: tx('env-luna-balance.title'),
+        description: tx('env-luna-balance.desc'),
         category: 'exercise',
         targetValue: 15,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'luna',
       },
@@ -694,23 +720,23 @@ export function getMissionsForEnvironment(
     marte: [
       {
         id: 'env-marte-load',
-        title: 'Entrenamiento de carga 0.38g',
-        description: 'Fortalecimiento de cuádriceps y zona dorsal',
+        title: tx('env-marte-load.title'),
+        description: tx('env-marte-load.desc'),
         category: 'exercise',
         targetValue: 30,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'marte',
       },
       {
         id: 'env-marte-resp',
-        title: 'Control respiratorio y polvo',
-        description: 'Revisión de SpO2 y respiración guiada post-hábitat',
+        title: tx('env-marte-resp.title'),
+        description: tx('env-marte-resp.desc'),
         category: 'exercise',
         targetValue: 10,
         currentValue: 0,
-        unit: 'min',
+        unit: unit('min'),
         completed: false,
         environment: 'marte',
       },
@@ -721,25 +747,23 @@ export function getMissionsForEnvironment(
     env === 'nave' || env === 'estacion'
       ? {
         id: 'treadmill-steps',
-        title: treadmillActive ? 'Rutina de caminadora T2' : 'Caminadora 0g (Opcional)',
-        description: treadmillActive
-          ? 'Contando pasos desde el reloj durante la rutina'
-          : 'En 0g no hay pasos; actívala si usas caminadora',
+        title: tx(treadmillActive ? 'treadmill-on.title' : 'treadmill-off.title'),
+        description: tx(treadmillActive ? 'treadmill-on.desc' : 'treadmill-off.desc'),
         category: 'treadmill',
         targetValue: goal,
         currentValue: treadmillActive ? currentSteps : 0,
-        unit: 'pasos',
+        unit: unit('pasos'),
         completed: treadmillActive && currentSteps >= goal,
         environment: env,
       }
       : {
         id: 'daily-steps',
-        title: `Meta de pasos (${ENVIRONMENTS[env].shortLabel})`,
-        description: 'Lectura automática desde el smartwatch',
+        title: tx('daily-steps.title', { place: getEnvironmentText(locale, env).shortLabel }),
+        description: tx('daily-steps.desc'),
         category: 'steps',
         targetValue: goal,
         currentValue: currentSteps,
-        unit: 'pasos',
+        unit: unit('pasos'),
         completed: currentSteps >= goal,
         environment: env,
       };
@@ -747,12 +771,12 @@ export function getMissionsForEnvironment(
   return [
     {
       id: 'daily-checkin',
-      title: 'Check-in médico diario',
-      description: 'Confirmar estado general para mantener tu racha',
+      title: tx('daily-checkin.title'),
+      description: tx('daily-checkin.desc'),
       category: 'checkin',
       targetValue: 1,
       currentValue: checkedInToday ? 1 : 0,
-      unit: 'check',
+      unit: unit('check'),
       completed: checkedInToday,
       environment: 'all',
     },
