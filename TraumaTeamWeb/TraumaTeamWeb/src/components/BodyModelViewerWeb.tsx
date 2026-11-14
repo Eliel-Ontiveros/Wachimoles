@@ -618,21 +618,26 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 
       // Render one preview per frame, reusing the detail camera and render target.
       const thumbnailQueue = [];
-      const queuedThumbnails = new Set();
+      const thumbnailVersions = new Map();
       let thumbnailFrame = null;
 
       function renderNextThumbnail() {
         thumbnailFrame = null;
-        const zn = thumbnailQueue.shift();
-        if (!zn) return;
+        const entry = thumbnailQueue.shift();
+        if (!entry) return;
+        const { zone: zn, reportColors } = entry;
+        const hasPain = zn.status !== 'normal' && (zn.painIntensity || 0) > 0;
+        const previewColor = reportColors
+          ? (hasPain ? getGradualPainColor(zn.painIntensity) : null)
+          : SELECTED_COLOR;
 
         try {
-          // Highlight only this zone, independently of the current selection or reports.
+          // Report previews follow severity; the anatomical picker keeps its blue highlight.
           meshZoneBuckets.forEach((bucket) => {
             paintedZonesPrev.forEach((index) => paintZoneBucket(bucket, index, null, 0));
-            paintZoneBucket(bucket, zones.indexOf(zn), SELECTED_COLOR, 0.92);
+            paintZoneBucket(bucket, zones.indexOf(zn), previewColor, 0.92);
           });
-          captureZoneSnapshot(zn, 'ZONE_THUMBNAIL');
+          captureZoneSnapshot(zn, reportColors ? 'ZONE_REPORT_THUMBNAIL' : 'ZONE_THUMBNAIL');
         } finally {
           meshZoneBuckets.forEach((bucket) =>
             paintZoneBucket(bucket, zones.indexOf(zn), null, 0)
@@ -643,13 +648,16 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
         if (thumbnailQueue.length) thumbnailFrame = requestAnimationFrame(renderNextThumbnail);
       }
 
-      function requestThumbnails(ids) {
+      function requestThumbnails(ids, reportColors = false) {
         if (meshZoneBuckets.length === 0 || !Array.isArray(ids)) return;
         ids.forEach((id) => {
           const zn = findZone(id);
-          if (!zn || queuedThumbnails.has(id)) return;
-          queuedThumbnails.add(id);
-          thumbnailQueue.push(zn);
+          if (!zn) return;
+          const key = (reportColors ? 'report:' : 'anatomy:') + zn.id;
+          const version = reportColors ? zn.status + ':' + zn.painIntensity : 'blue';
+          if (thumbnailVersions.get(key) === version) return;
+          thumbnailVersions.set(key, version);
+          thumbnailQueue.push({ zone: zn, reportColors });
         });
         if (thumbnailQueue.length && thumbnailFrame === null) {
           thumbnailFrame = requestAnimationFrame(renderNextThumbnail);
@@ -874,7 +882,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 
       window.onParentMessage = function(data) {
         if (data && data.type === 'REQUEST_ZONE_THUMBNAILS') {
-          requestThumbnails(data.ids);
+          requestThumbnails(data.ids, data.reportColors === true);
           return;
         }
         if (!data || data.type !== 'SYNC_STATE') return;
@@ -1082,13 +1090,16 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
         ) {
           onZoneSnapshotRef.current?.(data.zoneId, data.dataUrl);
         } else if (
-          data.type === 'ZONE_THUMBNAIL' &&
+          (data.type === 'ZONE_THUMBNAIL' || data.type === 'ZONE_REPORT_THUMBNAIL') &&
           typeof data.zoneId === 'string' &&
           typeof data.dataUrl === 'string' &&
           data.dataUrl.startsWith('data:image/png;base64,')
         ) {
-          setZoneThumbnails((previous) => ({ ...previous, [data.zoneId]: data.dataUrl }));
-          onZoneThumbnailRef.current?.(data.zoneId, data.dataUrl);
+          if (data.type === 'ZONE_THUMBNAIL') {
+            setZoneThumbnails((previous) => ({ ...previous, [data.zoneId]: data.dataUrl }));
+          } else {
+            onZoneThumbnailRef.current?.(data.zoneId, data.dataUrl);
+          }
         }
       } catch {
         // Ignorar mensajes externos
@@ -1138,11 +1149,20 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
   );
 
   useEffect(() => {
-    if (!viewerReady || (!dropdownOpen && !onZoneThumbnail)) return;
-    iframeRef.current?.contentWindow?.postMessage(JSON.stringify({
-      type: 'REQUEST_ZONE_THUMBNAILS',
-      ids: [...affectedMuscles, ...muscles].map((muscle) => muscle.id),
-    }), '*');
+    if (!viewerReady) return;
+    if (onZoneThumbnail) {
+      iframeRef.current?.contentWindow?.postMessage(JSON.stringify({
+        type: 'REQUEST_ZONE_THUMBNAILS',
+        ids: [...affectedMuscles, ...muscles].map((muscle) => muscle.id),
+        reportColors: true,
+      }), '*');
+    }
+    if (dropdownOpen) {
+      iframeRef.current?.contentWindow?.postMessage(JSON.stringify({
+        type: 'REQUEST_ZONE_THUMBNAILS',
+        ids: [...affectedMuscles, ...muscles].map((muscle) => muscle.id),
+      }), '*');
+    }
   }, [dropdownOpen, viewerReady, affectedMuscles, muscles, onZoneThumbnail]);
 
   useEffect(() => {
