@@ -29,6 +29,8 @@ describe("sanitizeIntent", () => {
       expect(sanitizeIntent({ type: "open-mission-setup", x: 1 })).toEqual({ type: "open-mission-setup" });
       expect(sanitizeIntent({ type: "arrive-early" })).toEqual({ type: "arrive-early" });
       expect(sanitizeIntent({ type: "dismiss-alert" })).toEqual({ type: "dismiss-alert" });
+      expect(sanitizeIntent({ type: "set-theme", theme: "dark", x: 1 })).toEqual({ type: "set-theme", theme: "dark" });
+      expect(sanitizeIntent({ type: "set-locale", locale: "en" })).toEqual({ type: "set-locale", locale: "en" });
       expect(sanitizeIntent({ type: "complete-mission", missionId: "env-luna-eva" })).toEqual({ type: "complete-mission", missionId: "env-luna-eva" });
       expect(sanitizeIntent({ type: "vital-history", metric: "spo2" })).toEqual({ type: "vital-history", metric: "spo2" });
       expect(sanitizeIntent({ type: "fill-health-check", bloodSugarMgDl: 110, systolicBp: 120, diastolicBp: 80, temperatureC: 36.5, sleepHours: 7, mood: 4, symptoms: ["Fatiga"], notes: "ok", z: 1 }))
@@ -36,6 +38,8 @@ describe("sanitizeIntent", () => {
     });
 
     it("rejects invalid required fields", () => {
+      expect(sanitizeIntent({ type: "set-theme", theme: "neon" })).toBeNull();
+      expect(sanitizeIntent({ type: "set-locale", locale: "fr" })).toBeNull();
       expect(sanitizeIntent({ type: "register-observation", muscleId: "alien" })).toBeNull();
       expect(sanitizeIntent({ type: "zone-detail", muscleId: "__proto__" })).toBeNull();
       expect(sanitizeIntent({ type: "zone-photos" })).toBeNull();

@@ -1,31 +1,28 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 
-import { DEFAULT_LOCALE, SPEECH, translate, type Locale, type MessageKey } from './messages';
+import { useSettings } from '@/settings/SettingsProvider';
+
+import { SPEECH, translate, type Locale, type MessageKey, type TranslateParams } from './messages';
 
 type I18nCtx = {
   locale: Locale;
+  /** Cambia el idioma y lo persiste (vive en SettingsProvider). */
   setLocale: (locale: Locale) => void;
-  t: (key: MessageKey, params?: Record<string, string | number>) => string;
+  t: (key: MessageKey, params?: TranslateParams) => string;
   /** Configuración de STT/TTS para el idioma activo. */
   speech: (typeof SPEECH)[Locale];
 };
 
 const I18nContext = createContext<I18nCtx | null>(null);
 
-/** Idioma activo de la app. Hoy fijo en español; listo para un selector de idioma. */
-export function I18nProvider({
-  children,
-  initialLocale = DEFAULT_LOCALE,
-}: {
-  children: ReactNode;
-  initialLocale?: Locale;
-}) {
-  const [locale, setLocale] = useState<Locale>(initialLocale);
+/** Expone el idioma activo (de `SettingsProvider`) y `t()`. Debe ir dentro de SettingsProvider. */
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const { locale, setLocale } = useSettings();
   const t = useCallback(
-    (key: MessageKey, params?: Record<string, string | number>) => translate(locale, key, params),
+    (key: MessageKey, params?: TranslateParams) => translate(locale, key, params),
     [locale]
   );
-  const value = useMemo(() => ({ locale, setLocale, t, speech: SPEECH[locale] }), [locale, t]);
+  const value = useMemo(() => ({ locale, setLocale, t, speech: SPEECH[locale] }), [locale, setLocale, t]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 

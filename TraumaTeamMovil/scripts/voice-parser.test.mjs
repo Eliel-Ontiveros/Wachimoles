@@ -195,3 +195,39 @@ test('S6 describe-screen phrases', () => {
   assert.equal(intent('what can I do in missions').screen, '/missions');
   assert.equal(intent('qué puedo decir').type, 'help');
 });
+
+test('S7 set-theme (es/en)', () => {
+  for (const [phrase, theme] of [
+    ['cambia a modo oscuro', 'dark'],
+    ['activa el modo claro', 'light'],
+    ['cambia a modo del sistema', 'system'],
+    ['tema oscuro', 'dark'],
+    ['switch to dark mode', 'dark'],
+    ['light mode', 'light'],
+    ['use system theme', 'system'],
+  ]) {
+    const i = intent(phrase);
+    assert.equal(i.type, 'set-theme', phrase);
+    assert.equal(i.theme, theme, phrase);
+  }
+});
+
+test('S7 set-locale (es/en)', () => {
+  for (const [phrase, locale] of [
+    ['cambia el idioma a inglés', 'en'],
+    ['cambia el idioma a español', 'es'],
+    ['change language to Spanish', 'es'],
+    ['change the language to English', 'en'],
+    ['switch to english', 'en'],
+    ['cambia a español', 'es'],
+  ]) {
+    const i = intent(phrase);
+    assert.equal(i.type, 'set-locale', phrase);
+    assert.equal(i.locale, locale, phrase);
+  }
+});
+
+test('S7 settings phrases do not hijack other commands', () => {
+  assert.equal(intent('abre signos vitales').type, 'navigate');
+  assert.equal(intent('configurar la misión').type, 'open-mission-setup');
+});

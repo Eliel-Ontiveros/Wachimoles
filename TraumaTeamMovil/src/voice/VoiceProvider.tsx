@@ -7,7 +7,8 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 import { useDrawer } from '@/components/trauma/drawer-context';
 import { useMission } from '@/components/trauma/mission-context';
 import { useI18n } from '@/i18n/I18nProvider';
-import type { MessageKey } from '@/i18n/messages';
+import { SPEECH, translate, type MessageKey } from '@/i18n/messages';
+import { useSettings } from '@/settings/SettingsProvider';
 import { interpretWithLlm, MAX_HISTORY_TURNS, type VoiceRequestContext, type VoiceTurn } from '@/services/voice-api';
 
 import { answer as dialogAnswer, needsDialog, startDialog, type DialogState, type Question } from './dialog';
@@ -54,6 +55,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const mission = useMission();
   const pathname = usePathname();
   const { t, locale, speech } = useI18n();
+  const settings = useSettings();
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [mode, setMode] = useState<'command' | 'dictation' | 'answer' | null>(null);
@@ -296,6 +298,23 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
             report({ kind: 'info', text: t('action.noAlertToDismiss') }, true);
           }
           return;
+        case 'set-theme':
+          settings.setThemePreference(intent.theme);
+          report({ kind: 'success', text: t(`settings.themeChanged.${intent.theme}` as MessageKey) }, true);
+          return;
+        case 'set-locale': {
+          // La confirmación se dice ya en el idioma nuevo (la voz de `say` es la del idioma anterior).
+          const text = translate(intent.locale, 'settings.localeChanged');
+          settings.setLocale(intent.locale);
+          report({ kind: 'success', text });
+          try {
+            Speech.stop();
+            Speech.speak(text, { language: SPEECH[intent.locale].lang, rate: 1.0, pitch: 1.0 });
+          } catch {
+            // La confirmación hablada es opcional.
+          }
+          return;
+        }
         case 'set-environment': {
           const env = t(`env.${intent.environment}` as MessageKey);
           m.setEnvironment(intent.environment);
@@ -380,7 +399,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           return;
       }
     },
-    [drawer, pushAlertsIntent, pushBodyIntent, pushHealthIntent, pushMissionsIntent, pushVitalsIntent, report, say, t, warpTo]
+    [drawer, pushAlertsIntent, pushBodyIntent, pushHealthIntent, pushMissionsIntent, pushVitalsIntent, report, say, settings, t, warpTo]
   );
 
   /** Termina el diálogo/aclaración: olvida el estado y la pregunta mostrada. */

@@ -12,7 +12,7 @@ Branch feat/i18n-theme (from main 698493a). App: TraumaTeamMovil (Expo SDK 58, N
 - S8 Dictionaries are split per area to avoid one huge file: `src/i18n/locales/<locale>/<area>.ts`, merged into MESSAGES; the existing test that every locale has every key keeps passing.
 
 ## Tasks
-- T1 S3-S8 infrastructure: SettingsProvider (locale + theme, persisted), theme tokens (`useAppTheme()` palette for style-prop colors + NativeWind `dark:` for classes), status bar, drawer settings UI, split dictionaries, voice set-theme/set-locale (app + backend) — worker
+- T1 S3-S8 infrastructure: SettingsProvider (locale + theme, persisted), theme tokens (`useAppTheme()` palette for style-prop colors + NativeWind `dark:` for classes), status bar, drawer settings UI, split dictionaries, voice set-theme/set-locale (app + backend) — worker — done
 - T2 S2,S4 migrate group A: VitalMonitorView, TraumaHeader, CriticalAlertToaster, HexDrawer (remaining strings), StartupSplashAnimation, streak/* — worker
 - T3 S2,S4 migrate group B: BodyView, BodyModelViewer, RegisterObservationModal, InjuryTimelapseModal, HealthQuestionnaireSection — worker
 - T4 S2,S4 migrate group C: MissionsView, SpaceJourneyTimeline, EnvironmentSelector, MissionOnboardingModal, MissionProvider/mission-api user-facing texts, types/mission labels, voice UI dark adjustments — worker
