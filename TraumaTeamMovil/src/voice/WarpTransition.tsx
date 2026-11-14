@@ -4,8 +4,9 @@ import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View, useWindowD
 export type WarpTrip = { id: number; label: string; heading: string };
 
 const STAR_COUNT = 56;
-const IN_MS = 560;
-const OUT_MS = 520;
+const IN_MS = 1100;
+const HOLD_MS = 550;
+const OUT_MS = 950;
 const GOLDEN = 137.508;
 
 /**
@@ -64,13 +65,14 @@ export function WarpTransition({
         Animated.timing(progress, {
           toValue: 2,
           duration: fast ? 1 : OUT_MS,
+          delay: fast ? 0 : HOLD_MS,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(veil, {
           toValue: 0,
           duration: fast ? 200 : OUT_MS,
-          delay: fast ? 0 : 140,
+          delay: fast ? 0 : HOLD_MS + 200,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
