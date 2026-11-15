@@ -15,7 +15,6 @@ import Svg, { Path } from 'react-native-svg';
 import {
   Camera,
   CheckCircle2,
-  History,
   Zap,
   Layers,
   FileText,
@@ -197,8 +196,8 @@ function ProblemDetailModal({
     : Boolean(observation?.functionalLimitation);
   const headerDate = isResolvedMode
     ? t('body.detail.curedOn', {
-        date: formatShortUpdateDate(resolvedRecord?.resolvedAt ?? resolvedRecord?.updatedAt),
-      })
+      date: formatShortUpdateDate(resolvedRecord?.resolvedAt ?? resolvedRecord?.updatedAt),
+    })
     : observation?.updatedAt
       ? formatObservationUpdatedAt(observation.updatedAt, locale, t)
       : '';
@@ -283,11 +282,10 @@ function ProblemDetailModal({
 
                   <View className="flex-1">
                     <Text
-                      className={`font-mono text-[9px] font-bold uppercase tracking-wider ${
-                        isResolvedMode
-                          ? 'text-emerald-600 dark:text-emerald-300'
-                          : 'text-slate-400 dark:text-trauma-nightSubtle'
-                      }`}>
+                      className={`font-mono text-[9px] font-bold uppercase tracking-wider ${isResolvedMode
+                        ? 'text-emerald-600 dark:text-emerald-300'
+                        : 'text-slate-400 dark:text-trauma-nightSubtle'
+                        }`}>
                       {isResolvedMode ? t('body.detail.historyCured') : t('body.detail.title')}
                     </Text>
                     <Text className="mt-0.5 font-mono text-base font-extrabold text-slate-900 dark:text-trauma-nightInk">
@@ -360,11 +358,10 @@ function ProblemDetailModal({
               {/* Chips clínicos: Hinchazón & Limitación funcional */}
               <View className="mt-3.5 flex-row gap-2">
                 <View
-                  className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${
-                    swelling
-                      ? 'border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950'
-                      : 'border-slate-100 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt'
-                  }`}>
+                  className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${swelling
+                    ? 'border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950'
+                    : 'border-slate-100 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt'
+                    }`}>
                   <Layers
                     size={14}
                     color={swelling ? colors.accentDeep : colors.textMuted}
@@ -379,11 +376,10 @@ function ProblemDetailModal({
                 </View>
 
                 <View
-                  className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${
-                    functionalLimitation
-                      ? 'border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950'
-                      : 'border-slate-100 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt'
-                  }`}>
+                  className={`flex-1 flex-row items-center rounded-xl border p-2.5 ${functionalLimitation
+                    ? 'border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950'
+                    : 'border-slate-100 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt'
+                    }`}>
                   <MotionStatusIcon
                     size={14}
                     color={functionalLimitation ? colors.accentDeep : colors.textMuted}
@@ -424,17 +420,15 @@ function ProblemDetailModal({
                       return (
                         <View
                           key={`${item.updateNumber}-${item.dateLabel}`}
-                          className={`rounded-xl border p-2.5 ${
-                            item.isResolvedEvent
-                              ? 'border-emerald-200 bg-emerald-50/70'
-                              : 'border-slate-200/80 bg-white'
-                          }`}>
+                          className={`rounded-xl border p-2.5 ${item.isResolvedEvent
+                            ? 'border-emerald-200 bg-emerald-50/70'
+                            : 'border-slate-200/80 bg-white'
+                            }`}>
                           <View className="flex-row items-center justify-between gap-2">
                             <View className="flex-row items-center gap-1.5">
                               <Text
-                                className={`font-mono text-[10.5px] font-extrabold ${
-                                  item.isResolvedEvent ? 'text-emerald-800' : 'text-slate-900'
-                                }`}>
+                                className={`font-mono text-[10.5px] font-extrabold ${item.isResolvedEvent ? 'text-emerald-800' : 'text-slate-900'
+                                  }`}>
                                 {item.title}
                               </Text>
                               {!!item.dateLabel && (
@@ -587,8 +581,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   useEffect(() => {
     tRef.current = t;
   }, [t]);
-  const { colors, scheme } = useAppTheme();
-  const iconInk = scheme === 'dark' ? colors.text : '#0f172a';
+  const { colors } = useAppTheme();
   const { bodyIntent, consumeBodyIntent } = useVoice();
   const [tab, setTabState] = useState<'body' | 'health' | 'records'>('body');
   // La voz necesita saber en qué pestaña está el usuario (S5): se reporta en cada cambio.
@@ -666,7 +659,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
           }
         });
         uniqueZones.forEach((mName, mId) => {
-          void refreshInjuryPhotos(mId, mName).catch(() => {});
+          void refreshInjuryPhotos(mId, mName).catch(() => { });
         });
       })
       .catch((error: unknown) => {
@@ -837,14 +830,33 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   const registeredMuscles = muscles.filter((m) => m.status !== 'normal' && m.observation);
 
   // Color gradual de la zona seleccionada actualmente (si tiene malestar registrado)
-  const selectedPainColor = selectedMuscle.observation?.painIntensity
-    ? getPainColorHex(selectedMuscle.observation.painIntensity)
+  const selectedPainIntensity = selectedMuscle.observation?.painIntensity ?? 0;
+  const selectedPainColor = selectedPainIntensity
+    ? getPainColorHex(selectedPainIntensity)
     : colors.accentDeep;
+  const selectedZoneColor = hasSavedProblem
+    ? selectedPainColor
+    : selectedResolvedRecord
+      ? colors.success
+      : colors.accentDeep;
+  const selectedUpdatesCount = hasSavedProblem
+    ? parseConditionUpdates({
+      description: selectedMuscle.observation?.notes ?? '',
+      fallbackPain: selectedMuscle.observation?.painIntensity,
+      fallbackDateLabel: selectedMuscle.observation?.updatedAt,
+      photos: injuryPhotos[selectedMuscle.id] ?? [],
+    }).length
+    : 0;
 
   return (
-    <View className="px-5 pb-10 pt-5">
-      {/* Pestañas superiores: Vista Corporal / Cuestionario / Registros */}
-      <View className="mb-5 flex-row gap-2">
+    <View className="px-5 pb-10 pt-6">
+      {/* Cabecera de pantalla */}
+      <Text className="mb-3 font-mono text-xl font-bold text-trauma-ink dark:text-trauma-nightInk">
+        {t('route./explore')}
+      </Text>
+
+      {/* Selector segmentado de vistas: Visor 3D / Cuestionario / Registros */}
+      <View className="mb-5 flex-row gap-1.5 rounded-2xl border border-trauma-line bg-white p-1.5 shadow-sm dark:border-trauma-nightLine dark:bg-trauma-night">
         {(
           [
             { id: 'body', label: t('body.tab.view3d') },
@@ -856,46 +868,79 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
               }),
             },
           ] as const
-        ).map((t) => (
-          <Pressable
-            key={t.id}
-            onPress={() => setTab(t.id)}
-            className={`flex-1 items-center rounded-md border px-2 py-1.5 active:opacity-70 ${tab === t.id
-                ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
-                : 'border-trauma-ink dark:border-trauma-nightLine bg-white dark:bg-trauma-night'
-              }`}>
-            <Text className="font-mono text-[11px] font-bold text-trauma-ink dark:text-trauma-nightInk" numberOfLines={1}>
-              {t.label}
-            </Text>
-          </Pressable>
-        ))}
+        ).map((item) => {
+          const isActive = tab === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => setTab(item.id)}
+              className={`flex-1 items-center rounded-xl border px-2 py-2 active:opacity-75 ${isActive
+                ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-cyan-950'
+                : 'border-transparent'
+                }`}>
+              <Text
+                className={`font-mono text-[11px] font-bold ${isActive
+                  ? 'text-trauma-ink dark:text-trauma-nightInk'
+                  : 'text-trauma-muted dark:text-trauma-nightMuted'
+                  }`}
+                numberOfLines={1}>
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {tab === 'health' ? (
         <HealthQuestionnaireSection />
       ) : tab === 'records' ? (
-        <View className="mt-1">
-          <Text className="mb-4 text-center font-mono text-base font-bold text-trauma-ink dark:text-trauma-nightInk">
-            {t('body.records.title')}
-          </Text>
+        <View>
+          {/* Resumen KPI de malestares activos y curados */}
+          <View className="mb-4 flex-row gap-3">
+            <View className="flex-1 rounded-2xl border border-trauma-line bg-white p-4 shadow-md dark:border-trauma-nightLine dark:bg-trauma-night">
+              <View className="flex-row items-center justify-between">
+                <Text className="font-mono text-[11px] font-bold uppercase tracking-wider text-trauma-muted dark:text-trauma-nightMuted">
+                  {t('body.records.activeShort')}
+                </Text>
+                <Zap size={14} color={colors.accentDeep} strokeWidth={2.2} />
+              </View>
+              <Text className="mt-1 font-mono text-2xl font-bold text-trauma-ink dark:text-trauma-nightInk">
+                {registeredMuscles.length}
+              </Text>
+            </View>
+
+            <View className="flex-1 rounded-2xl border border-trauma-line bg-white p-4 shadow-md dark:border-trauma-nightLine dark:bg-trauma-night">
+              <View className="flex-row items-center justify-between">
+                <Text className="font-mono text-[11px] font-bold uppercase tracking-wider text-trauma-muted dark:text-trauma-nightMuted">
+                  {t('body.detail.cured')}
+                </Text>
+                <CheckCircle2 size={14} color={colors.success} strokeWidth={2.2} />
+              </View>
+              <Text className="mt-1 font-mono text-2xl font-bold text-trauma-ink dark:text-trauma-nightInk">
+                {resolvedConditions.length}
+              </Text>
+            </View>
+          </View>
 
           {/* Escala minimalista en la pestaña de registros */}
-          <View className="mb-4 rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3 shadow-xs">
-            <View className="mb-1.5 flex-row items-center justify-between">
-              <Text className="font-mono text-[10px] font-bold text-slate-700 dark:text-trauma-nightInk">
+          <View className="mb-5 rounded-2xl border border-trauma-line bg-white p-4 shadow-md dark:border-trauma-nightLine dark:bg-trauma-night">
+            <View className="mb-2 flex-row items-center justify-between">
+              <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
                 {t('body.records.painScale')}
               </Text>
-              <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.records.gradual')}</Text>
+              <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">
+                {t('body.records.gradual')}
+              </Text>
             </View>
             <MinimalPainScaleBar showLabels />
           </View>
 
-          <Text className="mb-2 font-mono text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-trauma-nightMuted">
+          <Text className="mb-2.5 font-mono text-[11px] font-bold uppercase tracking-wider text-trauma-muted dark:text-trauma-nightMuted">
             {t('body.records.active', { count: registeredMuscles.length })}
           </Text>
 
           {registeredMuscles.length === 0 ? (
-            <View className="mb-5 items-center rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-5">
+            <View className="mb-5 items-center rounded-2xl border border-trauma-line bg-white p-5 shadow-md dark:border-trauma-nightLine dark:bg-trauma-night">
               <Text className="font-mono text-xs text-trauma-muted dark:text-trauma-nightMuted">
                 {t('body.records.empty')}
               </Text>
@@ -915,27 +960,16 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
                   <Pressable
                     key={m.id}
                     onPress={() => openDetailFor(m)}
-                    className="mb-3 rounded-2xl border border-trauma-line bg-white p-3.5 shadow-xs active:opacity-80 dark:bg-trauma-night dark:border-trauma-nightLine">
+                    className="mb-3 rounded-2xl border border-trauma-line bg-white p-4 shadow-md active:opacity-80 dark:border-trauma-nightLine dark:bg-trauma-night">
                     <View className="flex-row items-center justify-between">
-                      <View className="flex-1 flex-row items-center pr-2">
-                        <View
-                          style={{
-                            backgroundColor: `${painHex}1A`,
-                            borderColor: `${painHex}44`,
-                            borderWidth: 1,
-                          }}
-                          className="mr-2.5 h-10 w-10 items-center justify-center rounded-xl">
-                          <RegionCategoryIcon category={m.category} color={painHex} size={18} />
-                        </View>
-                        <View className="flex-1">
-                          <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
-                            {t(muscleNameKey(m.id))}
-                          </Text>
-                          <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
-                            {t(categoryNameKey(m.category))} · {updatesCount}{' '}
-                            {t(updatesCount === 1 ? 'body.records.updatesOne' : 'body.records.updatesMany')}
-                          </Text>
-                        </View>
+                      <View className="flex-1 pr-2">
+                        <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
+                          {t(muscleNameKey(m.id))}
+                        </Text>
+                        <Text className="font-mono text-[10px] text-trauma-muted dark:text-trauma-nightMuted">
+                          {t(categoryNameKey(m.category))} · {updatesCount}{' '}
+                          {t(updatesCount === 1 ? 'body.records.updatesOne' : 'body.records.updatesMany')}
+                        </Text>
                       </View>
 
                       <View className="flex-row items-center gap-2">
@@ -954,6 +988,16 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
                         <ArrowRight size={14} color={colors.textSubtle} />
                       </View>
                     </View>
+
+                    <View className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-trauma-nightLine">
+                      <View
+                        style={{
+                          width: `${Math.min(100, Math.max(0, intensity * 10))}%`,
+                          backgroundColor: painHex,
+                        }}
+                        className="h-full rounded-full"
+                      />
+                    </View>
                   </Pressable>
                 );
               })}
@@ -961,15 +1005,12 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
           )}
 
           {/* Historial de Malestares (Curados) */}
-          <View className="mb-2 flex-row items-center">
-            <History size={13} color={colors.success} strokeWidth={2.2} />
-            <Text className="ml-1.5 font-mono text-[10.5px] font-bold uppercase tracking-wider text-emerald-800">
-              {t('body.records.history', { count: resolvedConditions.length })}
-            </Text>
-          </View>
+          <Text className="mb-2.5 font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+            {t('body.records.history', { count: resolvedConditions.length })}
+          </Text>
 
           {resolvedConditions.length === 0 ? (
-            <View className="items-center rounded-2xl border border-dashed border-slate-200 bg-white/80 p-5 dark:border-trauma-nightLine">
+            <View className="items-center rounded-2xl border border-dashed border-trauma-line bg-white/80 p-5 dark:border-trauma-nightLine dark:bg-trauma-night/60">
               <Text className="text-center font-mono text-[11px] text-slate-400 dark:text-trauma-nightSubtle">
                 {t('body.records.historyEmpty')}
               </Text>
@@ -997,28 +1038,23 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
                 <Pressable
                   key={rec.id || rec.muscleId}
                   onPress={() => openDetailFor(targetMuscle, rec)}
-                  className="mb-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/35 p-3.5 shadow-xs active:opacity-80 dark:border-emerald-400/30 dark:bg-emerald-950/40">
+                  className="mb-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-4 shadow-md active:opacity-80 dark:border-emerald-400/30 dark:bg-emerald-950/40">
                   <View className="flex-row items-center justify-between">
-                    <View className="flex-1 flex-row items-center pr-2">
-                      <View className="mr-2.5 h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100/70">
-                        <CheckCircle2 size={18} color={colors.success} strokeWidth={2.2} />
-                      </View>
-                      <View className="flex-1">
-                        <Text className="font-mono text-xs font-bold text-slate-900 dark:text-trauma-nightInk">
-                          {t(muscleNameKey(targetMuscle.id))}
+                    <View className="flex-1 pr-2">
+                      <Text className="font-mono text-xs font-bold text-slate-900 dark:text-trauma-nightInk">
+                        {t(muscleNameKey(targetMuscle.id))}
+                      </Text>
+                      <Text className="font-mono text-[10px] text-slate-500 dark:text-trauma-nightMuted">
+                        {parsed.length}{' '}
+                        {t(parsed.length === 1 ? 'body.records.updatesOne' : 'body.records.updatesMany')} ·{' '}
+                        {recPhotos.length}{' '}
+                        {t(recPhotos.length === 1 ? 'body.records.photoOne' : 'body.records.photoMany')}
+                      </Text>
+                      {!!resolvedDate && (
+                        <Text className="font-mono text-[9.5px] text-emerald-700 dark:text-emerald-300">
+                          {t('body.records.curedOn', { date: resolvedDate })}
                         </Text>
-                        <Text className="font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted">
-                          {parsed.length}{' '}
-                          {t(parsed.length === 1 ? 'body.records.updatesOne' : 'body.records.updatesMany')} ·{' '}
-                          {recPhotos.length}{' '}
-                          {t(recPhotos.length === 1 ? 'body.records.photoOne' : 'body.records.photoMany')}
-                        </Text>
-                        {!!resolvedDate && (
-                          <Text className="font-mono text-[9px] text-emerald-700">
-                            {t('body.records.curedOn', { date: resolvedDate })}
-                          </Text>
-                        )}
-                      </View>
+                      )}
                     </View>
 
                     <View className="flex-row items-center gap-2">
@@ -1037,167 +1073,152 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
         </View>
       ) : (
         <>
-          <Text className="mb-3 text-center font-mono text-base font-bold text-trauma-ink dark:text-trauma-nightInk">
-            {t('body.select.title')}
-          </Text>
-
-          {/* Cuadro del Visor 3D Interactivo dividido en 34 zonas anatómicas */}
-          <View
-            className="overflow-hidden rounded-3xl border border-trauma-line dark:border-trauma-nightLine bg-trauma-bg dark:bg-trauma-nightBg shadow-md"
-            style={{ minHeight: 375 }}>
-            <BodyModelViewer
-              muscles={muscles}
-              selectedMuscle={selectedName}
-              onSelectMuscle={(name) => setSelectedName(name)}
-              isLocked={false}
-              onTouchStateChange={(touching) => {
-                onSetScrollEnabled?.(!touching);
-              }}
-              onZoneSnapshot={(zoneId, dataUrl) => {
-                setZoneSnapshots((prev) => ({ ...prev, [zoneId]: dataUrl }));
-              }}
-            />
-          </View>
-
-          {/* Barra inferior de ayuda y botón Fijar Vista */}
-          <View className="mt-2.5 flex-row items-center justify-between">
-            <Text className="flex-1 font-mono text-[9px] text-trauma-ink dark:text-trauma-nightInk">
-              {t('body.select.help')}
-            </Text>
-          </View>
-
-          {/* Barra de escala de dolor */}
-          <View className="mt-3 px-1">
-            <MinimalPainScaleBar showLabels />
-          </View>
-
-          {/* Tarjeta simplificada de problema registrado */}
-          {hasSavedProblem ? (
-            <View className="mt-4 rounded-2xl border border-slate-200/90 dark:border-trauma-nightLine bg-white dark:bg-trauma-night px-3.5 py-3 shadow-xs">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 flex-row items-center pr-2">
-                  <View
-                    style={{ backgroundColor: selectedPainColor }}
-                    className="mr-2 h-2.5 w-2.5 rounded-full"
-                  />
-                  <View className="flex-1">
-                    <Text className="font-mono text-xs font-bold text-slate-900 dark:text-trauma-nightInk" numberOfLines={1}>
-                      {t(muscleNameKey(selectedMuscle.id))}
-                    </Text>
-                    <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
-                      {t('body.card.activeUpdates', {
-                        count: parseConditionUpdates({
-                          description: selectedMuscle.observation?.notes ?? '',
-                          fallbackPain: selectedMuscle.observation?.painIntensity,
-                          fallbackDateLabel: selectedMuscle.observation?.updatedAt,
-                          photos: injuryPhotos[selectedMuscle.id] ?? [],
-                        }).length,
-                      })}
-                    </Text>
-                  </View>
-                </View>
-
+          {/* Tarjeta Hero del Visor 3D Interactivo */}
+          <View className="mb-5 rounded-2xl border border-trauma-line bg-white p-4 shadow-md dark:border-trauma-nightLine dark:bg-trauma-night">
+            <View className="mb-3 flex-row items-center justify-between gap-2">
+              <Text className="font-mono text-sm font-bold text-trauma-ink dark:text-trauma-nightInk">
+                {t('body.select.title')}
+              </Text>
+              <View className="max-w-[52%] flex-row items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 dark:border-trauma-nightLine dark:bg-trauma-nightAlt">
                 <View
-                  style={{
-                    backgroundColor: `${selectedPainColor}18`,
-                    borderColor: selectedPainColor,
-                    borderWidth: 1,
-                  }}
-                  className="rounded-lg px-2 py-0.5">
-                  <Text className="font-mono text-[11px] font-extrabold text-slate-800 dark:text-trauma-nightInk">
-                    {selectedMuscle.observation?.painIntensity}/10
-                  </Text>
-                </View>
-              </View>
-
-              <View className="mt-2.5 flex-row gap-2">
-                <Pressable
-                  onPress={() => openDetailFor(selectedMuscle)}
-                  className="flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt px-3 py-2 active:opacity-75">
-                  <FileText size={13} color={iconInk} strokeWidth={2.2} />
-                  <Text className="ml-1 font-mono text-[10.5px] font-bold text-slate-800 dark:text-trauma-nightInk">
-                    {t('body.card.details')}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setObservationModalOpen(true)}
-                  className="flex-1 flex-row items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-2 active:opacity-75">
-                  <Pencil size={13} color={iconInk} strokeWidth={2.2} />
-                  <Text className="ml-1 font-mono text-[10.5px] font-bold text-trauma-ink dark:text-trauma-nightInk">
-                    {t('body.card.addUpdate')}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => openTimelapseFor(selectedMuscle)}
-                  className="flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt px-2.5 py-2 active:opacity-75">
-                  <Camera size={13} color={colors.accentDeep} strokeWidth={2.2} />
-                  <Text className="ml-1 font-mono text-[10.5px] font-bold text-slate-800 dark:text-trauma-nightInk">
-                    {(injuryPhotos[selectedMuscle.id] ?? []).length}
-                  </Text>
-                </Pressable>
-              </View>
-
-              <Pressable
-                onPress={() => setPendingCureMuscle(selectedMuscle)}
-                className="mt-2.5 flex-row items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft px-4 py-2.5 shadow-xs active:opacity-75 dark:bg-cyan-950">
-                <CheckCircle2 size={14} color={iconInk} strokeWidth={2.2} />
-                <Text className="ml-1.5 font-mono text-[11px] font-bold text-trauma-ink dark:text-trauma-nightInk">
-                  {t('body.detail.cureBtn')}
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            // Botón para registrar observación si no hay malestar activo
-            <View className="mt-4 items-center rounded-2xl border border-slate-200/80 dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
-              <View className="mb-2.5 flex-row items-center">
-                <RegionCategoryIcon
-                  category={selectedMuscle.category}
-                  color={selectedResolvedRecord ? colors.success : colors.accentDeep}
-                  size={15}
+                  style={{ backgroundColor: selectedZoneColor }}
+                  className="mr-1.5 h-2 w-2 rounded-full"
                 />
-                <Text className="ml-2 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                <Text
+                  className="font-mono text-[10px] font-bold text-trauma-ink dark:text-trauma-nightInk"
+                  numberOfLines={1}>
                   {t(muscleNameKey(selectedMuscle.id))}
                 </Text>
-                <View
-                  className={`ml-2 rounded-full px-2 py-0.5 ${
-                    selectedResolvedRecord
-                      ? 'bg-emerald-100 dark:bg-emerald-950'
-                      : 'bg-slate-100 dark:bg-trauma-nightAlt'
-                  }`}>
-                  <Text
-                    className={`font-mono text-[9px] font-bold ${
-                      selectedResolvedRecord
-                        ? 'text-emerald-800 dark:text-emerald-200'
-                        : 'text-slate-500 dark:text-trauma-nightMuted'
-                    }`}>
-                    {selectedResolvedRecord ? t('body.card.curedPrev') : t('body.card.noRecord')}
-                  </Text>
-                </View>
+              </View>
+            </View>
+
+            <View className="overflow-hidden rounded-xl border border-slate-200 dark:border-trauma-nightLine">
+              <BodyModelViewer
+                muscles={muscles}
+                selectedMuscle={selectedName}
+                onSelectMuscle={(name) => setSelectedName(name)}
+                isLocked={false}
+                onTouchStateChange={(touching) => {
+                  onSetScrollEnabled?.(!touching);
+                }}
+                onZoneSnapshot={(zoneId, dataUrl) => {
+                  setZoneSnapshots((prev) => ({ ...prev, [zoneId]: dataUrl }));
+                }}
+              />
+            </View>
+
+            <View className="mt-3 border-t border-slate-100 pt-3 dark:border-trauma-nightLine">
+              <Text className="mb-2.5 font-mono text-[10px] leading-4 text-trauma-muted dark:text-trauma-nightMuted">
+                {t('body.select.help')}
+              </Text>
+              <MinimalPainScaleBar showLabels />
+            </View>
+          </View>
+
+          {/* Tarjeta de telemetría de la zona seleccionada */}
+          <View className="rounded-2xl border border-trauma-line bg-white p-4 shadow-md dark:border-trauma-nightLine dark:bg-trauma-night">
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1">
+                <Text
+                  className="font-mono text-sm font-bold text-trauma-ink dark:text-trauma-nightInk"
+                  numberOfLines={2}>
+                  {t(muscleNameKey(selectedMuscle.id))}
+                </Text>
+                <Text
+                  className="mt-0.5 font-mono text-[10px] text-trauma-muted dark:text-trauma-nightMuted"
+                  numberOfLines={1}>
+                  {hasSavedProblem
+                    ? `${t(categoryNameKey(selectedMuscle.category))} · ${t('body.card.activeUpdates', { count: selectedUpdatesCount })}`
+                    : selectedResolvedRecord
+                      ? `${t(categoryNameKey(selectedMuscle.category))} · ${t('body.card.curedPrev')}`
+                      : t(categoryNameKey(selectedMuscle.category))}
+                </Text>
               </View>
 
-              <Pressable
-                onPress={() => setObservationModalOpen(true)}
-                className="w-full flex-row items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt px-5 py-2.5 shadow-xs active:opacity-75">
-                <PlusCircle size={14} color={iconInk} strokeWidth={2.2} />
-                <Text className="ml-1.5 font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
-                  {t('body.card.register')}
-                </Text>
-              </Pressable>
-
-              {selectedResolvedRecord && (
+              {hasSavedProblem ? (
+                <View className="flex-row items-baseline">
+                  <Text className="font-mono text-xl font-bold text-trauma-ink dark:text-trauma-nightInk">
+                    {selectedPainIntensity}
+                  </Text>
+                  <Text className="font-mono text-xs text-trauma-muted dark:text-trauma-nightMuted">
+                    /10
+                  </Text>
+                </View>
+              ) : (
                 <Pressable
-                  onPress={() => openDetailFor(selectedMuscle, selectedResolvedRecord)}
-                  className="mt-2 w-full flex-row items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2 active:opacity-75">
-                  <History size={13} color={colors.success} strokeWidth={2.2} />
-                  <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-emerald-900">
-                    {t('body.card.viewCured')}
+                  onPress={() => setObservationModalOpen(true)}
+                  className="shrink-0 items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft px-3.5 py-2 active:opacity-75 dark:bg-cyan-950">
+                  <Text className="font-mono text-[11px] font-bold text-trauma-ink dark:text-trauma-nightInk">
+                    {t('body.card.register')}
                   </Text>
                 </Pressable>
               )}
             </View>
-          )}
+
+            {hasSavedProblem ? (
+              <>
+                <View className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-trauma-nightLine">
+                  <View
+                    style={{
+                      width: `${Math.min(100, Math.max(0, selectedPainIntensity * 10))}%`,
+                      backgroundColor: selectedPainColor,
+                    }}
+                    className="h-full rounded-full"
+                  />
+                </View>
+
+                <View className="mt-3 border-t border-slate-100 pt-3 dark:border-trauma-nightLine">
+                  <View className="flex-row gap-2">
+                    <Pressable
+                      onPress={() => openDetailFor(selectedMuscle)}
+                      className="items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 active:opacity-75 dark:border-trauma-nightLine dark:bg-trauma-nightAlt">
+                      <Text className="font-mono text-[10.5px] font-bold text-slate-800 dark:text-trauma-nightInk">
+                        {t('body.card.details')}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => setObservationModalOpen(true)}
+                      className="flex-1 items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft py-2 active:opacity-75 dark:bg-cyan-950">
+                      <Text className="font-mono text-[10.5px] font-bold text-trauma-ink dark:text-trauma-nightInk">
+                        {t('body.card.addUpdate')}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => openTimelapseFor(selectedMuscle)}
+                      className="items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 active:opacity-75 dark:border-trauma-nightLine dark:bg-trauma-nightAlt">
+                      <Text className="font-mono text-[10.5px] font-bold text-slate-800 dark:text-trauma-nightInk">
+                        {t('body.card.photos', {
+                          count: (injuryPhotos[selectedMuscle.id] ?? []).length,
+                        })}
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  <Pressable
+                    onPress={() => setPendingCureMuscle(selectedMuscle)}
+                    className="mt-2.5 items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 active:opacity-75 dark:border-emerald-500/40 dark:bg-emerald-950">
+                    <Text className="font-mono text-[11px] font-bold text-emerald-900 dark:text-emerald-200">
+                      {t('body.detail.cureBtn')}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              selectedResolvedRecord && (
+                <View className="mt-3 border-t border-slate-100 pt-3 dark:border-trauma-nightLine">
+                  <Pressable
+                    onPress={() => openDetailFor(selectedMuscle, selectedResolvedRecord)}
+                    className="w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2 active:opacity-75 dark:border-emerald-500/40 dark:bg-emerald-950/60">
+                    <Text className="font-mono text-[10.5px] font-bold text-emerald-900 dark:text-emerald-200">
+                      {t('body.card.viewCured')}
+                    </Text>
+                  </Pressable>
+                </View>
+              )
+            )}
+          </View>
         </>
       )}
 

@@ -262,7 +262,7 @@ async function requestSamples(
 }
 
 /** Consulta las muestras del usuario fijo configurado y autorizado por el backend. */
-export async function fetchDashboardSamples(limit = 100): Promise<DashboardSample[]> {
+export async function fetchDashboardSamples(limit = 500): Promise<DashboardSample[]> {
   return requestSamples(limit);
 }
 
@@ -272,6 +272,62 @@ export async function fetchMetricHistory(
   limit = 300
 ): Promise<DashboardSample[]> {
   return requestSamples(limit, metric);
+}
+
+function hasHeadlineMetricSample(samples: DashboardSample[], metric: SampleMetric): boolean {
+  return samples.some((s) => {
+    if (s.metric !== metric) return false;
+    return metric === 'stress' || metric === 'steps' ? s.value >= 0 : s.value > 0;
+  });
+}
+
+function mergeAndSortSamples(groups: DashboardSample[][]): DashboardSample[] {
+  const byKey = new Map<string, DashboardSample>();
+  for (const group of groups) {
+    for (const sample of group) {
+      const key = `${sample.metric}:${sample.id}:${sample.sampleId}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, sample);
+      }
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => {
+    const tA = Date.parse(a.measuredAt);
+    const tB = Date.parse(b.measuredAt);
+    const diff = (Number.isFinite(tB) ? tB : 0) - (Number.isFinite(tA) ? tA : 0);
+    return diff !== 0 ? diff : b.id - a.id;
+  });
+}
+
+/**
+ * Obtiene las muestras generales y completa por métrica (por ejemplo `spo2` o `sleep`)
+ * cuando lecturas frecuentes de pulso/estrés desplazan a las menos frecuentes fuera del lote inicial.
+ */
+export async function fetchLatestVitalsSamples(limit = 500): Promise<DashboardSample[]> {
+  const baseSamples = await fetchDashboardSamples(limit);
+  if (baseSamples.length === 0) {
+    return [];
+  }
+
+  const missingMetrics = SAMPLE_METRICS.filter(
+    (metric) => !hasHeadlineMetricSample(baseSamples, metric)
+  );
+  if (missingMetrics.length === 0) {
+    return baseSamples;
+  }
+
+  const extraResults = await Promise.allSettled(
+    missingMetrics.map((metric) => fetchMetricHistory(metric, 30))
+  );
+  const extraGroups = extraResults
+    .filter((res): res is PromiseFulfilledResult<DashboardSample[]> => res.status === 'fulfilled')
+    .map((res) => res.value);
+
+  if (extraGroups.length === 0) {
+    return baseSamples;
+  }
+
+  return mergeAndSortSamples([baseSamples, ...extraGroups]);
 }
 
 export async function fetchHeartRateHistory(limit = 300): Promise<DashboardSample[]> {
@@ -299,7 +355,7 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
   for (const s of samples) {
     if (s.metric === 'heart_rate') {
       pulseHistory.push(s);
-      if (heartRate === null) {
+      if (heartRate === null && s.value > 0) {
         heartRate = Math.round(s.value);
         const d = new Date(s.measuredAt);
         if (!latestDate || d > latestDate) latestDate = d;
@@ -307,7 +363,7 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
     }
     if (s.metric === 'spo2') {
       spo2History.push(s);
-      if (spo2 === null) {
+      if (spo2 === null && s.value > 0) {
         spo2 = Math.round(s.value);
         const d = new Date(s.measuredAt);
         if (!latestDate || d > latestDate) latestDate = d;
@@ -323,7 +379,7 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
     }
     if (s.metric === 'sleep') {
       sleepHistory.push(s);
-      if (sleepHours === null) {
+      if (sleepHours === null && s.value > 0) {
         sleepHours = s.value;
       }
     }

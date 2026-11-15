@@ -172,8 +172,6 @@ const body: Record<string, string> = {
   'body.health.moodSub': 'Daily behavioral health',
   'body.health.moodHelp': 'Prolonged isolation and confinement raise behavioral risk. Log your state to detect fatigue early.',
   'body.health.symptoms': 'Symptoms on mission',
-  'body.health.watchLine': 'Watch: {value}',
-  'body.health.bpm': 'bpm',
   'body.health.notePlaceholder': 'Additional clinical note (optional)...',
   'body.health.dictate': 'Dictate note',
   'body.health.guide': 'Recommended guidance · {status}',
@@ -225,6 +223,7 @@ const body: Record<string, string> = {
   'body.card.addUpdate': '+ Update',
   'body.card.curedPrev': 'Previously healed',
   'body.card.viewCured': 'View previous healed history',
+  'body.records.activeShort': 'Active',
 };
 
 export default body;

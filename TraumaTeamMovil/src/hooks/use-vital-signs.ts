@@ -7,7 +7,7 @@ import {
 } from '../types/vital-signs';
 import {
   extractLatestVitals,
-  fetchDashboardSamples,
+  fetchLatestVitalsSamples,
   fetchMetricHistory,
   getInitialEmptyVitals,
 } from '../services/vital-signs-api';
@@ -37,7 +37,7 @@ export function useVitalSigns(autoRefreshIntervalMs = 5000) {
     setErrorMessage(null);
 
     try {
-      const samples = await fetchDashboardSamples(100);
+      const samples = await fetchLatestVitalsSamples(500);
 
       if (!mountedRef.current) return;
 
@@ -89,7 +89,10 @@ export function useVitalSigns(autoRefreshIntervalMs = 5000) {
 
   // Carga inicial
   useEffect(() => {
-    refresh();
+    const timer = setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   // Sondeo periódico para detectar nuevos pulsos en tiempo real

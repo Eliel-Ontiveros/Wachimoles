@@ -165,6 +165,10 @@ const missions: Record<string, string> = {
   'missions.completedRow': 'Completed: {done}/{total}',
   'missions.completedA11y': 'Completed missions: {done} of {total}',
   'missions.timeline.launching': 'Launching trajectory',
+  'missions.unit.day': 'day',
+  'missions.unit.days': 'days',
+  'missions.kpi.completed': 'Completed',
+  'missions.kpi.weekly': 'Weekly check-ins',
 };
 
 export default missions;
