@@ -783,17 +783,6 @@ h3 {
   color: #e0f2fe;
 }
 
-@keyframes shipFloatY {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-
-  50% {
-    transform: translate3d(0, -2.5px, 0);
-  }
-}
-
 .pulse-hero-card {
   contain: layout style paint;
   background: var(--bg-surface);
@@ -1510,16 +1499,9 @@ dialog.history-native-dialog::backdrop {
   flex-direction: column;
 }
 
-.history-space-banner {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #060b19 0%, #0b1633 100%);
-  min-block-size: 94px;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(88, 199, 243, 0.25);
-}
-
-.history-space-svg {
+.env-banner-backdrop,
+.env-banner-backdrop::after,
+.env-banner-backdrop-img {
   position: absolute;
   inset: 0;
   inline-size: 100%;
@@ -1527,22 +1509,47 @@ dialog.history-native-dialog::backdrop {
   pointer-events: none;
 }
 
-.history-ship-float {
-  animation: shipFloatY 2.8s ease-in-out infinite;
+.env-banner-backdrop {
+  z-index: 0;
+  overflow: hidden;
+}
 
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
+.env-banner-backdrop-img {
+  display: block;
+  max-inline-size: none;
+  object-fit: cover;
+  object-position: center;
+}
+
+.env-banner-backdrop::after {
+  content: '';
+  background: linear-gradient(
+    90deg,
+    rgb(6 11 25 / var(--banner-scrim-start, 0.56)) 0%,
+    rgb(6 11 25 / var(--banner-scrim-mid, 0.22)) 58%,
+    rgb(6 11 25 / 0) 100%
+  );
+}
+
+.history-space-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #060b19;
+  min-block-size: 108px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(88, 199, 243, 0.25);
 }
 
 .history-banner-overlay {
   position: relative;
   z-index: 1;
+  min-block-size: 108px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 15px 18px;
+  padding: 18px 20px;
 }
 
 .history-banner-title {
@@ -1555,19 +1562,22 @@ dialog.history-native-dialog::backdrop {
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  color: #58c7f3;
+  color: #bae6fd;
+  text-shadow: 0 1px 3px rgba(6, 11, 25, 0.75);
 }
 
 .history-banner-title h3 {
   margin: 0;
   font-size: 1.06rem;
   font-weight: 800;
-  color: #f8fafc;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(6, 11, 25, 0.8);
 }
 
 .history-banner-title>span:last-child {
   font-size: 0.71rem;
-  color: #cbd5e1;
+  color: #e2e8f0;
+  text-shadow: 0 1px 3px rgba(6, 11, 25, 0.75);
 }
 
 .modal-close-cosmic {

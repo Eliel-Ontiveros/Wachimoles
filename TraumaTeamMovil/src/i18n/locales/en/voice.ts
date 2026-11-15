@@ -51,7 +51,6 @@ const voice: Record<string, string> = {
   'dialog.q.glucose': 'What is your blood sugar, in milligrams per deciliter?',
   'dialog.q.bp': 'What is your blood pressure? Say two numbers, for example one twenty over eighty.',
   'dialog.q.temp': 'What is your temperature, in degrees?',
-  'dialog.q.sleep': 'How many hours did you sleep?',
   'dialog.q.mood': 'How do you feel, from 1 to 5?',
   'dialog.q.symptoms': 'Any symptoms? Dizziness, congestion, fatigue, headache or none.',
   'dialog.hint.side': 'I only need the side: right or left.',

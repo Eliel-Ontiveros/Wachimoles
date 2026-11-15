@@ -124,6 +124,8 @@ const vitals: Record<string, string> = {
   'vital.steps.dayTotal': 'Steps recorded',
   'vital.steps.noRecorded': 'Waiting for watch steps',
   'vital.steps.goalTag': '{pct}% of goal',
+  'vital.report.title': 'Report discomfort',
+  'vital.report.subtitle': 'Open 3D body view & log symptoms',
 };
 
 export default vitals;

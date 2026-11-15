@@ -398,7 +398,11 @@ export function App() {
                         latestCheck={latestHealthCheck}
                         vitals={vitals}
                       />
-                      <HealthChartsPanel vitals={vitals} allSamples={samples} />
+                      <HealthChartsPanel
+                        vitals={vitals}
+                        allSamples={samples}
+                        environment={selectedAstronaut.environment}
+                      />
                     </>
                   ),
                 },

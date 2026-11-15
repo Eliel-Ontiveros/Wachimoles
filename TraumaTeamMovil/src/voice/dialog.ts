@@ -23,7 +23,6 @@ type Slot =
   | 'glucose'
   | 'bp'
   | 'temp'
-  | 'sleep'
   | 'mood'
   | 'symptoms';
 
@@ -263,11 +262,6 @@ function apply(slot: Slot, intent: VoiceIntent, text: string): Applied {
       if (n !== undefined && Number.isInteger(n) && b !== undefined && Number.isInteger(b) && b < 10) n = n + b / 10;
       return health && inRange(n, 30, 45) ? { intent: { ...health, temperatureC: n } } : null;
     }
-    case 'sleep': {
-      let n = extractNumbers(text)[0];
-      if (n !== undefined && hasPhrase(text, ['y media', 'and a half', 'y medio'])) n += 0.5;
-      return health && inRange(n, 0, 24) ? { intent: { ...health, sleepHours: n } } : null;
-    }
     case 'mood': {
       const m = mood(text);
       return health && m !== null ? { intent: { ...health, mood: m } } : null;
@@ -290,7 +284,6 @@ const QUESTIONS: Record<Slot, { key: MessageKey; hint: MessageKey }> = {
   glucose: { key: 'dialog.q.glucose', hint: 'dialog.hint.number' },
   bp: { key: 'dialog.q.bp', hint: 'dialog.hint.bp' },
   temp: { key: 'dialog.q.temp', hint: 'dialog.hint.number' },
-  sleep: { key: 'dialog.q.sleep', hint: 'dialog.hint.number' },
   mood: { key: 'dialog.q.mood', hint: 'dialog.hint.mood' },
   symptoms: { key: 'dialog.q.symptoms', hint: 'dialog.hint.symptoms' },
 };
@@ -308,7 +301,6 @@ function missingSlots(intent: VoiceIntent, includeOptional: boolean): Slot[] {
     if (h.bloodSugarMgDl === undefined) slots.push('glucose');
     if (h.systolicBp === undefined || h.diastolicBp === undefined) slots.push('bp');
     if (h.temperatureC === undefined) slots.push('temp');
-    if (h.sleepHours === undefined) slots.push('sleep');
     if (h.mood === undefined) slots.push('mood');
     if (h.symptoms === undefined) slots.push('symptoms');
   }

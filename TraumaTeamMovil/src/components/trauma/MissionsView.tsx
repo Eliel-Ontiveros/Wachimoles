@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
-import { Check, CheckCircle2, Circle, Dumbbell, Flame, Footprints, Sparkles } from 'lucide-react-native';
-import { EnvironmentSelector } from './EnvironmentSelector';
-import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
+import { Check, CheckCircle2, Circle, Dumbbell, Flame, Footprints, Rocket, Sparkles } from 'lucide-react-native';
 import { useMission } from './mission-context';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatNumber } from '@/i18n/format';
@@ -21,6 +19,19 @@ function MissionIcon({ category, completed }: { category: DailyMission['category
   return <Dumbbell size={16} color={color} />;
 }
 
+/** Shared Home-style cyan progress track for mission KPIs and cards. */
+function MissionProgressBar({ percent }: { percent: number }) {
+  const clamped = Math.min(100, Math.max(0, percent));
+  return (
+    <View className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-trauma-nightLine">
+      <View
+        className="h-full rounded-full bg-trauma-cyan"
+        style={{ width: `${clamped}%` }}
+      />
+    </View>
+  );
+}
+
 export function MissionsView() {
   const {
     environmentConfig,
@@ -35,7 +46,8 @@ export function MissionsView() {
   const { t, locale } = useI18n();
   const { colors, scheme } = useAppTheme();
   const weekDays = t('missions.week.initials').split(',');
-  const routineSummary = getEnvironmentText(locale, environmentConfig.id).routineSummary;
+  const envText = getEnvironmentText(locale, environmentConfig.id);
+  const gravityShort = envText.gravityLabel.split(' ')[0] ?? envText.gravityLabel;
   const { missionsIntent, consumeMissionsIntent, announce } = useVoice();
   const [pulse] = useState(() => new Animated.Value(0));
   const handledNonce = useRef(0);
@@ -96,114 +108,173 @@ export function MissionsView() {
   );
 
   const completedCount = missions.filter((m) => m.completed).length;
+  const completionPct =
+    missions.length > 0 ? Math.round((completedCount / missions.length) * 100) : 0;
+  const activeWeekFlags = weekDays.map(
+    (_, idx) => idx < Math.min(6, streakDays) || (idx === 6 && checkedInToday)
+  );
+  const activeWeekCount = activeWeekFlags.filter(Boolean).length;
+  const weeklyPct =
+    weekDays.length > 0 ? Math.round((activeWeekCount / weekDays.length) * 100) : 0;
 
   return (
-    <View className="px-5 pb-10 pt-5">
+    <View className="px-5 pb-10 pt-6">
       <StreakCheckinHost />
-      {/* Animación de navecita hacia el destino */}
-      <View className="mb-4">
-        <SpaceJourneyTimeline />
+
+      {/* Cabecera superior alineada con Inicio */}
+      <View className="mb-3 flex-row items-center justify-between">
+        <Text className="font-mono text-xl font-bold text-trauma-ink dark:text-trauma-nightInk">
+          {t('route./missions')}
+        </Text>
+        <View className="flex-row items-center rounded-full border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night px-2.5 py-1 shadow-xs">
+          <Rocket size={12} color={colors.accentDeep} />
+          <Text className="ml-1.5 font-mono text-[10.5px] font-bold text-trauma-ink dark:text-trauma-nightInk">
+            {envText.shortLabel} · {gravityShort}
+          </Text>
+        </View>
       </View>
 
-      {/* Selector de entorno */}
-      <View className="mb-4">
-        <EnvironmentSelector />
-      </View>
-
-      {/* Tarjeta de racha estilo Duolingo */}
-      <View className="mb-5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
-              <Flame size={22} color="#f97316" fill="#fb923c" />
-            </View>
-            <View>
-              <Text className="font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
-                {t('missions.streak.title')}
+      {/* Tarjeta Hero de Racha y Check-in con el lenguaje visual de Inicio */}
+      <View className="mb-5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-md">
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 pr-3">
+            <View className="flex-row items-end">
+              <View style={{ marginRight: 8, marginBottom: 6 }}>
+                <Flame size={20} color="#f97316" fill="#fb923c" />
+              </View>
+              <Text className="font-mono text-4xl font-extrabold text-trauma-ink dark:text-trauma-nightInk">
+                {streakDays}
               </Text>
-              <Text className="font-mono text-2xl font-extrabold text-trauma-ink dark:text-trauma-nightInk">
-                {t(streakDays === 1 ? 'missions.streak.day' : 'missions.streak.days', { n: streakDays })}
+              <Text className="mb-1 ml-1.5 font-mono text-xs font-bold text-trauma-muted dark:text-trauma-nightMuted">
+                {t(streakDays === 1 ? 'missions.unit.day' : 'missions.unit.days')}
               </Text>
             </View>
+            <Text className="mt-0.5 font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+              {t('missions.streak.title')}
+            </Text>
           </View>
 
-          <View>
-            <Animated.View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: -5,
-                left: -5,
-                right: -5,
-                bottom: -5,
-                borderRadius: 16,
-                borderWidth: 2,
-                borderColor: '#f59e0b',
-                opacity: pulse,
-                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.06] }) }],
-              }}
-            />
-            <Pressable
-              onPress={doDailyCheckIn}
-              disabled={checkedInToday}
-              className={`flex-row items-center rounded-xl border px-3.5 py-2.5 ${checkedInToday
-                  ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950'
-                  : 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt active:opacity-75'
+          <View className="items-end">
+            <View>
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: -5,
+                  left: -5,
+                  right: -5,
+                  bottom: -5,
+                  borderRadius: 16,
+                  borderWidth: 2,
+                  borderColor: '#f59e0b',
+                  opacity: pulse,
+                  transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.06] }) }],
+                }}
+              />
+              <Pressable
+                onPress={doDailyCheckIn}
+                disabled={checkedInToday}
+                className={`flex-row items-center rounded-xl border px-3 py-2 shadow-xs ${
+                  checkedInToday
+                    ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950'
+                    : 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-cyan-950 active:opacity-75'
                 }`}>
-              <Check size={14} color={checkedInToday ? colors.success : scheme === 'dark' ? colors.text : '#0f172a'} strokeWidth={2.5} />
-              <Text
-                className={`ml-1.5 font-mono text-xs font-bold ${checkedInToday
-                    ? 'text-emerald-700 dark:text-emerald-300'
-                    : 'text-trauma-ink dark:text-trauma-nightInk'
+                <Check
+                  size={13}
+                  color={checkedInToday ? colors.success : scheme === 'dark' ? colors.text : '#0f172a'}
+                  strokeWidth={2.5}
+                />
+                <Text
+                  className={`ml-1.5 font-mono text-[10.5px] font-bold ${
+                    checkedInToday
+                      ? 'text-emerald-700 dark:text-emerald-300'
+                      : 'text-trauma-ink dark:text-trauma-nightInk'
                   }`}>
-                {checkedInToday ? t('missions.checkin.done') : t('missions.checkin.today')}
-              </Text>
-            </Pressable>
+                  {checkedInToday ? t('missions.checkin.done') : t('missions.checkin.today')}
+                </Text>
+              </Pressable>
+            </View>
+            <Text className="mt-1.5 font-mono text-[8.5px] text-slate-400 dark:text-trauma-nightSubtle">
+              {envText.gravityLabel}
+            </Text>
           </View>
         </View>
 
         {/* Indicador semanal */}
-        <View className="mt-4 flex-row justify-between border-t border-slate-100 dark:border-trauma-nightLine pt-3">
+        <View className="mt-4 flex-row justify-between border-t border-slate-100 dark:border-trauma-nightLine pt-3.5">
           {weekDays.map((day, idx) => {
-            const active = idx < Math.min(6, streakDays) || (idx === 6 && checkedInToday);
+            const active = activeWeekFlags[idx];
             return (
               <View key={idx} className="items-center">
                 <View
-                  className={`h-7 w-7 items-center justify-center rounded-full border ${active
-                      ? 'border-amber-300 dark:border-amber-700 bg-amber-100 dark:bg-amber-900'
-                      : 'border-slate-200 dark:border-trauma-nightLine bg-slate-50 dark:bg-trauma-nightAlt'
-                    }`}>
+                  className={`h-7 w-7 items-center justify-center rounded-full border ${
+                    active
+                      ? 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950'
+                      : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
+                  }`}>
                   {active ? (
-                    <Flame size={13} color="#ea580c" fill="#fb923c" />
+                    <Flame size={12} color="#f97316" fill="#fb923c" />
                   ) : (
-                    <View className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                    <View className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-trauma-nightSubtle" />
                   )}
                 </View>
-                <Text className="mt-1 font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">{day}</Text>
+                <Text className="mt-1 font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
+                  {day}
+                </Text>
               </View>
             );
           })}
         </View>
       </View>
 
-      {/* Misiones diarias adaptadas al entorno */}
-      <View className="mb-2.5 flex-row items-center justify-between">
-        <View>
-          <Text className="font-mono text-sm font-bold text-trauma-ink dark:text-trauma-nightInk">
-            {t('missions.daily.title')}
-          </Text>
-          <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
-            {routineSummary}
-          </Text>
+      {/* Fila de 2 métricas resumidas idéntica a las tarjetas SpO2 / Stress de Inicio */}
+      <View className="mb-5 flex-row gap-4">
+        <View className="flex-1 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-md">
+          <View className="flex-row items-center justify-between">
+            <Text className="font-mono text-xs text-trauma-ink dark:text-trauma-nightInk">
+              {t('missions.kpi.completed')}
+            </Text>
+            <Text className="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-300">
+              {completionPct}%
+            </Text>
+          </View>
+          <View className="my-2 flex-row items-baseline">
+            <Text className="font-mono text-3xl font-extrabold text-trauma-ink dark:text-trauma-nightInk">
+              {completedCount}/{missions.length}
+            </Text>
+          </View>
+          <MissionProgressBar percent={completionPct} />
         </View>
-        <View className="rounded-lg bg-slate-100 dark:bg-trauma-nightAlt px-2.5 py-1">
-          <Text className="font-mono text-[10px] font-bold text-slate-700 dark:text-trauma-nightMuted">
-            {completedCount}/{missions.length}
-          </Text>
+
+        <View className="flex-1 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-md">
+          <View className="flex-row items-center justify-between">
+            <Text className="font-mono text-xs text-trauma-ink dark:text-trauma-nightInk">
+              {t('missions.kpi.weekly')}
+            </Text>
+            <Text className="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-300">
+              {weeklyPct}%
+            </Text>
+          </View>
+          <View className="my-2 flex-row items-baseline">
+            <Text className="font-mono text-3xl font-extrabold text-trauma-ink dark:text-trauma-nightInk">
+              {activeWeekCount}/{weekDays.length}
+            </Text>
+          </View>
+          <MissionProgressBar percent={weeklyPct} />
         </View>
       </View>
 
-      <View className="gap-2.5">
+      {/* Misiones diarias adaptadas al entorno */}
+      <View className="mb-3">
+        <Text className="font-mono text-sm font-bold text-trauma-ink dark:text-trauma-nightInk">
+          {t('missions.daily.title')}
+        </Text>
+        <Text className="mt-0.5 font-mono text-[9.5px] leading-[14px] text-slate-400 dark:text-trauma-nightSubtle">
+          {envText.routineSummary}
+        </Text>
+      </View>
+
+      <View className="gap-4">
         {missions.map((mission) => {
           const rawPct =
             mission.targetValue > 0
@@ -220,128 +291,69 @@ export function MissionsView() {
                 : t('missions.hint.treadmillOff')
               : t('missions.hint.toggle');
 
-          const fillColor = mission.completed
-            ? scheme === 'dark'
-              ? 'rgba(56, 189, 248, 0.16)'
-              : 'rgba(2, 132, 199, 0.10)'
-            : scheme === 'dark'
-              ? 'rgba(56, 189, 248, 0.11)'
-              : 'rgba(88, 213, 247, 0.15)';
-
-          const edgeColor = mission.completed
-            ? colors.accentDeep
-            : visualPct > 0
-              ? '#58d5f7'
-              : scheme === 'dark'
-                ? '#334155'
-                : '#cbd5e1';
-
           return (
             <Pressable
               key={mission.id}
               onPress={() => toggleMission(mission.id)}
-              className={`relative overflow-hidden rounded-2xl border shadow-xs active:opacity-85 ${mission.completed
-                  ? 'border-sky-300/80 bg-white dark:border-sky-700/80 dark:bg-trauma-night'
-                  : 'border-trauma-line bg-white dark:border-trauma-nightLine dark:bg-trauma-night'
-                }`}>
-              {/* Relleno horizontal sutil integrado al fondo según el avance */}
-              {visualPct > 0 && (
-                <View
-                  pointerEvents="none"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    width: `${visualPct}%`,
-                    backgroundColor: fillColor,
-                  }}>
-                  {!mission.completed && visualPct < 100 && (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        right: 0,
-                        width: 1.5,
-                        backgroundColor:
-                          scheme === 'dark'
-                            ? 'rgba(125, 211, 252, 0.35)'
-                            : 'rgba(2, 132, 199, 0.25)',
-                      }}
-                    />
-                  )}
-                </View>
-              )}
-
-              {/* Acento vertical sutil en el borde izquierdo */}
-              <View
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  left: 0,
-                  width: 3,
-                  backgroundColor: edgeColor,
-                }}
-              />
-
-              <View className="p-3.5 pl-4">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-1 flex-row items-center pr-2.5">
-                    <View
-                      className={`mr-3 h-10 w-10 items-center justify-center rounded-xl border ${mission.completed
-                          ? 'border-sky-300/70 bg-white/90 dark:border-sky-700/70 dark:bg-sky-950/80'
-                          : 'border-slate-200/80 bg-white/85 dark:border-trauma-nightLine dark:bg-trauma-nightAlt/90'
-                        }`}>
-                      <MissionIcon category={mission.category} completed={mission.completed} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
-                        {mission.title}
-                      </Text>
-                      <Text className="mt-0.5 font-mono text-[9.5px] leading-[14px] text-slate-500 dark:text-trauma-nightMuted">
-                        {mission.description}
-                      </Text>
-                    </View>
-                  </View>
-
+              className={`rounded-2xl border bg-white p-4 shadow-md active:opacity-85 dark:bg-trauma-night ${
+                mission.completed
+                  ? 'border-trauma-cyanEdge dark:border-sky-700'
+                  : 'border-trauma-line dark:border-trauma-nightLine'
+              }`}>
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 flex-row items-center pr-3">
                   <View
-                    className={`flex-row items-center rounded-full border px-2.5 py-1 ${mission.completed
-                        ? 'border-sky-300/80 bg-sky-100/80 dark:border-sky-700/70 dark:bg-sky-900/60'
-                        : 'border-slate-200/90 bg-white/85 dark:border-trauma-nightLine dark:bg-trauma-nightAlt/90'
-                      }`}>
-                    {mission.completed ? (
-                      <CheckCircle2 size={14} color={colors.accentDeep} />
-                    ) : (
-                      <Circle size={12} color={scheme === 'dark' ? colors.border : '#94a3b8'} />
-                    )}
-                    <Text
-                      className={`ml-1 font-mono text-[10px] font-extrabold ${mission.completed
-                          ? 'text-sky-700 dark:text-sky-300'
-                          : 'text-slate-600 dark:text-trauma-nightMuted'
-                        }`}>
-                      {visualPct}%
+                    className={`mr-3 h-10 w-10 items-center justify-center rounded-xl border ${
+                      mission.completed
+                        ? 'border-trauma-cyanEdge/70 bg-trauma-cyanSoft/50 dark:border-sky-800 dark:bg-cyan-950/60'
+                        : 'border-slate-200 bg-[#f7f7f7] dark:border-trauma-nightLine dark:bg-trauma-nightAlt'
+                    }`}>
+                    <MissionIcon category={mission.category} completed={mission.completed} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
+                      {mission.title}
+                    </Text>
+                    <Text className="mt-0.5 font-mono text-[9.5px] leading-[14px] text-slate-500 dark:text-trauma-nightMuted">
+                      {mission.description}
                     </Text>
                   </View>
                 </View>
 
-                <View className="mt-2.5 flex-row items-center justify-between">
+                <View className="flex-row items-center gap-1.5">
                   <Text
-                    numberOfLines={1}
-                    className="mr-2 flex-1 font-mono text-[9px] text-slate-500 dark:text-trauma-nightSubtle">
-                    {statusHint}
+                    className={`font-mono text-[10px] font-bold ${
+                      mission.completed
+                        ? 'text-sky-600 dark:text-sky-300'
+                        : 'text-slate-400 dark:text-trauma-nightSubtle'
+                    }`}>
+                    {visualPct}%
                   </Text>
-                  <Text
-                    className={`font-mono text-[10px] font-bold ${mission.completed
-                        ? 'text-sky-700 dark:text-sky-300'
-                        : 'text-slate-700 dark:text-trauma-nightMuted'
-                      }`}>
-                    {formatNumber(mission.currentValue, locale)} / {formatNumber(mission.targetValue, locale)}{' '}
-                    {mission.unit}
-                  </Text>
+                  {mission.completed ? (
+                    <CheckCircle2 size={16} color={colors.accentDeep} />
+                  ) : (
+                    <Circle size={15} color={colors.textSubtle} />
+                  )}
                 </View>
+              </View>
+
+              <MissionProgressBar percent={visualPct} />
+
+              <View className="mt-2.5 flex-row items-center justify-between border-t border-slate-100 pt-2.5 dark:border-trauma-nightLine">
+                <Text
+                  numberOfLines={1}
+                  className="mr-2 flex-1 font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                  {statusHint}
+                </Text>
+                <Text
+                  className={`font-mono text-[10px] font-bold ${
+                    mission.completed
+                      ? 'text-sky-600 dark:text-sky-300'
+                      : 'text-slate-600 dark:text-trauma-nightMuted'
+                  }`}>
+                  {formatNumber(mission.currentValue, locale)} / {formatNumber(mission.targetValue, locale)}{' '}
+                  {mission.unit}
+                </Text>
               </View>
             </Pressable>
           );

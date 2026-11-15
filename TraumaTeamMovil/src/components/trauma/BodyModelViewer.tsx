@@ -4,16 +4,17 @@ import { MUSCLE_MODEL_BASE64 } from '@/assets/images/muscle-model-base64';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { Locale, MessageKey } from '@/i18n/messages';
 import { formatDate } from '@/i18n/format';
+import {
+  type BackendBodyRegion,
+  type BodyRegionCategory,
+  normalizeBodyRegion,
+  toBackendBodyRegion,
+} from '@/utils/body-region';
+
+export type { BackendBodyRegion, BodyRegionCategory };
+export { normalizeBodyRegion, toBackendBodyRegion };
 
 export type MuscleStatus = 'normal' | 'warning' | 'critical';
-
-export type BodyRegionCategory =
-  | 'Head and neck'
-  | 'Front torso'
-  | 'Back torso'
-  | 'Upper limb'
-  | 'Hip and pelvis'
-  | 'Lower limb';
 
 const CATEGORY_KEYS: Record<BodyRegionCategory, MessageKey> = {
   'Head and neck': 'body.category.head_neck',
@@ -28,23 +29,6 @@ const CATEGORY_KEYS: Record<BodyRegionCategory, MessageKey> = {
 export const muscleNameKey = (id: string) => `body.muscle.${id}` as MessageKey;
 /** Clave i18n de la categoría anatómica (el valor en español es el que se envía al backend). */
 export const categoryNameKey = (category: BodyRegionCategory) => CATEGORY_KEYS[normalizeBodyRegion(category)];
-
-/** Categorías guardadas en español (datos heredados) → categoría en inglés. */
-const LEGACY_REGIONS: Record<string, BodyRegionCategory> = {
-  'cabeza y cuello': 'Head and neck',
-  'tronco anterior': 'Front torso',
-  'tronco posterior': 'Back torso',
-  'extremidad superior': 'Upper limb',
-  'cadera y pelvis': 'Hip and pelvis',
-  'extremidad inferior': 'Lower limb',
-};
-
-/** Acepta una región en inglés o en español heredado; lo desconocido cae en 'Front torso'. */
-export function normalizeBodyRegion(value: string | undefined | null): BodyRegionCategory {
-  const key = (value ?? '').trim();
-  if (key in CATEGORY_KEYS) return key as BodyRegionCategory;
-  return LEGACY_REGIONS[key.toLowerCase()] ?? 'Front torso';
-}
 
 /** Valor de `updatedAt` para "justo ahora" (se traduce al mostrar). */
 export const UPDATED_NOW = '__now__';
@@ -526,8 +510,7 @@ function buildBodyViewerHtml(
     html, body {
       width: 100%;
       height: 100%;
-      /* Fondo claro anterior: background: #f8fafc; */
-      background: radial-gradient(circle at 50% 35%, #0f172a 0%, #060b19 70%, #020617 100%);
+      background: radial-gradient(circle at 50% 35%, #111a2e 0%, #060b19 72%, #030612 100%);
       overflow: hidden;
       font-family: monospace;
       touch-action: none;
@@ -565,9 +548,9 @@ function buildBodyViewerHtml(
       pointer-events: auto;
       cursor: pointer;
       transition: transform 0.18s ease, background-color 0.2s ease, border-color 0.2s ease;
-      background: rgba(255, 255, 255, 0.68);
-      border: 1.3px solid rgba(100, 116, 139, 0.4);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+      background: rgba(255, 255, 255, 0.85);
+      border: 1.3px solid rgba(100, 116, 139, 0.45);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
     }
     .zone-pin svg {
       width: 9px;
@@ -589,9 +572,9 @@ function buildBodyViewerHtml(
       width: 23px;
       height: 23px;
       transform: translate(-50%, -50%) scale(1.18);
-      background: #38bdf8;
+      background: #58d5f7;
       border-color: #0284c7;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.85);
+      box-shadow: 0 0 10px rgba(88, 213, 247, 0.85);
       z-index: 25;
     }
     .zone-pin.active svg {
@@ -614,23 +597,19 @@ function buildBodyViewerHtml(
       width: 32px;
       height: 32px;
       border-radius: 10px;
-      /* Estilo claro anterior:
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid #cbd5e1;
-      */
-      background: rgba(15, 23, 42, 0.78);
-      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(17, 26, 46, 0.88);
+      border: 1px solid #1e293b;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-      transition: transform 0.12s ease, background-color 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease;
     }
     .ctrl-btn:active {
       transform: scale(0.92);
-      background: rgba(56, 189, 248, 0.25);
-      border-color: #38bdf8;
+      background: rgba(88, 213, 247, 0.22);
+      border-color: #7dd3fc;
     }
     .ctrl-btn.toggled-off {
       opacity: 0.55;
@@ -638,8 +617,7 @@ function buildBodyViewerHtml(
     .ctrl-btn svg {
       width: 16px;
       height: 16px;
-      /* stroke: #1e293b; */
-      stroke: #e2e8f0;
+      stroke: #f1f5f9;
       stroke-width: 2;
       fill: none;
       stroke-linecap: round;
@@ -654,27 +632,19 @@ function buildBodyViewerHtml(
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      /* Fondo claro anterior:
-      background: #f8fafc;
-      color: #0284c7;
-      */
       background: #060b19;
       z-index: 100;
       transition: opacity 0.35s ease;
       font-size: 11px;
-      color: #38bdf8;
+      color: #58d5f7;
       font-weight: 700;
       letter-spacing: 0.5px;
     }
     .spinner {
       width: 28px;
       height: 28px;
-      /* Spinner claro anterior:
-      border: 3px solid #e0f2fe;
-      border-top-color: #0284c7;
-      */
-      border: 3px solid rgba(56, 189, 248, 0.2);
-      border-top-color: #38bdf8;
+      border: 3px solid rgba(88, 213, 247, 0.2);
+      border-top-color: #58d5f7;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin-bottom: 10px;
@@ -798,7 +768,6 @@ function buildBodyViewerHtml(
 
     // Configuración de escena Three.js
     const scene = new THREE.Scene();
-    // Fondo claro anterior: scene.background = new THREE.Color(0xf8fafc);
     scene.background = new THREE.Color(0x060b19);
 
     // Campo estelar espacial de fondo
@@ -1535,7 +1504,6 @@ export function BodyModelViewer({
           ref={iframeRef as any}
           srcDoc={htmlContent}
           onLoad={() => sendSyncStateRef.current()}
-          // Anterior claro: backgroundColor: '#f8fafc'
           style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#060b19' }}
           title={t('body.viewer.title')}
         />
@@ -1571,23 +1539,20 @@ export function BodyModelViewer({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 370,
-    // Anterior claro: backgroundColor: '#f8fafc',
+    height: 360,
     backgroundColor: '#060b19',
-    borderRadius: 20,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   webView: {
     width: '100%',
     height: '100%',
-    // Anterior claro: backgroundColor: '#f8fafc',
     backgroundColor: '#060b19',
   },
   loadingContainer: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-    // Anterior claro: backgroundColor: '#f8fafc',
     backgroundColor: '#060b19',
   },
 });

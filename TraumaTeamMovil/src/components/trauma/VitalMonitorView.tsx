@@ -1892,16 +1892,6 @@ export function VitalMonitorView() {
         onPress={() => void handleOpenMetricHistory('steps')}
       />
 
-      {/* Reportar molestia → Navegación a Vista Corporal */}
-      <View className="items-center mt-3">
-        <Pressable
-          onPress={() => router.navigate('/explore')}
-          accessibilityLabel={t('vital.report.a11y')}
-          className="h-20 w-20 items-center justify-center rounded-full border-2 shadow-md active:opacity-70">
-          <Image source={require('@/assets/images/App Icono.svg')} style={{ width: 100, height: 100 }} />
-        </Pressable>
-      </View>
-
       {/* Modal interactivo con el historial agrupado por día (Pulso, Oxígeno, Estrés, Sueño y Pasos) */}
       <VitalHistoryModal
         visible={historyModalOpen}

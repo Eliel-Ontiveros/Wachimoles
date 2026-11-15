@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import shipSprite from '../assets/Naveee (1).svg';
 import { groupSamplesByDay } from '../services/backend-api';
-import type { DashboardSample, SampleMetric, VitalSignsData } from '../types/dashboard';
+import type {
+  DashboardSample,
+  EnvironmentType,
+  SampleMetric,
+  VitalSignsData,
+} from '../types/dashboard';
+import { EnvironmentBannerBackdrop } from './EnvironmentBannerBackdrop';
 import {
   ActivityIcon,
   ChevronRightIcon,
@@ -17,6 +22,7 @@ import {
 interface HealthChartsPanelProps {
   vitals: VitalSignsData;
   allSamples: DashboardSample[];
+  environment?: EnvironmentType;
 }
 
 interface MetricDescriptor {
@@ -79,18 +85,6 @@ const METRICS: MetricDescriptor[] = [
     color: '#06b6d4',
     decimals: 0,
   },
-];
-
-const BANNER_STARS = [
-  { x: 24, y: 16, r: 1.1, o: 0.6 },
-  { x: 78, y: 42, r: 0.9, o: 0.45 },
-  { x: 138, y: 14, r: 1.3, o: 0.75 },
-  { x: 210, y: 54, r: 1.0, o: 0.5 },
-  { x: 295, y: 20, r: 1.2, o: 0.7 },
-  { x: 382, y: 48, r: 1.1, o: 0.6 },
-  { x: 454, y: 16, r: 1.4, o: 0.8 },
-  { x: 520, y: 58, r: 0.9, o: 0.45 },
-  { x: 576, y: 26, r: 1.1, o: 0.65 },
 ];
 
 const MAX_DISPLAY_SAMPLES = 48;
@@ -177,7 +171,11 @@ async function closeTopLayer(dialog: HTMLDialogElement): Promise<void> {
   }
 }
 
-export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, allSamples }) => {
+export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({
+  vitals,
+  allSamples,
+  environment = 'tierra',
+}) => {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const stageContentRef = useRef<HTMLDivElement | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<SampleMetric>('heart_rate');
@@ -492,53 +490,9 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
         onClose={() => setHoveredIdx(null)}
       >
         <div className="history-modal-inner">
-          {/* Banner espacial con nave a2.jpg */}
-          <div className="history-space-banner">
-            <svg viewBox="0 0 600 92" preserveAspectRatio="xMidYMid slice" className="history-space-svg" aria-hidden="true">
-              <defs>
-                <clipPath id="history-ship-clip">
-                  <circle cx="395" cy="36" r="18" />
-                </clipPath>
-                <radialGradient id="history-planet-earth" cx="35%" cy="30%" r="65%">
-                  <stop offset="0%" stopColor="#38bdf8" />
-                  <stop offset="100%" stopColor="#0369a1" />
-                </radialGradient>
-                <radialGradient id="history-planet-moon" cx="35%" cy="30%" r="65%">
-                  <stop offset="0%" stopColor="#f1f5f9" />
-                  <stop offset="100%" stopColor="#94a3b8" />
-                </radialGradient>
-              </defs>
-
-              {BANNER_STARS.map((st, idx) => (
-                <circle key={idx} cx={st.x} cy={st.y} r={st.r} fill="#e0f2fe" opacity={st.o} />
-              ))}
-
-              {/* Órbita punteada Tierra -> Nave a2 -> Luna en el sector derecho */}
-              <path
-                d="M 270 68 Q 395 14 520 56"
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth="1.4"
-                strokeDasharray="4 4"
-                opacity="0.52"
-              />
-              <circle cx="270" cy="68" r="11" fill="url(#history-planet-earth)" opacity="0.92" />
-              <circle cx="520" cy="56" r="9" fill="url(#history-planet-moon)" opacity="0.92" />
-
-              {/* Nave espacial Naveee (1).svg flotando en el centro de la órbita */}
-              <g className="history-ship-float">
-                <circle cx="395" cy="36" r="22" fill="rgba(115, 203, 244, 0.2)" />
-                <circle cx="395" cy="36" r="18.6" fill="#060b19" stroke="#73cbf4" strokeWidth="1.8" />
-                <image
-                  href={shipSprite}
-                  x="381"
-                  y="26.5"
-                  width="28"
-                  height="19"
-                  preserveAspectRatio="xMidYMid meet"
-                />
-              </g>
-            </svg>
+          {/* Location SVG banner matching mobile's EnvironmentBannerBackdrop */}
+          <div className="history-space-banner" data-environment={environment}>
+            <EnvironmentBannerBackdrop environment={environment} />
 
             <div className="history-banner-overlay">
               <div className="history-banner-title">
