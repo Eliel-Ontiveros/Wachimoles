@@ -1,3 +1,4 @@
+import { notifyHealthAlertsChanged } from './health-alerts-api';
 import {
   API_CONFIG,
   fetchBackendWithFallback,
@@ -1486,6 +1487,7 @@ export async function syncObservationToBackend(
       }
 
       if (!resolveAfterSave) {
+        notifyHealthAlertsChanged();
         return { synced: true };
       }
     }
@@ -1498,6 +1500,7 @@ export async function syncObservationToBackend(
       return { synced: false };
     }
 
+    notifyHealthAlertsChanged();
     return { synced: true };
   } catch (error) {
     console.warn('Could not sync the condition with the backend.', error);

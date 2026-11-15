@@ -1,3 +1,4 @@
+import { parseHealthAlerts, HealthAlertsNotReadyError, isHealthAlertsNotReadyResponse, type HealthAlert } from '../../../../shared/health-alerts.ts';
 import type {
   BodyConditionImageRecord,
   BodyConditionRecord,
@@ -736,3 +737,20 @@ export async function fetchAstronautLocationFromBackend(): Promise<AstronautLoca
   }
 }
 
+
+export async function fetchHealthAlerts(): Promise<HealthAlert[]> {
+  const res = await fetchWithBearerOrBasic(resolveUrl('/dashboard/alerts/monitor'), { method: 'GET', cache: 'no-store' });
+  if (!res.ok) {
+    const body: unknown = await res.json().catch(() => null);
+    if (res.status === 503 && isHealthAlertsNotReadyResponse(body)) throw new HealthAlertsNotReadyError();
+    throw new ApiRequestError(res.status, `Could not load alerts (${res.status}).`);
+  }
+  return parseHealthAlerts(await res.json());
+}
+
+export async function acknowledgeHealthAlert(id: string): Promise<void> {
+  const res = await fetchWithBearerOrBasic(resolveUrl(`/dashboard/alerts/monitor/${encodeURIComponent(id)}/acknowledge`), { method: 'POST' });
+  if (!res.ok) throw new ApiRequestError(res.status, `Could not acknowledge this alert (${res.status}).`);
+  const result: unknown = await res.json();
+  if (!isRecord(result) || result.acknowledged !== true) throw new Error('Invalid acknowledgement response.');
+}

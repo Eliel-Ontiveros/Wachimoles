@@ -20,6 +20,13 @@ const baseProps = (size: number, strokeWidth: number, className?: string) => ({
   'aria-hidden': true,
 });
 
+export const BellIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, className }) => (
+  <svg {...baseProps(size, strokeWidth, className)}>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+    <path d="M10 21h4" />
+  </svg>
+);
+
 export const HeartIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, className }) => (
   <svg {...baseProps(size, strokeWidth, className)}>
     <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />

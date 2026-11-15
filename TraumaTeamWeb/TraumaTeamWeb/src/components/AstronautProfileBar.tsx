@@ -16,6 +16,7 @@ interface AstronautProfileBarProps {
   selectedAstronautId: string;
   onSelectAstronaut: (id: string) => void;
   connectionStatus: ConnectionEndpointStatus;
+  notifications?: React.ReactNode;
 }
 
 function getInitials(shortName: string): string {
@@ -31,6 +32,7 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
   astronauts,
   selectedAstronautId,
   onSelectAstronaut,
+  notifications,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownWrapRef = useRef<HTMLDivElement | null>(null);
@@ -88,6 +90,7 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
         </h1>
       </div>
 
+      <div className="topbar-account-actions">
       <div
         ref={dropdownWrapRef}
         className="topbar-profiles astro-dropdown-wrap"
@@ -175,7 +178,8 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
           </div>
         )}
       </div>
-
+      {notifications}
+      </div>
     </header>
   );
 };

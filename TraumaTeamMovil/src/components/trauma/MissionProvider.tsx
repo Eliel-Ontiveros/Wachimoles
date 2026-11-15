@@ -1,3 +1,5 @@
+import { useHealthAlerts } from '../../hooks/use-health-alerts';
+import type { HealthAlert } from '../../../../shared/health-alerts';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Alert, AppState } from 'react-native';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -110,6 +112,8 @@ function formatHealthCheckRecordedAt(recordedAt: string, dateIso: string, locale
 }
 
 export function MissionProvider({ children }: { children: ReactNode }) {
+  const { alerts: serverAlerts, active: remotePopup, dismiss: dismissHealthPopup, markDelivered: markHealthPopupDelivered,
+    acknowledgeAll: acknowledgeServerAlerts, error: alertsError, refresh: refreshAlerts } = useHealthAlerts();
   const { vitals, getFullHistory } = useVitalSigns(5000);
   const { locale } = useI18n();
   // Los textos que se guardan en estado (fechas, avisos) usan el idioma vigente al crearse.
@@ -696,14 +700,21 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     [pushCriticalAlert, checkedInToday, doDailyCheckIn]
   );
 
+  const remotePopupId = remotePopup?.id;
+  const markToasterDelivered = useCallback(() => {
+    if (remotePopupId) markHealthPopupDelivered(remotePopupId);
+  }, [remotePopupId, markHealthPopupDelivered]);
+  const hasRemotePopup = Boolean(remotePopup);
   const dismissToaster = useCallback(() => {
-    setActiveToasterAlert(null);
-  }, []);
+    if (hasRemotePopup) dismissHealthPopup();
+    else setActiveToasterAlert(null);
+  }, [hasRemotePopup, dismissHealthPopup]);
 
   const acknowledgeAllAlerts = useCallback(() => {
+    void acknowledgeServerAlerts();
     setAlerts((prev) => prev.map((a) => ({ ...a, acknowledged: true })));
     setActiveToasterAlert(null);
-  }, []);
+  }, [acknowledgeServerAlerts]);
 
   const addInjuryPhoto = useCallback(
     async (
@@ -773,16 +784,26 @@ export function MissionProvider({ children }: { children: ReactNode }) {
     }),
     [locale]
   );
-  const alerts = useMemo(() => storedAlerts.map(localizeAlert), [storedAlerts, localizeAlert]);
+  const localizeHealthAlert = useCallback((a: HealthAlert): CriticalAlert => ({
+    id: a.id, metric: a.rule, severity: a.severity,
+    title: a.rule === 'pain_threshold'
+      ? translate(locale, 'alerts.painTitle') : translate(locale, 'alerts.problemsTitle'),
+    message: a.rule === 'pain_threshold'
+      ? translate(locale, 'alerts.painMessage', { zone: a.muscleName ?? '', threshold: a.threshold })
+      : translate(locale, 'alerts.problemsMessage', { count: a.value }),
+    valueLabel: a.rule === 'pain_threshold' ? `${a.value}/10` : translate(locale, 'alerts.problemCount', { count: a.value }),
+    timestamp: formatDate(new Date(a.createdAt), locale, { dateStyle: 'short', timeStyle: 'short' }),
+    acknowledged: Boolean(a.acknowledgedAt), resolved: Boolean(a.resolvedAt),
+  }), [locale]);
+  const alerts = useMemo(() => [
+    ...serverAlerts.map(localizeHealthAlert), ...storedAlerts.map(localizeAlert),
+  ], [serverAlerts, localizeHealthAlert, storedAlerts, localizeAlert]);
   const activeToasterAlert = useMemo(
-    () => (activeStoredToaster ? localizeAlert(activeStoredToaster) : null),
-    [activeStoredToaster, localizeAlert]
+    () => remotePopup ? localizeHealthAlert(remotePopup)
+      : activeStoredToaster ? localizeAlert(activeStoredToaster) : null,
+    [remotePopup, localizeHealthAlert, activeStoredToaster, localizeAlert]
   );
-
-  const unreadAlertCount = useMemo(
-    () => storedAlerts.filter((a) => !a.acknowledged).length,
-    [storedAlerts]
-  );
+  const unreadAlertCount = alerts.filter(a => !a.acknowledged).length;
 
   const openMissionSetup = useCallback(() => setMissionSetupOpen(true), []);
   const closeMissionSetup = useCallback(() => setMissionSetupOpen(false), []);
@@ -820,8 +841,11 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       getFullHistory,
       alerts,
       unreadAlertCount,
+      alertsError,
+      refreshAlerts,
       activeToasterAlert,
       dismissToaster,
+      markToasterDelivered,
       acknowledgeAllAlerts,
       injuryPhotos,
       addInjuryPhoto,
@@ -830,6 +854,8 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       submitHealthCheck,
     }),
     [
+      alertsError,
+      refreshAlerts,
       environment,
       origin,
       destination,
@@ -862,6 +888,7 @@ export function MissionProvider({ children }: { children: ReactNode }) {
       unreadAlertCount,
       activeToasterAlert,
       dismissToaster,
+      markToasterDelivered,
       acknowledgeAllAlerts,
       injuryPhotos,
       addInjuryPhoto,

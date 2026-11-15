@@ -12,6 +12,7 @@ export default defineConfig({
       // Shared mission artwork and fonts also need to resolve during development.
       allow: [
         fileURLToPath(new URL('.', import.meta.url)),
+        fileURLToPath(new URL('../../shared', import.meta.url)),
         fileURLToPath(new URL('../../TraumaTeamMovil/assets', import.meta.url)),
       ],
     },

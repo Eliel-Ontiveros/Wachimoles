@@ -70,13 +70,14 @@ export type AlertSeverity = 'critical' | 'warning';
 
 export interface CriticalAlert {
   id: string;
-  metric: 'heart_rate' | 'stress' | 'spo2' | 'health_check';
+  metric: 'heart_rate' | 'stress' | 'spo2' | 'health_check' | 'pain_threshold' | 'active_problems';
   title: string;
   message: string;
   valueLabel: string;
   severity: AlertSeverity;
   timestamp: string;
   acknowledged: boolean;
+  resolved?: boolean;
 }
 
 export type HealthStatusLevel = 'normal' | 'warning' | 'critical';

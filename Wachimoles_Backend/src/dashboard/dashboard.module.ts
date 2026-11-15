@@ -1,3 +1,5 @@
+import { AlertsController } from "../alerts/alerts.controller";
+import { AlertsGuard } from "../alerts/alerts.guard";
 import { Module } from "@nestjs/common";
 import { DashboardController } from "./dashboard.controller";
 import { DashboardTokenGuard } from "./dashboard-token.guard";
@@ -13,6 +15,7 @@ import { SupabaseService } from "./supabase.service";
 
 @Module({
   controllers: [
+    AlertsController,
     DashboardController,
     DashboardDataController,
     BodyConditionsController,
@@ -22,6 +25,6 @@ import { SupabaseService } from "./supabase.service";
     AstronautMissionController,
     AstronautLocationController
   ],
-  providers: [DashboardTokenGuard, DashboardWebGuard, SupabaseService]
+  providers: [AlertsGuard, DashboardTokenGuard, DashboardWebGuard, SupabaseService]
 })
 export class DashboardModule {}

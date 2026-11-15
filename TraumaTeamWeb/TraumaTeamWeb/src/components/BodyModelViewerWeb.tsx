@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MUSCLE_MODEL_BASE64 } from '../assets/muscle-model-base64.js';
 import { getPainColorHex } from '../data/anatomy-catalog';
-import { getRegionCategoryLabel } from '../utils/display-labels.ts';
+import { displayReportText, getRegionCategoryLabel } from '../utils/display-labels.ts';
 import type { BodyRegionCategory, MuscleData } from '../types/dashboard';
 import {
   ActivityIcon,
@@ -1209,7 +1209,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
 
   const renderMuscleOption = (muscle: MuscleData) => {
     const hasSymptoms = muscle.status !== 'normal' && Boolean(muscle.observation);
-    const conditionLabel = hasSymptoms ? muscle.observation?.conditionName : 'No ailment';
+    const conditionLabel = hasSymptoms ? displayReportText(muscle.observation?.conditionName ?? '') : 'No ailment';
     const pain = muscle.observation?.painIntensity ?? 0;
     const painColor = getPainColorHex(pain);
     const isSelected = selectedMuscleId === muscle.id;
