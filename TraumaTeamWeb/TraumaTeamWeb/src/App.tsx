@@ -388,6 +388,7 @@ export function App() {
             <RealtimeEcgMonitor vitals={vitals} astronaut={selectedAstronaut} />
             <SideCarousel
               enabled
+              autoAdvanceMs={30_000}
               ariaLabel="Vitals, body composition and flight log"
               slides={[
                 {
