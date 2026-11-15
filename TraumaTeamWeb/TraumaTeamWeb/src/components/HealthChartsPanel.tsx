@@ -447,7 +447,6 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
             </span>
             <div className="history-head-copy">
               <h2>Flight Log</h2>
-              <span>{allSamples.length} readings in orbit</span>
             </div>
           </div>
 

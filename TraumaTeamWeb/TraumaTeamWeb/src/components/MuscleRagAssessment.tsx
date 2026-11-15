@@ -1,15 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MuscleData } from '../types/dashboard';
 import { askAssistant } from '../services/assistant-api';
-import type { AssistantAnswer, AssistantEnvironment, AssistantMode } from '../services/assistant-api';
+import type { AssistantAnswer, AssistantEnvironment } from '../services/assistant-api';
 import { buildMuscleAssessmentQuestion } from '../services/muscle-assessment';
-
-const MODE_LABELS: Record<AssistantMode, string> = {
-  generated: 'Document-based explanation',
-  evidence_only: 'Retrieved passages · synthesis disabled',
-  insufficient_evidence: 'Insufficient documentary evidence',
-  generation_unavailable: 'Synthesis unavailable · passages only',
-};
+import { RagResearchResult } from './RagResearchResult';
+import './muscle-rag-assessment.css';
 
 interface Props {
   muscle: MuscleData;
@@ -22,7 +17,6 @@ export function MuscleRagAssessment({ muscle, initialEnvironment }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef<AbortController | null>(null);
-  const sourcePrefix = useId();
   const request = buildMuscleAssessmentQuestion(muscle, environment);
 
   useEffect(() => () => pending.current?.abort(), []);
@@ -54,46 +48,16 @@ export function MuscleRagAssessment({ muscle, initialEnvironment }: Props) {
   return (
     <section className="ai-slot-card rag-assessment" aria-label="Document-based muscle assessment" aria-busy={loading}>
       <div className="ai-slot-head">
-        <h3>Document-based assessment</h3>
+        <h3>Understand your symptoms</h3>
       </div>
       <div className="ai-slot-body rag-assessment-body">
-        {answer && (
-          <div className="rag-result" aria-live="polite">
-            <h3>{MODE_LABELS[answer.mode]}</h3>
-            {answer.answer.split(/\n\s*\n/).map((paragraph, index) => (
-              <p key={index} className="rag-answer-text">
-                {paragraph.split(/(\[\d+\])/g).map((part, partIndex) => {
-                  const id = /^\[(\d+)\]$/.exec(part)?.[1];
-                  return id && answer.citations.some((citation) => citation.citationId === Number(id))
-                    ? <a key={partIndex} href={`#${sourcePrefix}-${id}`} aria-label={`Read source ${id}`} onClick={() => {
-                      const source = document.getElementById(`${sourcePrefix}-${id}`);
-                      if (source instanceof HTMLDetailsElement) source.open = true;
-                    }}>{part}</a>
-                    : part;
-                })}
-              </p>
-            ))}
-            {answer.citations.length > 0 && (
-              <div className="rag-sources">
-                <h4>Retrieved evidence ({answer.citations.length})</h4>
-                {answer.citations.map((citation) => (
-                  <details key={citation.chunkId} id={`${sourcePrefix}-${citation.citationId}`}>
-                    <summary>[{citation.citationId}] {citation.title}</summary>
-                    <blockquote>{citation.excerpt}</blockquote>
-                    <a href={citation.url} target="_blank" rel="noopener noreferrer">Read original source · {citation.publisher}</a>
-                    <p>Snapshot: {citation.retrievedAt.slice(0, 10)} · Passage: {citation.chunkId}</p>
-                  </details>
-                ))}
-              </div>
-            )}
-            <p className="rag-notice">{answer.notice}</p>
-          </div>
-        )}
+        {answer && <RagResearchResult answer={answer} />}
+        {!answer && request && !loading && <p className="research-intro">See what published research can explain about your symptoms, with sources you can explore.</p>}
         {!request && <p className="rag-empty">No active symptoms are recorded for this muscle. Select a muscle with an active report to request an assessment.</p>}
         {request && (
           <div className="rag-controls">
             <label className="rag-environment">
-              Selected environment
+              Your environment
               <select value={environment} disabled={loading} onChange={(event) => {
                 setEnvironment(event.target.value as AssistantEnvironment);
                 setAnswer(null);
@@ -112,6 +76,7 @@ export function MuscleRagAssessment({ muscle, initialEnvironment }: Props) {
         )}
         <div aria-live="polite" role="status">
           {loading && <div className="rag-loading"><span aria-hidden="true" /><p>Retrieving evidence and checking source references…</p></div>}
+          {answer && <span className="research-sr-only">Research ready. {answer.citations.length} sources available.</span>}
         </div>
         {error && <p className="rag-error" role="alert">{error}</p>}
       </div>
