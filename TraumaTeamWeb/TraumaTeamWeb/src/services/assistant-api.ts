@@ -25,6 +25,14 @@ export interface AssistantQuestion {
   question: string;
   environment: AssistantEnvironment;
   bodyZone?: string;
+  muscleReport?: {
+    conditionName: string;
+    painIntensity: number;
+    swelling: boolean;
+    functionalLimitation: boolean;
+    notes: string;
+    recordedAtIso?: string;
+  };
 }
 
 const MODES: readonly string[] = ['generated', 'evidence_only', 'insufficient_evidence', 'generation_unavailable'];

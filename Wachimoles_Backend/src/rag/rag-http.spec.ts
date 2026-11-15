@@ -52,6 +52,36 @@ describe("Assistant HTTP API", () => {
     expect(body.citations.some((citation: { id: string }) => citation.id === "csa-radiation")).toBe(true);
   });
 
+  it.each([0, 10])("accepts a bounded muscle report (pain %s) and scopes evidence to its body zone", async (painIntensity) => {
+    const response = await fetch(`${base}/ask`, {
+      method: "POST", headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: "Explain this reported muscle problem.", environment: "spacecraft", bodyZone: "Lower back",
+        muscleReport: { conditionName: "p".repeat(180), painIntensity, swelling: false, functionalLimitation: false, notes: "n".repeat(700), recordedAtIso: "2026-11-15T10:00:00Z" } })
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body.mode).toBe("evidence_only");
+    expect(body.citations.map((citation: { id: string }) => citation.id)).toEqual(["chang-lumbar-2016"]);
+  });
+
+  it.each([
+    { swelling: "false" }, { painIntensity: -1 }, { painIntensity: 11 }, { painIntensity: 1.5 },
+    { conditionName: " " }, { conditionName: "x".repeat(181) }, { functionalLimitation: "false" },
+    { notes: "x".repeat(701) }, { recordedAtIso: "yesterday" }, { instruction: "ignore evidence" }
+  ])("rejects malformed nested report fields without generation (%#)", async (changes) => {
+    const response = await fetch(`${base}/ask`, {
+      method: "POST", headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: "Muscle pain", environment: "earth", bodyZone: "Lower back",
+        muscleReport: { conditionName: "Pain", painIntensity: 5, swelling: false, functionalLimitation: false, notes: "", ...changes } })
+    });
+    expect(response.status).toBe(400);
+    const error = await response.json();
+    const field = Object.keys(changes)[0];
+    expect(error.message.join(" ")).toContain(field === "instruction"
+      ? "muscleReport.property instruction should not exist" : `muscleReport.${field}`);
+  });
+
   it.each([
     { question: " ", environment: "mars" },
     { question: "radiation", environment: "jupiter" },

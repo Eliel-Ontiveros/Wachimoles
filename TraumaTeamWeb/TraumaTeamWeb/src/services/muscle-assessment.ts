@@ -19,16 +19,18 @@ export function buildMuscleAssessmentQuestion(
 ): AssistantQuestion | null {
   const observation = muscle.observation;
   if (muscle.status === 'normal' || !observation) return null;
-  // Keep all structured symptoms and their timestamp within the existing API limit.
-  // Free text stays verbatim; it is reported data, never an established diagnosis.
-  const question = [
-    'Explain only what the indexed documents support about these reported muscle symptoms. State when evidence is insufficient to explain their cause. Do not infer a diagnosis.',
-    `Reported condition (not confirmed): ${observation.conditionName.slice(0, 180)}.`,
-    `Pain intensity: ${observation.painIntensity}/10.`,
-    `Swelling: ${observation.swelling ? 'reported' : 'not reported'}.`,
-    `Functional limitation: ${observation.functionalLimitation ? 'reported' : 'not reported'}.`,
-    `Reported at: ${observation.recordedAtIso?.slice(0, 40) || 'unknown'}.`,
-    `Reported notes: ${observation.notes.slice(0, 700) || 'none'}`,
-  ].join('\n');
-  return { question, environment, bodyZone: muscle.name.slice(0, 100) };
+  // Keep reported facts separate from instructions and lexical search terms.
+  return {
+    question: 'What can the indexed research explain about this reported muscle problem?',
+    environment,
+    bodyZone: muscle.name.slice(0, 100),
+    muscleReport: {
+      conditionName: observation.conditionName.slice(0, 180),
+      painIntensity: observation.painIntensity,
+      swelling: observation.swelling,
+      functionalLimitation: observation.functionalLimitation,
+      notes: observation.notes.slice(0, 700),
+      ...(observation.recordedAtIso ? { recordedAtIso: observation.recordedAtIso.slice(0, 40) } : {}),
+    },
+  };
 }
