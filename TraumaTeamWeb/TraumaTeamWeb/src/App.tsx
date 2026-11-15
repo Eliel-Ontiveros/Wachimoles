@@ -384,7 +384,11 @@ export function App() {
               latestCheck={latestHealthCheck}
               vitals={vitals}
             />
-            <HealthChartsPanel vitals={vitals} allSamples={samples} />
+            <HealthChartsPanel
+              vitals={vitals}
+              allSamples={samples}
+              environment={selectedAstronaut.environment}
+            />
           </div>
 
           {/* Column 2: Muscle dropdown + vertically stretched 3D body */}

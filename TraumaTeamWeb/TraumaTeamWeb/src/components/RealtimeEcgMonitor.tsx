@@ -1,9 +1,5 @@
 import React, { useMemo } from 'react';
-import earthBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/EarthBanner.svg';
-import shipBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/ShipBanner.svg';
-import stationBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/StationBanner.svg';
-import moonBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MoonBanner.svg';
-import marsBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MarsBanner.svg';
+import { ENVIRONMENT_BANNERS } from '../data/environment-banners';
 import type { AstronautProfile, VitalSignsData } from '../types/dashboard';
 import { HeartRateIcon } from './Icons';
 
@@ -34,13 +30,13 @@ const LOCATION_LABELS: Record<string, string> = {
 };
 
 // Artwork follows the astronaut's current location.
-const LOCATION_ENVIRONMENTS = {
-  tierra: { background: earthBackground, gravity: '1.0g Earth Gravity' },
-  nave: { background: shipBackground, gravity: '0g Microgravity' },
-  estacion: { background: stationBackground, gravity: '0g Microgravity' },
-  luna: { background: moonBackground, gravity: '0.16g Lunar Gravity' },
-  marte: { background: marsBackground, gravity: '0.38g Martian Gravity' },
-} satisfies Record<AstronautProfile['environment'], { background: string; gravity: string }>;
+const LOCATION_GRAVITY: Record<AstronautProfile['environment'], string> = {
+  tierra: '1.0g Earth Gravity',
+  nave: '0g Microgravity',
+  estacion: '0g Microgravity',
+  luna: '0.16g Lunar Gravity',
+  marte: '0.38g Martian Gravity',
+};
 
 function buildBeatPath(cycles: number): string {
   const pts: string[] = [];
@@ -60,7 +56,8 @@ const ECG_VIEWBOX_WIDTH = BEAT_WIDTH * 5;
 const ECG_CONTINUOUS_PATH = buildBeatPath(5);
 
 export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, astronaut }) => {
-  const locationEnvironment = LOCATION_ENVIRONMENTS[astronaut.environment] ?? LOCATION_ENVIRONMENTS.tierra;
+  const banner = ENVIRONMENT_BANNERS[astronaut.environment] ?? ENVIRONMENT_BANNERS.tierra;
+  const defaultGravity = LOCATION_GRAVITY[astronaut.environment] ?? LOCATION_GRAVITY.tierra;
   const bpm = vitals.heartRate !== null && vitals.heartRate > 0 ? vitals.heartRate : null;
   const isAvailable = vitals.isAvailable && bpm !== null;
 
@@ -85,9 +82,16 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
   return (
     <div className="environment-and-pulse-stack">
       <div className="environment-card" data-environment={astronaut.environment} aria-label="Current astronaut location">
-        <img className="environment-card-background" src={locationEnvironment.background} alt="" aria-hidden="true" />
+        <img
+          className="environment-card-background"
+          src={banner.src}
+          alt=""
+          aria-hidden="true"
+          width={809}
+          height={185}
+        />
         <strong className="environment-card-name">{LOCATION_LABELS[astronaut.environment] ?? astronaut.environment}</strong>
-        <span className="environment-card-gravity">{astronaut.gravityLabel.trim() || locationEnvironment.gravity}</span>
+        <span className="environment-card-gravity">{astronaut.gravityLabel.trim() || defaultGravity}</span>
       </div>
 
       {/* Tarjeta blanca de Pulso ECG */}

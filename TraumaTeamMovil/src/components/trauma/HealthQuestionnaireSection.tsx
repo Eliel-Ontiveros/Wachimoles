@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import Svg, { Circle, Path, Polygon } from 'react-native-svg';
-import { Check, Clock, HelpCircle, Moon } from 'lucide-react-native';
+import { Check, Clock, HelpCircle } from 'lucide-react-native';
 import { EnvironmentBannerBackdrop } from './EnvironmentSelector';
 import { getTodayIsoDate } from '../../services/mission-api';
 import { DailyHealthCheck, HealthStatusLevel } from '../../types/mission';
@@ -154,13 +154,6 @@ function evalTemperature(t: number | null): HealthStatusLevel | null {
   return 'normal';
 }
 
-function evalSleep(h: number | null): HealthStatusLevel | null {
-  if (h === null) return null;
-  if (h < 5.5) return 'critical';
-  if (h < 7) return 'warning';
-  return 'normal';
-}
-
 // Barra visual de rango codificada por color (normal / vigilar / crítico)
 function MetricRangeBar({
   value,
@@ -220,9 +213,6 @@ export function HealthQuestionnaireSection() {
   const [tempText, setTempText] = useState(
     todayCheck?.temperatureC != null ? String(todayCheck.temperatureC) : ''
   );
-  const [sleepText, setSleepText] = useState(
-    todayCheck?.sleepHours != null ? String(todayCheck.sleepHours) : ''
-  );
   const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>(todayCheck?.mood ?? 4);
   const [symptoms, setSymptoms] = useState<string[]>(normalizeSymptoms(todayCheck?.symptoms ?? []));
   const [notes, setNotes] = useState(todayCheck?.notes ?? '');
@@ -237,7 +227,6 @@ export function HealthQuestionnaireSection() {
     setSysText(todayCheck.systolicBp != null ? String(todayCheck.systolicBp) : '');
     setDiaText(todayCheck.diastolicBp != null ? String(todayCheck.diastolicBp) : '');
     setTempText(todayCheck.temperatureC != null ? String(todayCheck.temperatureC) : '');
-    setSleepText(todayCheck.sleepHours != null ? String(todayCheck.sleepHours) : '');
     setMood(todayCheck.mood);
     setSymptoms(normalizeSymptoms(todayCheck.symptoms));
     setNotes(todayCheck.notes ?? '');
@@ -253,7 +242,6 @@ export function HealthQuestionnaireSection() {
     if (f.systolicBp !== undefined) setSysText(String(f.systolicBp));
     if (f.diastolicBp !== undefined) setDiaText(String(f.diastolicBp));
     if (f.temperatureC !== undefined) setTempText(String(f.temperatureC));
-    if (f.sleepHours !== undefined) setSleepText(String(f.sleepHours));
     if (f.mood !== undefined) setMood(f.mood);
     if (f.symptoms !== undefined && f.symptoms.length > 0) setSymptoms(normalizeSymptoms(f.symptoms));
     if (f.notes !== undefined) setNotes(f.notes);
@@ -266,16 +254,14 @@ export function HealthQuestionnaireSection() {
   const sys = parseNum(sysText);
   const dia = parseNum(diaText);
   const temp = parseNum(tempText);
-  const sleep = parseNum(sleepText);
 
   const evaluation = useMemo(() => {
     const sGlucose = evalBloodSugar(glucose);
     const sBp = evalBloodPressure(sys, dia);
     const sTemp = evalTemperature(temp);
-    const sSleep = evalSleep(sleep);
     const sMood = MOOD_OPTIONS.find((m) => m.value === mood)?.status ?? 'normal';
 
-    const levels = [sGlucose, sBp, sTemp, sSleep, sMood].filter(
+    const levels = [sGlucose, sBp, sTemp, sMood].filter(
       (x): x is HealthStatusLevel => x !== null
     );
 
@@ -302,9 +288,6 @@ export function HealthQuestionnaireSection() {
       actions.push(t('body.health.actTempWarning'));
     }
 
-    if (sSleep === 'critical' || sSleep === 'warning') {
-      actions.push(t('body.health.actSleep'));
-    }
     if (sMood === 'critical' || sMood === 'warning') {
       actions.push(t('body.health.actMood'));
     }
@@ -318,11 +301,10 @@ export function HealthQuestionnaireSection() {
       (glucose !== null ? 1 : 0) +
       (sys !== null || dia !== null ? 1 : 0) +
       (temp !== null ? 1 : 0) +
-      (sleep !== null ? 1 : 0) +
       1; // ánimo siempre tiene valor seleccionado
 
-    return { sGlucose, sBp, sTemp, sSleep, sMood, overall, recommendation, completedCount };
-  }, [glucose, sys, dia, temp, sleep, mood, t]);
+    return { sGlucose, sBp, sTemp, sMood, overall, recommendation, completedCount };
+  }, [glucose, sys, dia, temp, mood, t]);
 
   const toggleSymptom = (sym: string) => {
     if (sym === NO_SYMPTOM) {
@@ -345,7 +327,7 @@ export function HealthQuestionnaireSection() {
       systolicBp: sys,
       diastolicBp: dia,
       temperatureC: temp,
-      sleepHours: sleep,
+      sleepHours: todayCheck?.sleepHours ?? null,
       mood,
       symptoms,
       notes: notes.trim(),
@@ -356,7 +338,7 @@ export function HealthQuestionnaireSection() {
     setTimeout(() => setSavedBanner(false), 2600);
   };
 
-  const completionPct = Math.round((evaluation.completedCount / 5) * 100);
+  const completionPct = Math.round((evaluation.completedCount / 4) * 100);
 
   const renderHelp = (key: string, text: string) =>
     openHelp === key ? (
@@ -369,7 +351,6 @@ export function HealthQuestionnaireSection() {
     { id: 'glucose', label: t('body.health.glucose'), status: evaluation.sGlucose },
     { id: 'bp', label: t('body.health.bpShort'), status: evaluation.sBp },
     { id: 'temp', label: t('body.health.tempShort'), status: evaluation.sTemp },
-    { id: 'sleep', label: t('body.health.sleep'), status: evaluation.sSleep },
     { id: 'mood', label: t('body.health.mood'), status: evaluation.sMood },
   ];
 
@@ -440,7 +421,7 @@ export function HealthQuestionnaireSection() {
             </View>
           </View>
 
-          {/* Resumen visual de 5 indicadores */}
+          {/* Resumen visual de 4 indicadores */}
           <View className="mt-3 flex-row gap-1.5">
             {summaryItems.map((it) => {
               const dotColor = it.status ? STATUS_STYLE[it.status].color : '#94a3b8';
@@ -601,99 +582,53 @@ export function HealthQuestionnaireSection() {
         )}
       </View>
 
-      {/* 3. Temperatura y Sueño */}
-      <View className="mb-2.5 flex-row gap-2.5">
-        <View className="flex-1 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center">
-              <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950">
-                <TermoIcon size={15} color={colors.warning} />
-              </View>
-              <Text className="font-mono text-[11px] font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.health.temp')}</Text>
+      {/* 3. Temperatura */}
+      <View className="mb-2.5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center">
+            <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950">
+              <TermoIcon size={16} color={colors.warning} />
             </View>
-            <Pressable
-              onPress={() => setOpenHelp(openHelp === 'temp' ? null : 'temp')}
-              hitSlop={8}>
-              <HelpCircle size={14} color={colors.textSubtle} />
-            </Pressable>
+            <Text className="font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.health.temp')}</Text>
           </View>
-          <View className="mt-2 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-2.5 py-2">
-            <TextInput
-              value={tempText}
-              onChangeText={setTempText}
-              keyboardType="decimal-pad"
-              placeholder="36.6"
-              placeholderTextColor={colors.textSubtle}
-              className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
-            />
-            <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">°C</Text>
-          </View>
-          <View className="mt-1.5 flex-row gap-1">
-            {['36.5', '36.8'].map((v) => (
-              <Pressable
-                key={v}
-                onPress={() => setTempText(v)}
-                className={`flex-1 items-center rounded-md border py-0.5 ${tempText.trim() === v
-                  ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
-                  : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
-                  }`}>
-                <Text className="font-mono text-[9px] font-bold text-slate-700 dark:text-trauma-nightInk">{v}°</Text>
-              </Pressable>
-            ))}
-          </View>
-          <MetricRangeBar value={temp} min={34.5} max={39.5} status={evaluation.sTemp} />
+          <Pressable
+            onPress={() => setOpenHelp(openHelp === 'temp' ? null : 'temp')}
+            hitSlop={8}>
+            <HelpCircle size={15} color={colors.textSubtle} />
+          </Pressable>
         </View>
 
-        <View className="flex-1 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center">
-              <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950">
-                <Moon size={14} color="#4f46e5" />
-              </View>
-              <Text className="font-mono text-[11px] font-bold text-slate-800 dark:text-trauma-nightInk">{t('body.health.sleep')}</Text>
-            </View>
-            <Pressable
-              onPress={() => setOpenHelp(openHelp === 'sleep' ? null : 'sleep')}
-              hitSlop={8}>
-              <HelpCircle size={14} color={colors.textSubtle} />
-            </Pressable>
-          </View>
-          <View className="mt-2 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-2.5 py-2">
-            <TextInput
-              value={sleepText}
-              onChangeText={setSleepText}
-              keyboardType="decimal-pad"
-              placeholder="7.5"
-              placeholderTextColor={colors.textSubtle}
-              className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
-            />
-            <Text className="font-mono text-[10px] text-slate-400 dark:text-trauma-nightSubtle">{t('body.health.hrs')}</Text>
-          </View>
-          <View className="mt-1.5 flex-row gap-1">
-            {['6.5', '7.5', '8'].map((v) => (
-              <Pressable
-                key={v}
-                onPress={() => setSleepText(v)}
-                className={`flex-1 items-center rounded-md border py-0.5 ${sleepText.trim() === v
-                  ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
-                  : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
-                  }`}>
-                <Text className="font-mono text-[9px] font-bold text-slate-700 dark:text-trauma-nightInk">{v}h</Text>
-              </Pressable>
-            ))}
-          </View>
-          <MetricRangeBar value={sleep} min={3} max={10} status={evaluation.sSleep} />
+        <View className="mt-2.5 flex-row items-center rounded-xl border border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt px-3 py-2">
+          <TextInput
+            value={tempText}
+            onChangeText={setTempText}
+            keyboardType="decimal-pad"
+            placeholder="36.6"
+            placeholderTextColor={colors.textSubtle}
+            className="flex-1 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk"
+          />
+          <Text className="font-mono text-[10px] font-bold text-slate-400 dark:text-trauma-nightSubtle">°C</Text>
         </View>
+
+        <View className="mt-2 flex-row gap-1.5">
+          {['36.5', '36.8'].map((v) => (
+            <Pressable
+              key={v}
+              onPress={() => setTempText(v)}
+              className={`flex-1 items-center rounded-lg border py-1 ${tempText.trim() === v
+                ? 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
+                : 'border-slate-200 dark:border-trauma-nightLine bg-[#f7f7f7] dark:bg-trauma-nightAlt'
+                }`}>
+              <Text className="font-mono text-[9.5px] font-bold text-slate-700 dark:text-trauma-nightInk">{v}°</Text>
+            </Pressable>
+          ))}
+        </View>
+        <MetricRangeBar value={temp} min={34.5} max={39.5} status={evaluation.sTemp} />
+        {renderHelp(
+          'temp',
+          t('body.health.tempHelp')
+        )}
       </View>
-
-      {renderHelp(
-        'temp',
-        t('body.health.tempHelp')
-      )}
-      {renderHelp(
-        'sleep',
-        t('body.health.sleepHelp')
-      )}
 
       {/* 4. Estado de ánimo y salud conductual */}
       <View className="mb-2.5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-3.5 shadow-xs">

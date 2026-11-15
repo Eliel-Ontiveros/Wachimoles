@@ -139,8 +139,6 @@ test('health questionnaire with skips and BP pair', () => {
   d.say('120 sobre 80');
   assert.equal(d.question.key, 'dialog.q.temp');
   d.say('treinta y seis punto cinco');
-  assert.equal(d.question.key, 'dialog.q.sleep');
-  d.say('omitir');
   assert.equal(d.question.key, 'dialog.q.mood');
   d.say('cansado');
   assert.equal(d.question.key, 'dialog.q.symptoms');
@@ -161,19 +159,17 @@ test('health: mood words, ninguno, skip phrases, finish early, initial fields', 
   assert.equal(d.question.key, 'dialog.q.bp');
   d.say('no sé');
   d.say('36,5');
-  d.say('seven');
   assert.equal(d.question.key, 'dialog.q.mood');
   d.say('óptimo');
   const r = d.say('ninguno');
   assert.equal(r.done.mood, 5);
-  assert.equal(r.done.sleepHours, 7);
   assert.equal(r.done.temperatureC, 36.5);
   assert.deepEqual(r.done.symptoms, ['None']);
   assert.equal('systolicBp' in r.done, false);
 
   const moods = { bien: 4, estable: 4, tenso: 2, estresado: 2, mal: 1, crítico: 1, '2': 2 };
   for (const [word, mood] of Object.entries(moods)) {
-    const e = dialogFrom('mi glucosa es 100 presión 120 80 temperatura 36.5 dormí 8 horas');
+    const e = dialogFrom('mi glucosa es 100 presión 120 80 temperatura 36.5');
     assert.equal(e.question.key, 'dialog.q.mood');
     e.say(word);
     assert.equal(e.say('ninguno').done.mood, mood, word);
@@ -190,12 +186,10 @@ test('English health answers', () => {
   d.say('one hundred ten');
   d.say('120 over 80');
   d.say('thirty six point eight');
-  d.say('seven and a half');
   d.say('good');
   const r = d.say('none');
   assert.equal(r.done.bloodSugarMgDl, 110);
   assert.equal(r.done.temperatureC, 36.8);
-  assert.equal(r.done.sleepHours, 7.5);
   assert.equal(r.done.mood, 4);
 });
 
