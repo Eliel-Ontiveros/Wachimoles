@@ -2,6 +2,7 @@ import { parseHealthAlerts, HealthAlertsNotReadyError, isHealthAlertsNotReadyRes
 import type {
   BodyConditionImageRecord,
   BodyConditionRecord,
+  BodyProfile,
   DailyHealthCheck,
   DailyMetricSummary,
   DashboardSample,
@@ -9,6 +10,7 @@ import type {
   SampleMetric,
   SaveBodyConditionPayload,
   VitalSignsData,
+  WeightRecord,
 } from '../types/dashboard';
 
 export interface BackendRuntimeConfig {
@@ -753,4 +755,67 @@ export async function acknowledgeHealthAlert(id: string): Promise<void> {
   if (!res.ok) throw new ApiRequestError(res.status, `Could not acknowledge this alert (${res.status}).`);
   const result: unknown = await res.json();
   if (!isRecord(result) || result.acknowledged !== true) throw new Error('Invalid acknowledgement response.');
+}
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+const isNullableNumber = (value: unknown): boolean => value === null || isFiniteNumber(value);
+
+function isWeightRecord(value: unknown): value is WeightRecord {
+  if (!isRecord(value)) return false;
+  if (!isFiniteNumber(value.id) || typeof value.measurementId !== 'string') return false;
+  if (!isFiniteNumber(value.weightKg) || !(value.device === null || typeof value.device === 'string')) return false;
+  if (typeof value.measuredAt !== 'string' || typeof value.receivedAt !== 'string') return false;
+  if (value.metrics === null) return true;
+  if (!isRecord(value.metrics) || !isRecord(value.metrics.exact)) return false;
+  const { exact, estimated } = value.metrics;
+  const exactOk =
+    ['bmi', 'healthyWeightMinKg', 'healthyWeightMaxKg', 'overweightMaxKg'].every((key) => isFiniteNumber(exact[key])) &&
+    typeof exact.bmiCategory === 'string' &&
+    isNullableNumber(exact.idealWeightKg) &&
+    isNullableNumber(exact.weightToIdealKg);
+  const estimatedOk =
+    estimated === null ||
+    (isRecord(estimated) &&
+      ['bodyFatPercent', 'fatMassKg', 'leanMassKg', 'bodyWaterLiters', 'bodyWaterPercent', 'basalMetabolismKcal']
+        .every((key) => isFiniteNumber(estimated[key])));
+  return exactOk && estimatedOk;
+}
+
+function isBodyProfile(value: unknown): value is BodyProfile {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.heightCm) &&
+    isNullableNumber(value.ageYears) &&
+    (value.sex === null || value.sex === 'male' || value.sex === 'female') &&
+    typeof value.updatedAt === 'string'
+  );
+}
+
+/** Latest smart-scale weighing with its body metrics, or null when there is none yet. */
+export async function fetchLatestWeightFromBackend(): Promise<WeightRecord | null> {
+  const url = resolveUrl('/dashboard/weights', { limit: '1' });
+  const res = await fetchWithBearerOrBasic(url, { method: 'GET' });
+  if (!res.ok) {
+    throw new ApiRequestError(res.status, `Could not load the scale weighings (${res.status}).`);
+  }
+  const body: unknown = await res.json();
+  if (!Array.isArray(body) || !body.every(isWeightRecord)) {
+    throw new Error('Invalid format received from /dashboard/weights.');
+  }
+  return body[0] ?? null;
+}
+
+/** Height, age and sex used by the scale metrics, or null when no profile has been set. */
+export async function fetchBodyProfileFromBackend(): Promise<BodyProfile | null> {
+  const res = await fetchWithBearerOrBasic(resolveUrl('/dashboard/body-profile'), { method: 'GET' });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new ApiRequestError(res.status, `Could not load the body profile (${res.status}).`);
+  }
+  const body: unknown = await res.json();
+  if (!isBodyProfile(body)) {
+    throw new Error('Invalid format received from /dashboard/body-profile.');
+  }
+  return body;
 }
