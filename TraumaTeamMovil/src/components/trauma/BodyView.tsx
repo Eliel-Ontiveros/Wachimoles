@@ -599,7 +599,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   useEffect(() => () => reportBodyTab('body'), []);
   const [muscles, setMuscles] = useState<MuscleData[]>(INITIAL_MUSCLES);
   const [resolvedConditions, setResolvedConditions] = useState<BodyConditionRecord[]>([]);
-  const [selectedName, setSelectedName] = useState<string>('Neck');
+  const [selectedName, setSelectedName] = useState<string>('Face / Facial region');
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
   const [observationModalOpen, setObservationModalOpen] = useState(false);
 

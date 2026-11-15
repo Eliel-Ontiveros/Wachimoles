@@ -26,17 +26,26 @@ export function VoiceFab() {
   }
   const mounted = v.panelOpen || exiting;
   const [enter] = useState(() => new Animated.Value(v.panelOpen ? 1 : 0));
-  const [intro] = useState(() => new Animated.Value(v.panelOpen ? 0 : 1));
+  const [intro] = useState(() => new Animated.Value(v.panelOpen ? 2 : 0));
   const initialPanelOpenRef = useRef(v.panelOpen);
 
   useEffect(() => {
     if (initialPanelOpenRef.current) return;
     const introAnim = Animated.sequence([
-      Animated.delay(450),
+      Animated.delay(220),
+      // Entrada de chico a grande para presentar la burbuja de voz
       Animated.timing(intro, {
-        toValue: 0,
-        duration: 820,
-        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.back(1.35)),
+        useNativeDriver: true,
+      }),
+      Animated.delay(560),
+      // Se contrae suavemente y se guarda en la orilla
+      Animated.timing(intro, {
+        toValue: 2,
+        duration: 680,
+        easing: Easing.inOut(Easing.cubic),
         useNativeDriver: true,
       }),
     ]);
@@ -47,7 +56,7 @@ export function VoiceFab() {
   useEffect(() => {
     if (v.panelOpen) {
       intro.stopAnimation();
-      intro.setValue(0);
+      intro.setValue(2);
       enter.stopAnimation();
       Animated.timing(enter, {
         toValue: 1,
@@ -62,7 +71,7 @@ export function VoiceFab() {
     enter.stopAnimation();
     Animated.timing(enter, {
       toValue: 0,
-      duration: 280,
+      duration: 320,
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -95,20 +104,20 @@ export function VoiceFab() {
 
   if (!mounted) {
     const dockedTranslateX = intro.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -46],
+      inputRange: [0, 1, 2],
+      outputRange: [-20, -48, 0],
     });
     const dockedTranslateY = intro.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -24],
+      inputRange: [0, 1, 2],
+      outputRange: [-8, -26, 0],
     });
     const dockedScale = intro.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 2.3],
+      inputRange: [0, 1, 2],
+      outputRange: [0.05, 2.35, 1],
     });
     const dockedOpacity = intro.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.34, 0.96],
+      inputRange: [0, 0.3, 1, 2],
+      outputRange: [0, 0.98, 0.98, 0.34],
     });
 
     return (
@@ -250,8 +259,9 @@ export function VoiceFab() {
           style={{
             opacity: enter,
             transform: [
-              { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) },
-              { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
+              { translateX: enter.interpolate({ inputRange: [0, 1], outputRange: [88, 0] }) },
+              { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) },
+              { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] }) },
             ],
           }}>
           <Pressable

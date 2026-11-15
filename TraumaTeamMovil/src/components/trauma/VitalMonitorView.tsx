@@ -1691,7 +1691,6 @@ export function VitalMonitorView() {
     vitals,
     getFullHistory,
     streakDays,
-    missions,
     environment,
     treadmillRoutineActive,
     toggleTreadmillRoutine,
@@ -1704,8 +1703,6 @@ export function VitalMonitorView() {
   const [historySamples, setHistorySamples] = useState<DashboardSample[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const historyReqIdRef = useRef(0);
-
-  const completedMissions = missions.filter((m) => m.completed).length;
 
   const [heartBeatAnim] = useState(() => new Animated.Value(1));
 
@@ -1872,25 +1869,18 @@ export function VitalMonitorView() {
         onPress={() => handleOpenMetricHistory('sleep')}
       />
 
-      {/* Resumen de trayectoria y misiones diarias */}
-      <Pressable
-        onPress={() => router.navigate('/missions')}
-        accessibilityLabel={t('vital.missions.a11y')}
-        className="mb-5 active:opacity-90">
-        <SpaceJourneyTimeline compact />
+      {/* Resumen de trayectoria y acciones de misiones en una fila */}
+      <View className="mb-6">
+        <SpaceJourneyTimeline
+          compact
+          onPress={() => router.navigate('/missions')}
+        />
         <View className="mt-3.5">
-          <EnvironmentSelector compact />
+          <EnvironmentSelector
+            compact
+            onMissionsPress={() => router.navigate('/missions')}
+          />
         </View>
-        <View className="mt-2.5 flex-row items-center justify-between rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft/60 dark:bg-cyan-950/60 px-3.5 py-2">
-          <Text className="font-mono text-[10.5px] font-bold text-trauma-ink dark:text-trauma-nightInk">
-            {t('vital.missions.today', { done: completedMissions, total: missions.length })}
-          </Text>
-          <ChevronRight size={14} color={colors.accentDeep} />
-        </View>
-      </Pressable>
-      {/* Selector de entorno */}
-      <View className="mb-4">
-
       </View>
 
       {/* Tarjeta de pasos diarios y rutina de caminadora en 0g con acceso al historial por día */}

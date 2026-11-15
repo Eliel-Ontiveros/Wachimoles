@@ -14,7 +14,7 @@ import {
 import Svg, { Polygon } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, usePathname, type Href } from 'expo-router';
-import { Activity, BookOpen, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
+import { Activity, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
 
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey, VoiceLanguage } from '@/i18n/messages';
@@ -127,7 +127,6 @@ const NAV_ITEMS: {
   { path: '/', label: 'route./', subtitle: 'nav.vitals.subtitle', href: '/', Icon: Activity },
   { path: '/explore', label: 'route./explore', subtitle: 'nav.body.subtitle', href: '/explore', Icon: PersonStanding },
   { path: '/missions', label: 'route./missions', subtitle: 'nav.missions.subtitle', href: '/missions', Icon: Rocket },
-  { path: '/assistant', label: 'nav.assistant', subtitle: 'nav.assistant.subtitle', href: '/assistant', Icon: BookOpen },
 ];
 
 export function HexDrawer() {

@@ -6,7 +6,6 @@ import { AlertTriangle, Bell, CheckCheck, Menu, X } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useI18n } from '@/i18n/I18nProvider';
-import { ThemeToggle } from '@/settings/ThemeToggle';
 import { useAppTheme } from '@/theme';
 import { useVoice } from '@/voice/voice-context';
 
@@ -58,22 +57,19 @@ export function TraumaHeader() {
           </Svg>
         </View>
 
-        <View className="flex-row items-center gap-2">
-          <ThemeToggle />
-          <Pressable
-            onPress={() => setAlertsOpen(true)}
-            accessibilityLabel={t('alerts.title')}
-            className="h-10 w-10 items-center justify-center rounded-xl border border-trauma-ink bg-white active:opacity-60 dark:border-trauma-nightLine dark:bg-trauma-night">
-            <Bell size={18} color={unreadAlertCount > 0 ? colors.danger : colors.text} />
-            {unreadAlertCount > 0 && (
-              <View className="absolute -right-1 -top-1 h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1">
-                <Text className="font-mono text-[9px] font-bold text-white">
-                  {unreadAlertCount}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={() => setAlertsOpen(true)}
+          accessibilityLabel={t('alerts.title')}
+          className="h-10 w-10 items-center justify-center rounded-xl border border-trauma-ink bg-white active:opacity-60 dark:border-trauma-nightLine dark:bg-trauma-night">
+          <Bell size={18} color={unreadAlertCount > 0 ? colors.danger : colors.text} />
+          {unreadAlertCount > 0 && (
+            <View className="absolute -right-1 -top-1 h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1">
+              <Text className="font-mono text-[9px] font-bold text-white">
+                {unreadAlertCount}
+              </Text>
+            </View>
+          )}
+        </Pressable>
       </View>
 
       {/* Tarjeta compacta de notificaciones */}

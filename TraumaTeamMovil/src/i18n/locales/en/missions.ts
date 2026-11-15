@@ -162,6 +162,9 @@ const missions: Record<string, string> = {
   'missions.healthLoad.msg': 'Check the connection to the backend and try again.',
   'missions.healthSave.title': 'The questionnaire was not saved',
   'missions.healthSave.msg': 'The questionnaire was updated on screen, but it could not be saved on the server. Check your connection before closing the app.',
+  'missions.completedRow': 'Completed: {done}/{total}',
+  'missions.completedA11y': 'Completed missions: {done} of {total}',
+  'missions.timeline.launching': 'Launching trajectory',
 };
 
 export default missions;
