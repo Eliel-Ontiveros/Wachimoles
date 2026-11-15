@@ -622,11 +622,6 @@ h3 {
   display: flex;
 }
 
-/* Picker-only detail column (stage 'musculo', no muscle selected): tablet/mobile only. */
-.stage-col.stage-col-picker-only {
-  display: none;
-}
-
 .muscle-detail-close {
   position: sticky;
   inset-block-start: 0;
@@ -659,10 +654,6 @@ h3 {
 }
 
 @container stage-shell (max-width: 1180px) {
-  .stage-grid.stage-mode-musculo > .stage-col.stage-col-picker-only {
-    display: flex;
-  }
-
   /* Stacked 'All' view: rows grow with their content (no overlap) and the
      3D viewer, whose canvas fills its parent, keeps a usable height. */
   .stage-grid.stage-mode-all {
@@ -690,9 +681,8 @@ h3 {
     overflow-y: visible;
   }
 
-  /* Detail column, or the viewer when it follows the body-composition column, spans full width. */
-  .stage-grid.stage-mode-all > .stage-col-detail,
-  .stage-grid.stage-mode-all > .stage-col-bodycomp ~ .stage-col-viewer {
+  /* The detail column spans full width. */
+  .stage-grid.stage-mode-all > .stage-col-detail {
     grid-column: 1 / -1;
   }
 

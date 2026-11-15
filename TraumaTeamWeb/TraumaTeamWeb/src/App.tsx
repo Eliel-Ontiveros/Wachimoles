@@ -378,32 +378,26 @@ export function App() {
         </nav>
 
         <main className={`stage-grid stage-mode-${responsiveStage}`}>
-          {/* Column 1: vitals; becomes a Vitals / Body composition carousel while a muscle is selected */}
+          {/* Column 1: banner + pulse, then a Vitals / Body composition / Flight log carousel; the 3D body stays centered */}
           <div
             className={`stage-col ${
               responsiveStage === 'all' || responsiveStage === 'signos' ? 'visible' : 'hidden-sm'
             }`}
           >
+            {/* Location banner + live pulse stay on top of every carousel slide */}
+            <RealtimeEcgMonitor vitals={vitals} astronaut={selectedAstronaut} />
             <SideCarousel
-              enabled={selectedMuscle !== null}
-              ariaLabel="Vitals and body composition"
+              enabled
+              ariaLabel="Vitals, body composition and flight log"
               slides={[
                 {
                   id: 'vitals',
                   label: 'Vitals',
                   content: (
-                    <>
-                      <RealtimeEcgMonitor vitals={vitals} astronaut={selectedAstronaut} />
-                      <SymptomPulseCards
-                        latestCheck={latestHealthCheck}
-                        vitals={vitals}
-                      />
-                      <HealthChartsPanel
-                        vitals={vitals}
-                        allSamples={samples}
-                        environment={selectedAstronaut.environment}
-                      />
-                    </>
+                    <SymptomPulseCards
+                      latestCheck={latestHealthCheck}
+                      vitals={vitals}
+                    />
                   ),
                 },
                 {
@@ -411,20 +405,20 @@ export function App() {
                   label: 'Body composition',
                   content: <BodyCompositionCards data={bodyComposition} />,
                 },
+                {
+                  id: 'flight-log',
+                  label: 'Flight log',
+                  content: (
+                    <HealthChartsPanel
+                      vitals={vitals}
+                      allSamples={samples}
+                      environment={selectedAstronaut.environment}
+                    />
+                  ),
+                },
               ]}
             />
           </div>
-
-          {/* Body composition column (no muscle selected). Conditional siblings keep the viewer's position stable. */}
-          {selectedMuscle === null && (
-            <div
-              className={`stage-col stage-col-bodycomp ${
-                responsiveStage === 'all' || responsiveStage === 'signos' ? 'visible' : 'hidden-sm'
-              }`}
-            >
-              <BodyCompositionCards data={bodyComposition} />
-            </div>
-          )}
 
           {/* Column 2: Muscle dropdown + vertically stretched 3D body */}
           <div
@@ -444,11 +438,8 @@ export function App() {
           </div>
 
           {/* Column 3: Zone symptoms + AI space + Photos (read-only) */}
-          {(selectedMuscle !== null || responsiveStage === 'musculo') && (
           <div
             className={`stage-col stage-col-detail ${
-              selectedMuscle === null ? 'stage-col-picker-only' : ''
-            } ${
               responsiveStage === 'all' || responsiveStage === 'musculo' ? 'visible' : 'hidden-sm'
             }`}
           >
@@ -627,7 +618,6 @@ export function App() {
               </div>
             </section>
           </div>
-          )}
         </main>
       </div>
       </div>

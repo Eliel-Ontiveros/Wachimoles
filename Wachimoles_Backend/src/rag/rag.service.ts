@@ -111,15 +111,17 @@ export class RagService {
           model: this.model,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: JSON.stringify({
-              question: body.question,
-              selectedEnvironment: body.environment,
-              reportedBodyZone: body.bodyZone ?? null,
-              reportedMuscleReport: body.muscleReport ?? null,
-              evidence: citations.map(({ citationId, title, excerpt, contentKind, evidenceContext, sourceSections, reviewStatus }) => ({
-                sourceId: citationId, title, passage: excerpt, contentKind, evidenceContext, sourceSections, reviewStatus
-              }))
-            }) }
+            {
+              role: "user", content: JSON.stringify({
+                question: body.question,
+                selectedEnvironment: body.environment,
+                reportedBodyZone: body.bodyZone ?? null,
+                reportedMuscleReport: body.muscleReport ?? null,
+                evidence: citations.map(({ citationId, title, excerpt, contentKind, evidenceContext, sourceSections, reviewStatus }) => ({
+                  sourceId: citationId, title, passage: excerpt, contentKind, evidenceContext, sourceSections, reviewStatus
+                }))
+              })
+            }
           ],
           thinking: { type: "disabled" },
           response_format: { type: "json_object" },
