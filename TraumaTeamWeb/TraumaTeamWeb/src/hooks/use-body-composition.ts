@@ -15,8 +15,8 @@ export interface BodyCompositionState {
   error: string | null;
 }
 
-/** Scale weighings arrive a few times a day; a slow poll keeps the cards current. */
-const REFRESH_MS = 60_000;
+/** A new weighing shows up within a few seconds, like the alerts panel; paused while the tab is hidden. */
+const REFRESH_MS = 5_000;
 
 export type BodyCompositionData = BodyCompositionState & { reload: () => void };
 
@@ -55,10 +55,18 @@ export function useBodyComposition(): BodyCompositionData {
       }
     }
     void load();
-    const timer = window.setInterval(() => void load(), REFRESH_MS);
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, REFRESH_MS);
+    // Catch up immediately when the user returns to the tab.
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [revision]);
 
