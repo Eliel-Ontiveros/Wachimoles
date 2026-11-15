@@ -1,0 +1,16 @@
+{
+  "name": "wachimoles-bascula",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lectura de báscula Bluetooth OKOK (Chipsea-BLE) y envío de peso a la API de WachiMoles",
+  "scripts": {
+    "scan": "node src/scan.js",
+    "start": "node src/index.js",
+    "dry-run": "node src/index.js --dry-run",
+    "probe": "node src/probe.js",
+    "test": "node --test test/*.test.js"
+  },
+  "optionalDependencies": {
+    "@abandonware/noble": "^1.9.2-26"
+  }
+}
