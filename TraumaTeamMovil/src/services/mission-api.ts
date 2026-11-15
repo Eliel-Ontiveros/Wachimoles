@@ -16,6 +16,7 @@ import {
 } from '../types/mission';
 import { Platform } from 'react-native';
 import { MESSAGES, translate, type Locale, type MessageKey } from '../i18n/messages';
+import { toBackendBodyRegion } from '../utils/body-region';
 
 // Servicio preparado para conectar misiones, entorno y fotos de lesiones con el backend
 
@@ -182,7 +183,7 @@ const FALLBACK_ACTIVE_BODY_CONDITIONS: BodyConditionRecord[] = [
   {
     id: '81a948a4-a763-4559-a60a-45bb0d82d041',
     muscleId: 'pectoral_izq',
-    bodyRegion: 'Front torso',
+    bodyRegion: 'Tronco anterior',
     muscleName: 'Left pectoral',
     conditionName: 'Muscle pain',
     description: 'Sharp pain',
@@ -198,7 +199,7 @@ const FALLBACK_ACTIVE_BODY_CONDITIONS: BodyConditionRecord[] = [
   {
     id: 'ebc31a7b-d19f-4529-8f61-3fbe5bef5def',
     muscleId: 'cuello',
-    bodyRegion: 'Head and neck',
+    bodyRegion: 'Cabeza y cuello',
     muscleName: 'Neck',
     conditionName: 'Muscle pain',
     description: 'Discomfort when moving the neck from side to side',
@@ -1469,7 +1470,7 @@ export async function syncObservationToBackend(
       const putResponse = await sendWithAuth(
         'PUT',
         JSON.stringify({
-          bodyRegion: input.bodyRegion,
+          bodyRegion: toBackendBodyRegion(input.bodyRegion),
           muscleName: input.muscleName,
           conditionName: input.conditionName?.trim() || 'Muscle pain',
           description: observation.notes,
