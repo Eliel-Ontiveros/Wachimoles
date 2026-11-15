@@ -380,6 +380,37 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 
       let animTargetCamPos = null;
       let animTargetLookAt = null;
+      let fullBodyBounds = null;
+      let isFullBodyView = true;
+
+      function frameFullBody(animated = false) {
+        isFullBodyView = true;
+        if (!fullBodyBounds) return;
+
+        const center = fullBodyBounds.getCenter(new THREE.Vector3());
+        const size = fullBodyBounds.getSize(new THREE.Vector3());
+        const verticalTan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        const horizontalTan = verticalTan * camera.aspect;
+        // Fit both axes, including the nearest surface, with room above the head and below the feet.
+        const distance = Math.max(size.y / (2 * verticalTan), size.x / (2 * horizontalTan)) * 1.12 + size.z / 2;
+        const position = center.clone().add(new THREE.Vector3(0, 0, isFrontView ? distance : -distance));
+        controls.maxDistance = Math.max(3.2, distance * 1.5);
+        camera.far = Math.max(20, controls.maxDistance + size.length());
+        camera.updateProjectionMatrix();
+
+        if (animated) {
+          animTargetLookAt = center;
+          animTargetCamPos = position;
+        } else {
+          animTargetLookAt = null;
+          animTargetCamPos = null;
+          controls.target.copy(center);
+          camera.position.copy(position);
+          controls.update();
+        }
+      }
+
+      controls.addEventListener('start', () => { isFullBodyView = false; });
 
       function getPinSvg(hasPain, isActive) {
         if (hasPain) {
@@ -667,6 +698,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 
       function focusCameraOnZone(zn) {
         if (!zn || !zn.cameraAngles) return;
+        isFullBodyView = false;
         const [azDeg, polDeg, dist] = zn.cameraAngles;
         const az = THREE.MathUtils.degToRad(azDeg);
         const pol = THREE.MathUtils.degToRad(polDeg);
@@ -710,6 +742,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 
       document.getElementById('btn-zoom-in').addEventListener('click', (e) => {
         e.stopPropagation();
+        isFullBodyView = false;
         const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
         const newDist = Math.max(controls.minDistance, dir.length() * 0.78);
         dir.setLength(newDist);
@@ -719,6 +752,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
 
       document.getElementById('btn-zoom-out').addEventListener('click', (e) => {
         e.stopPropagation();
+        isFullBodyView = false;
         const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
         const newDist = Math.min(controls.maxDistance, dir.length() * 1.25);
         dir.setLength(newDist);
@@ -729,8 +763,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
       document.getElementById('btn-reset').addEventListener('click', (e) => {
         e.stopPropagation();
         isFrontView = true;
-        animTargetLookAt = new THREE.Vector3(0, 0, 0);
-        animTargetCamPos = new THREE.Vector3(0, 0.06, 2.22);
+        frameFullBody(true);
         if (selectedName !== null) {
           selectedName = null;
           refreshPinsDOM();
@@ -763,6 +796,8 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
             }
           });
           scene.add(model);
+          fullBodyBounds = new THREE.Box3().setFromObject(model);
+          frameFullBody();
           updateMeshZoneColors();
 
           const initZn = findZone(selectedName);
@@ -907,8 +942,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
             focusCameraOnZone(zn);
           } else {
             isFrontView = true;
-            animTargetLookAt = new THREE.Vector3(0, 0, 0);
-            animTargetCamPos = new THREE.Vector3(0, 0.06, 2.22);
+            frameFullBody(true);
           }
         }
         if (changed) {
@@ -995,6 +1029,7 @@ function buildViewerHtml(initialMuscles: MuscleData[], initialSelectedName: stri
         camera.aspect = viewWidth / viewHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(viewWidth, viewHeight);
+        if (isFullBodyView) frameFullBody();
       });
 
       let rafId = 0;
@@ -1136,12 +1171,14 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
   );
 
   const groupedByCategory = useMemo(
-    () =>
-      REGION_CATEGORIES.map((category) => ({
+    () => {
+      const affectedIds = new Set(affectedMuscles.map((muscle) => muscle.id));
+      return REGION_CATEGORIES.map((category) => ({
         category,
-        items: muscles.filter((m) => m.category === category),
-      })),
-    [muscles]
+        items: muscles.filter((m) => m.category === category && !affectedIds.has(m.id)),
+      })).filter((group) => group.items.length > 0);
+    },
+    [muscles, affectedMuscles]
   );
 
   const selectedMuscle = useMemo(
@@ -1209,7 +1246,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
 
   const renderMuscleOption = (muscle: MuscleData) => {
     const hasSymptoms = muscle.status !== 'normal' && Boolean(muscle.observation);
-    const conditionLabel = hasSymptoms ? displayReportText(muscle.observation?.conditionName ?? '') : 'No ailment';
+    const conditionLabel = hasSymptoms ? displayReportText(muscle.observation?.conditionName ?? '') : '';
     const pain = muscle.observation?.painIntensity ?? 0;
     const painColor = getPainColorHex(pain);
     const isSelected = selectedMuscleId === muscle.id;
@@ -1223,27 +1260,29 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
         aria-selected={isSelected}
         aria-label={`${muscle.name}${conditionLabel ? ` · ${conditionLabel}` : ''}${hasSymptoms ? ` · With symptoms · Pain ${pain}/10` : ''}`}
         tabIndex={-1}
-        className={`muscle-picker-option muscle-picker-tile ${hasSymptoms ? 'is-affected-row' : ''} ${isSelected ? 'is-selected' : ''}`}
+        className={`muscle-picker-option ${isSelected ? 'is-selected' : ''}`}
         onClick={() => handleChooseMuscle(muscle.id)}
       >
         <span className="muscle-option-preview" aria-hidden="true">
           {thumbnail ? (
-            <img src={thumbnail} alt="" width={72} height={72} />
+            <img src={thumbnail} alt="" width={44} height={44} />
           ) : (
-            <RegionCategoryIcon category={muscle.category} size={28} />
+            <RegionCategoryIcon category={muscle.category} size={20} />
           )}
         </span>
         <span className="muscle-option-copy">
           <strong>{muscle.name}</strong>
           {conditionLabel && <small>{conditionLabel}</small>}
-          {hasSymptoms && (
-            <span className="muscle-option-pain-pill" aria-hidden="true">
-              <span className="muscle-option-pain-dot" style={{ backgroundColor: painColor }} />
-              Pain {pain}/10
-            </span>
-          )}
         </span>
-        {isSelected && <CheckIcon size={14} className="muscle-option-check" />}
+        {hasSymptoms ? (
+          <span className="muscle-option-pain" aria-hidden="true">
+            <span className="muscle-option-pain-dot" style={{ backgroundColor: painColor }} />
+            {pain}/10
+          </span>
+        ) : <span />}
+        <span className="muscle-option-check" aria-hidden="true">
+          {isSelected && <CheckIcon size={16} />}
+        </span>
       </button>
     );
   };
@@ -1259,9 +1298,6 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
     <div className="viewer3d-wrapper">
       <div className="viewer3d-dropdown-bar">
         <div ref={pickerWrapRef} className="viewer3d-select-field">
-          <span id={selectId} className="viewer3d-select-label">
-            3D Muscle / Zone
-          </span>
           <button
             ref={triggerRef}
             type="button"
@@ -1279,32 +1315,17 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
             onClick={() => setDropdownOpen((open) => !open)}
           >
             <span className="muscle-picker-trigger-left">
-              {selectedMuscle ? (
-                selectedHasSymptom ? (
-                  <span
-                    className="muscle-option-icon is-affected"
-                    style={{
-                      backgroundColor: '#060b19',
-                      borderColor: selectedPainColor,
-                      color: selectedPainColor,
-                      boxShadow: `0 0 8px -1px ${selectedPainColor}80`,
-                    }}
-                    aria-hidden="true"
-                  >
-                    <AlertTriangleIcon size={12} strokeWidth={2.3} />
-                  </span>
-                ) : (
-                  <span className="muscle-option-icon is-normal" aria-hidden="true">
-                    <RegionCategoryIcon category={selectedMuscle.category} size={12} />
-                  </span>
-                )
-              ) : (
-                <span className="muscle-option-icon is-idle" aria-hidden="true">
-                  <ActivityIcon size={12} />
-                </span>
-              )}
+              <span
+                className="muscle-picker-leading"
+                style={selectedHasSymptom ? { color: selectedPainColor } : undefined}
+                aria-hidden="true"
+              >
+                {selectedHasSymptom ? <AlertTriangleIcon size={18} />
+                  : selectedMuscle ? <RegionCategoryIcon category={selectedMuscle.category} size={18} />
+                  : <ActivityIcon size={18} />}
+              </span>
 
-              <span className="muscle-picker-trigger-text">
+              <span id={selectId} className="muscle-picker-trigger-text">
                 {selectedMuscle
                   ? selectedMuscle.name
                   : 'Select the muscle or zone:'}
@@ -1338,8 +1359,8 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
                 const step = {
                   ArrowRight: 1,
                   ArrowLeft: -1,
-                  ArrowDown: index === 0 ? 1 : 2,
-                  ArrowUp: index <= 2 ? -index : -2,
+                  ArrowDown: 1,
+                  ArrowUp: -1,
                 }[event.key];
                 const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
                   : step !== undefined ? Math.max(0, Math.min(options.length - 1, index + step)) : null;
@@ -1348,25 +1369,12 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
                 options[next]?.focus();
               }}
             >
-              <button
-                type="button"
-                role="option"
-                aria-selected={selectedMuscleId === null}
-                tabIndex={-1}
-                className={`muscle-picker-option ${selectedMuscleId === null ? 'is-selected' : ''}`}
-                onClick={() => handleChooseMuscle(null)}
-              >
-                {selectedMuscleId === null && (
-                  <span />
-                )}
-              </button>
-
               {affectedMuscles.length > 0 && (
                 <div className="muscle-picker-group" role="group" aria-label="With reported symptoms">
                   <div className="muscle-picker-group-label">
                     With reported symptoms ({affectedMuscles.length})
                   </div>
-                  <div className="muscle-picker-grid">
+                  <div className="muscle-picker-list">
                     {affectedMuscles.map((muscle) => renderMuscleOption(muscle))}
                   </div>
                 </div>
@@ -1375,7 +1383,7 @@ export const BodyModelViewerWeb: React.FC<BodyModelViewerWebProps> = ({
               {groupedByCategory.map((group) => (
                 <div key={group.category} className="muscle-picker-group" role="group" aria-label={getRegionCategoryLabel(group.category)}>
                   <div className="muscle-picker-group-label">{getRegionCategoryLabel(group.category)}</div>
-                  <div className="muscle-picker-grid">
+                  <div className="muscle-picker-list">
                     {group.items.map((muscle) => renderMuscleOption(muscle))}
                   </div>
                 </div>

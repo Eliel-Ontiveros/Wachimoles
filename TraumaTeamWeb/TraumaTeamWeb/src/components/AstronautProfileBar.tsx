@@ -43,7 +43,7 @@ export const AstronautProfileBar: React.FC<AstronautProfileBarProps> = ({
     astronauts.find((a) => a.id === selectedAstronautId) ?? astronauts[0];
   const envBadge =
     activeAstronaut?.environment === 'nave'
-      ? '0g · Orbit'
+      ? 'Orbit'
       : activeAstronaut?.gravityLabel ?? '';
 
   useEffect(() => {

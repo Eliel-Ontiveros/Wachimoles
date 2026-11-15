@@ -443,7 +443,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
         <div className="history-card-head">
           <div className="history-head-title">
             <span className="sym-icon-box tone-sky" aria-hidden="true">
-              <OrbitIcon size={20} />
+              <OrbitIcon size={24} />
             </span>
             <div className="history-head-copy">
               <h2>Flight Log</h2>
@@ -470,7 +470,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
               aria-label={`View ${qm.label} history: ${qm.valueText} ${qm.unit}`}
             >
               <span className={`sym-icon-box ${qm.tone}`} aria-hidden="true">
-                {renderMetricIcon(qm.key, 20)}
+                {renderMetricIcon(qm.key, 24)}
               </span>
               <span className="history-metric-label">{qm.label}</span>
               <span className="history-metric-value">

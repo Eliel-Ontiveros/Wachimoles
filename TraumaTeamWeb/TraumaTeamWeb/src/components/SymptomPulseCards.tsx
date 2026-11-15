@@ -358,7 +358,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
         <article className="symptom-pulse-card">
           <div className="sym-card-head">
             <span className="sym-icon-box tone-sky">
-              <OxygenIcon size={20} />
+              <OxygenIcon size={24} />
             </span>
             <span className="sym-title">Oxygen</span>
           </div>
@@ -389,7 +389,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
         <article className="symptom-pulse-card">
           <div className="sym-card-head">
             <span className="sym-icon-box tone-amber">
-              <StressIcon size={20} />
+              <StressIcon size={24} />
             </span>
             <span className="sym-title">Stress</span>
           </div>
@@ -420,7 +420,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
         <article className="symptom-pulse-card">
           <div className="sym-card-head">
             <span className="sym-icon-box tone-sky">
-              <GlucoseIcon size={20} />
+              <GlucoseIcon size={24} />
             </span>
             <span className="sym-title">Glucose</span>
           </div>
@@ -461,7 +461,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
         <article className="symptom-pulse-card">
           <div className="sym-card-head">
             <span className="sym-icon-box tone-rose">
-              <ActivityIcon size={20} />
+              <ActivityIcon size={24} />
             </span>
             <span className="sym-title">Blood Pressure</span>
           </div>
@@ -512,7 +512,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
         <article className="symptom-pulse-card">
           <div className="sym-card-head">
             <span className="sym-icon-box tone-amber">
-              <ThermometerIcon size={20} />
+              <ThermometerIcon size={24} />
             </span>
             <span className="sym-title">Temperature</span>
           </div>
@@ -553,7 +553,7 @@ export const SymptomPulseCards: React.FC<SymptomPulseCardsProps> = ({
         <article className="symptom-pulse-card">
           <div className="sym-card-head">
             <span className="sym-icon-box tone-emerald">
-              <SmileIcon size={20} />
+              <SmileIcon size={24} />
             </span>
             <span className="sym-title">Mood</span>
           </div>

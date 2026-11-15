@@ -956,8 +956,8 @@ h3 {
 }
 
 .sym-icon-box {
-  inline-size: 30px;
-  block-size: 30px;
+  inline-size: 34px;
+  block-size: 34px;
   border-radius: 7px;
   display: grid;
   place-items: center;
@@ -1288,7 +1288,7 @@ h3 {
   border-radius: 8px;
   padding: 8px 0;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto 14px;
+  grid-template-columns: 34px minmax(0, 1fr) auto 14px;
   align-items: center;
   gap: 8px;
   color: var(--text-main);
@@ -1814,38 +1814,31 @@ dialog.history-native-dialog::backdrop {
   gap: 4px;
 }
 
-.viewer3d-select-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-/* Muscle listbox with anatomical previews grouped in two columns. */
+/* Muscle selector: quiet trigger and a single, scannable list. */
 .muscle-picker-trigger {
   inline-size: 100%;
+  min-block-size: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 12px;
-  border: 1.5px solid var(--border-color);
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  font-family: inherit;
-  font-size: 0.83rem;
-  font-weight: 700;
-  text-align: left;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: start;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .muscle-picker-trigger:hover,
 .muscle-picker-trigger.is-open {
-  border-color: var(--accent-bright);
-  box-shadow: 0 0 0 3px rgba(147, 222, 255, 0.25);
+  border-color: var(--accent);
+  background: var(--bg-elevated);
 }
 
 .muscle-picker-trigger:focus-visible {
@@ -1856,9 +1849,14 @@ dialog.history-native-dialog::backdrop {
 .muscle-picker-trigger-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-inline-size: 0;
-  flex: 1;
+}
+
+.muscle-picker-leading {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--accent-text);
 }
 
 .muscle-picker-trigger-text {
@@ -1869,7 +1867,7 @@ dialog.history-native-dialog::backdrop {
 
 .muscle-picker-chevron {
   flex-shrink: 0;
-  color: var(--accent-text);
+  color: var(--text-muted);
   transition: transform 0.18s ease;
 }
 
@@ -1878,63 +1876,68 @@ dialog.history-native-dialog::backdrop {
 }
 
 .muscle-picker-menu {
-  container-type: inline-size;
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
+  inset-block-start: calc(100% + 8px);
+  inset-inline: 0;
   z-index: 45;
-  max-block-size: min(520px, 65dvh);
+  max-block-size: min(480px, 60dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
   background: var(--bg-elevated);
   color: var(--text-main);
-  border: 1.5px solid var(--border-color);
-  border-radius: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 18px 40px -10px rgba(2, 6, 23, 0.28);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.2);
 }
 
 .muscle-picker-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 4px;
-  border-top: 1px solid var(--border-color);
+  margin-block-start: 6px;
+  padding-block-start: 6px;
+  border-block-start: 1px solid var(--border-color);
+}
+
+.muscle-picker-group:first-child {
+  margin-block-start: 0;
+  padding-block-start: 0;
+  border-block-start: 0;
 }
 
 .muscle-picker-group-label {
-  padding: 4px 8px 2px;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-muted);
+}
+
+.muscle-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .muscle-picker-option {
   inline-size: 100%;
-  display: flex;
+  min-block-size: 52px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 16px;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 10px;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-main);
-  font-family: inherit;
-  text-align: left;
+  font: inherit;
+  text-align: start;
   cursor: pointer;
-  transition: background-color 0.13s ease, border-color 0.13s ease;
+  transition: background-color 0.13s ease;
 }
 
 .muscle-picker-option:hover {
-  background: var(--accent-soft);
+  background: var(--bg-subtle);
 }
 
 .muscle-picker-option:focus-visible {
@@ -1942,30 +1945,15 @@ dialog.history-native-dialog::backdrop {
   outline-offset: -2px;
 }
 
-.muscle-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.muscle-picker-tile {
-  --muscle-preview-size: clamp(52px, 16cqi, 72px);
-  position: relative;
-  min-inline-size: 0;
-  display: grid;
-  grid-template-columns: var(--muscle-preview-size) minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-  text-align: left;
+.muscle-picker-option.is-selected {
+  background: var(--accent-soft);
 }
 
 .muscle-option-preview {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  inline-size: var(--muscle-preview-size);
-  block-size: var(--muscle-preview-size);
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
   color: var(--text-muted);
 }
 
@@ -1973,130 +1961,61 @@ dialog.history-native-dialog::backdrop {
   display: block;
   inline-size: 100%;
   block-size: 100%;
-  border-radius: 7px;
+  border-radius: 6px;
   object-fit: contain;
 }
 
-.muscle-picker-tile .muscle-option-copy {
-  align-items: flex-start;
-  gap: 4px;
-  padding-inline-end: 10px;
-}
-
-.muscle-picker-tile .muscle-option-copy strong,
-.muscle-picker-tile .muscle-option-copy small {
-  white-space: normal;
-  overflow: visible;
-  overflow-wrap: anywhere;
-}
-
-.muscle-picker-tile .muscle-option-copy strong {
-  font-size: 0.75rem;
-}
-
-.muscle-picker-tile .muscle-option-pain-pill {
-  background: var(--bg-surface);
-  color: var(--text-main);
-  border-color: var(--border-color);
-}
-
-.muscle-picker-tile .muscle-option-check {
-  position: absolute;
-  inset-block-start: 4px;
-  inset-inline-end: 4px;
-}
-
-.muscle-picker-option.is-affected-row {
-  background: rgba(15, 23, 42, 0.03);
-}
-
-.muscle-picker-option.is-affected-row:hover {
-  background: var(--accent-soft);
-}
-
-.muscle-picker-option.is-selected {
-  background: var(--accent-soft);
-  border-color: var(--accent-bright);
-}
-
-.muscle-option-icon {
-  inline-size: 24px;
-  block-size: 24px;
-  border-radius: 7px;
-  border: 1.5px solid transparent;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.muscle-option-icon.is-normal {
-  background: var(--bg-subtle);
-  border-color: var(--border-color);
-  color: var(--text-muted);
-}
-
-.muscle-option-icon.is-idle {
-  background: var(--accent-soft);
-  border-color: rgba(147, 222, 255, 0.65);
-  color: var(--accent-text);
-}
-
 .muscle-option-copy {
-  flex: 1 1 auto;
   min-inline-size: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
 }
 
 .muscle-option-copy strong {
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .muscle-option-copy small {
-  font-size: 0.67rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1.4;
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
-.muscle-option-pain-pill {
+.muscle-option-pain {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  font-weight: 800;
-  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-muted);
 }
 
 .muscle-option-pain-dot {
   inline-size: 6px;
   block-size: 6px;
-  border-radius: 999px;
+  border-radius: 50%;
   flex-shrink: 0;
-}
-
-.muscle-option-pain-dot.only {
-  inline-size: 8px;
-  block-size: 8px;
-  box-shadow: 0 0 0 2px #060b19;
 }
 
 .muscle-option-check {
+  display: flex;
   color: var(--accent-text);
-  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .muscle-picker-trigger,
+  .muscle-picker-chevron,
+  .muscle-picker-option {
+    transition: none;
+  }
 }
 
 .viewer3d-canvas-frame {
