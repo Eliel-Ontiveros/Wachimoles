@@ -14,7 +14,7 @@ export function tokenize(text: string): string[] {
 }
 
 // BM25 lexical retrieval: no embeddings, API calls, or vector database required.
-export function retrieve(corpus: RagCorpus, question: string, context: string, limit = 4): RagCitation[] {
+export function retrieve(corpus: RagCorpus, question: string, context: string, limit = 4, requiredRegion: string[] = []): RagCitation[] {
   const terms = [...new Set(tokenize(question))];
   if (!terms.length || !corpus.chunks.length) return [];
   const contextTerms = [...new Set(tokenize(context))];
@@ -37,9 +37,13 @@ export function retrieve(corpus: RagCorpus, question: string, context: string, l
     return inverseFrequency * frequency * 2.2 / (frequency + 1.2 * (0.25 + 0.75 * doc.words.length / averageLength));
   };
   const ranked = documents
-    // Context can rerank evidence, but cannot make an unrelated question relevant.
-    .filter((doc) => doc.source && terms.filter((term) => doc.frequencies.has(term)).length >= Math.min(2, terms.length))
-    .map((doc) => ({ ...doc, score: terms.reduce((sum, term) => sum + scoreTerm(term, doc), 0) + 0.2 * contextTerms.reduce((sum, term) => sum + scoreTerm(term, doc), 0) }))
+    // A structured muscle report requires a region match; generic questions keep their existing gate.
+    .filter((doc) => doc.source && (requiredRegion.length
+      ? requiredRegion.some((term) => doc.frequencies.has(term))
+      : terms.filter((term) => doc.frequencies.has(term)).length >= Math.min(2, terms.length)))
+    .map((doc) => ({ ...doc, score: terms.reduce((sum, term) => sum + scoreTerm(term, doc), 0)
+      + 0.2 * contextTerms.reduce((sum, term) => sum + scoreTerm(term, doc), 0)
+      + 3 * requiredRegion.reduce((sum, term) => sum + scoreTerm(term, doc), 0) }))
     .sort((a, b) => b.score - a.score);
   const counts = new Map<string, number>();
   const results: RagCitation[] = [];

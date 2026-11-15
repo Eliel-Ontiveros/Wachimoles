@@ -20,7 +20,7 @@ flowchart LR
 There are two separate workflows:
 
 1. **Ingestion**, run when sources change: download the curated pages, remove navigation and social content, split the text into overlapping passages, record URLs, retrieval timestamps and SHA-256 hashes, and save `Wachimoles_Backend/src/rag/corpus.json`.
-2. **Question answering**, run for every question: search the stored passages, use the selected environment and body zone to rerank relevant results, and optionally ask DeepSeek to produce a short explanation. Every generated statement must reference a retrieved passage ID.
+2. **Question answering**, run for every question: search the stored passages and optionally ask DeepSeek to produce a short explanation. Free-text questions retain environment/body-zone reranking. Structured muscle reports require a matching body region before ranking by condition and present symptoms. Every generated statement must reference a retrieved passage ID.
 
 The app calls NestJS. The DeepSeek key stays in NestJS. Supabase continues to store existing app records; this first RAG does not require database changes.
 
@@ -112,7 +112,29 @@ Open the side menu and select **Space Health Assistant**. Start with the built-i
 
 The separate Vite web dashboard also calls the existing assistant endpoint. Configure `TraumaTeamWeb/.env` using its `.env.example`, select an active muscle report and press **Review symptoms against documents** in the muscle detail panel. See the [web setup and response behavior](../TraumaTeamWeb/TraumaTeamWeb/README.md).
 
-The web request attaches the selected muscle's reported condition, pain, swelling, functional limitation, timestamp and notes, plus its selected environment. It does not attach other health data or photos. Requests occur only on user action; polling does not trigger generation. The current research corpus supports document-based explanations and abstention, not a clinical diagnosis.
+The web request separates the question from an optional validated `muscleReport` object. Existing mobile/free-text requests remain valid without this object. The environment comes from the selected astronaut's saved context, not a second selector. No other health data or photos are attached; polling never triggers generation.
+
+```json
+{
+  "question": "What can the indexed research explain about this reported muscle problem?",
+  "environment": "spacecraft",
+  "bodyZone": "Lower back",
+  "muscleReport": {
+    "conditionName": "Pain",
+    "painIntensity": 5,
+    "swelling": false,
+    "functionalLimitation": false,
+    "notes": "",
+    "recordedAtIso": "2026-11-15T10:00:00Z"
+  }
+}
+```
+
+The report requires a nonblank condition (maximum 180 characters), integer pain intensity from 0 to 10, boolean symptom flags, and notes up to 700 characters. The ISO timestamp is optional. Unknown nested fields and invalid values are rejected with HTTP 400. Without a usable body zone, a muscle report returns insufficient evidence.
+
+Search excludes instructions, timestamps and negative symptom flags. Narrow anatomical aliases connect deltoid/shoulder and lower-back/lumbar (including Spanish shoulder/lower-back labels); other regions abstain until their evidence coverage and whole-zone aliases are reviewed. Arbitrary token overlaps such as “back” in “Back of leg” or “upper” in “Upper arm” never select another region's evidence. Region matches are mandatory and strongly weighted; only present symptoms boost ranking. Notes are limited to 200 characters at low weight for retrieval, but all 700 bounded characters reach the generator. No region match means `insufficient_evidence` and no provider call, rather than borrowing research from another body region.
+
+The prompt asks for relevant findings followed by their limitations, keeps reported facts distinct from research, and makes swelling/wearable cautions conditional. It preserves population and environment limits and abstains when no relevant explanation is supported. These controls reduce irrelevant answers; citation-ID validation still does not prove semantic entailment or medical correctness.
 
 ### Backend generation settings
 
@@ -130,7 +152,7 @@ Restart the backend and reopen the assistant screen. Submit a question again. Th
 
 The integration calls `POST https://api.deepseek.com/chat/completions` using [DeepSeek's documented API](https://api-docs.deepseek.com/) and [JSON Output](https://api-docs.deepseek.com/guides/json_mode/). The model name is configurable because model availability changes. No OpenAI key, SDK or separate embedding service is required.
 
-When generation is enabled, a question sends its text, selected environment, optional body zone, and retrieved passages to DeepSeek. The mobile question screen does not automatically attach wearable readings, saved questionnaires, body observations or photos. The web muscle assessment includes the selected muscle report in its question as described above. This version makes independent requests and does not retain chat history in the application.
+When generation is enabled, a question sends its text, selected environment, optional body zone, and retrieved passages to DeepSeek. The mobile question screen does not automatically attach wearable readings, saved questionnaires, body observations or photos. The web muscle assessment includes a separate structured report as described above. This version makes independent requests and does not retain chat history in the application.
 
 ## 4. Verify the flow directly
 
@@ -217,7 +239,8 @@ The existing shared dashboard token is prototype access, and Expo public variabl
 - `Wachimoles_Backend/scripts/ingest-rag.mjs`: download, extraction, chunking and provenance.
 - `Wachimoles_Backend/knowledge/sources.json`: curated source catalog.
 - `Wachimoles_Backend/src/rag/corpus.json`: versioned source snapshots and passages.
-- `Wachimoles_Backend/src/rag/retrieval.ts`: BM25 ranking.
+- `Wachimoles_Backend/src/rag/retrieval.ts`: BM25 ranking and optional mandatory region gate.
+- `Wachimoles_Backend/src/rag/muscle-retrieval.ts`: structured-report search terms and conservative region aliases.
 - `Wachimoles_Backend/src/rag/rag.service.ts`: prompt, DeepSeek call, citation validation and fallback.
 - `Wachimoles_Backend/src/rag/rag.controller.ts`: authenticated HTTP endpoints.
 - `TraumaTeamMovil/src/services/assistant-api.ts`: mobile HTTP contract and source validation.

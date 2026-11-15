@@ -30,13 +30,15 @@ Run the configured NestJS backend separately. Its Supabase settings are required
 ## Review muscle symptoms against documents
 
 1. Select an active muscle report in the 3D viewer or the reported-zone list.
-2. In **Understand your symptoms**, review the selected environment.
+2. Open **Understand your symptoms**. It uses the selected astronaut's saved environment automatically; there is no second environment selector.
 3. Press **Review your symptoms**. Each press makes one request to `POST /dashboard/assistant/ask`.
 4. Read the main finding, then expand **Read the full explanation** for the remaining findings or **Explore sources** for evidence. Numbered citations open and focus the matching passage. Source excerpts, retrieval dates and original URLs remain available.
 
 The result uses 16 px body text and progressive disclosure without truncating the original answer. The backend asks for up to three short findings in everyday English, with the main finding and its essential limitations first. Existing longer answers remain readable in full. If synthesis is disabled or unavailable, the source list starts open. The diagnosis limitation and urgent-symptom guidance stay visible; **About this assessment** retains the complete backend notice. Restart or redeploy the backend for the revised generation instructions to take effect.
 
-The request includes the selected muscle name, reported condition, pain intensity, swelling, functional limitation, report timestamp, notes and selected environment. A reported condition is not treated as a confirmed diagnosis. Free-text notes remain verbatim; the English BM25 corpus may have limited recall for Spanish-only notes. Long condition names and notes are bounded to fit the existing 1,500-character question limit.
+The request keeps the question separate from an optional structured `muscleReport`: reported condition (up to 180 characters), pain intensity (0–10), swelling and functional-limitation booleans, notes (up to 700 characters), and an optional ISO report timestamp. The selected muscle name is `bodyZone`; environment comes from the selected astronaut. False flags mean not reported, not a medically confirmed absence. No diagnosis is inferred from the condition label.
+
+Muscle-report retrieval requires a matching body region. Narrow equivalents cover deltoid/shoulder and lower-back/lumbar, including the Spanish shoulder and lower-back labels; other regions abstain until their indexed coverage and whole-zone aliases have been reviewed. Generic words such as “back” in “Back of leg” cannot select lumbar research. Only present symptom flags become search terms. Notes contribute at most 200 characters as a low-weight ranking signal, while the complete bounded report reaches the generator. Instructions and timestamps do not participate in search. A region without matching evidence returns `insufficient_evidence` without a generation call. Spanish-only free text still has limited recall in the English corpus.
 
 No wearable measurements, general questionnaires or photos are attached to this request. A report's timestamp is shown so an older record is not presented as a current observation. Switching muscles, modifying a report or resolving it clears its assessment and aborts an in-flight request. Changing the environment also clears the previous result. Requests are manual; dashboard polling never starts paid generation.
 

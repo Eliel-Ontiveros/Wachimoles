@@ -24,18 +24,23 @@ const generated = {
 
 afterEach(() => resetBackendConfig());
 
-test('builds a bounded request with all reported symptoms, timestamp and selected context', () => {
+test('separates bounded report data, including absent symptoms, from the question instructions', () => {
   const body = buildMuscleAssessmentQuestion(muscle, toAssistantEnvironment('nave'))!;
   assert.equal(body.environment, 'spacecraft');
   assert.equal(body.bodyZone, muscle.name);
-  for (const text of ['Dolor muscular', '6/10', 'Swelling: reported', 'Functional limitation: not reported',
-    'Pain after exercise', '2026-11-14T12:00:00Z', 'Do not infer a diagnosis']) {
-    assert.ok(body.question.includes(text), text);
-  }
+  assert.deepEqual(body.muscleReport, {
+    conditionName: 'Dolor muscular', painIntensity: 6, swelling: true, functionalLimitation: false,
+    notes: 'Pain after exercise', recordedAtIso: '2026-11-14T12:00:00Z',
+  });
+  assert.ok(!body.question.includes('Swelling:'));
+  assert.ok(!body.question.includes('Functional limitation:'));
+  assert.ok(!body.question.includes('Explain only'));
   const long = buildMuscleAssessmentQuestion({ ...muscle, observation: {
     ...muscle.observation!, conditionName: 'a'.repeat(1000), notes: 'b'.repeat(5000),
   } }, 'mars')!;
   assert.ok(long.question.length <= 1500);
+  assert.equal(long.muscleReport!.conditionName.length, 180);
+  assert.equal(long.muscleReport!.notes.length, 700);
   assert.equal(toAssistantEnvironment('tierra'), 'earth');
   assert.equal(toAssistantEnvironment('luna'), 'moon');
   assert.equal(toAssistantEnvironment('marte'), 'mars');
