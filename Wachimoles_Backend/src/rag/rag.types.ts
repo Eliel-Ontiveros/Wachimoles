@@ -37,6 +37,7 @@ export interface RagCitation extends RagSource {
   chunkId: string;
   wordOffset: number;
   excerpt: string;
+  evidenceScope?: "region_specific" | "general";
 }
 
 export interface RagAnswer {

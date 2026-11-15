@@ -13,7 +13,7 @@ function regionTerms(bodyZone: string): string[] {
   if (["lower back", "lower-back", "lumbar", "lumbar spine", "paraspinal", "multifidus", "espalda baja"].includes(zone)) {
     return tokenize("lumbar paraspinal multifidus");
   }
-  // Register another region only after reviewing indexed evidence for that region.
+  // Unknown regions use general context, never another region's findings.
   return [];
 }
 
@@ -21,14 +21,26 @@ export function retrieveMuscleEvidence(
   corpus: RagCorpus, report: MuscleReportDto, bodyZone: string, environment: string,
 ): RagCitation[] {
   const region = regionTerms(bodyZone);
-  if (!region.length) return [];
   const query = [
     ...region, report.conditionName,
     report.painIntensity > 0 ? "pain" : "",
     report.swelling ? "swelling" : "",
     report.functionalLimitation ? "limited movement" : "",
   ].join(" ");
-  // Negative flags, timestamps and boilerplate never become search terms. Notes
-  // are a bounded, low-weight tie-breaker and cannot bypass the region gate.
-  return retrieve(corpus, query, `${environment} ${report.notes.slice(0, 200)}`, 4, region);
+  // Negative flags, timestamps and boilerplate never become search terms.
+  const context = `${environment} ${report.notes.slice(0, 200)}`;
+  const specific = region.length ? retrieve(corpus, query, context, 4, region) : [];
+  if (specific.length) return specific.map((citation) => ({ ...citation, evidenceScope: "region_specific" }));
+
+  // These reviewed sources discuss general muscle function, exercise and movement,
+  // not the cause of symptoms in an unstudied muscle. Keep region-specific papers out.
+  const generalSources = new Set(["english-sprint-2020"]);
+  if (report.functionalLimitation) generalSources.add("tays-sensorimotor-2021");
+  const generalCorpus = {
+    ...corpus,
+    sources: corpus.sources.filter((source) => generalSources.has(source.id)),
+    chunks: corpus.chunks.filter((chunk) => generalSources.has(chunk.sourceId)),
+  };
+  return retrieve(generalCorpus, `muscle strength exercise ${query}`, context)
+    .map((citation) => ({ ...citation, evidenceScope: "general" }));
 }

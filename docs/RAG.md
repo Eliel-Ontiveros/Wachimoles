@@ -20,7 +20,7 @@ flowchart LR
 There are two separate workflows:
 
 1. **Ingestion**, run when sources change: download the curated pages, remove navigation and social content, split the text into overlapping passages, record URLs, retrieval timestamps and SHA-256 hashes, and save `Wachimoles_Backend/src/rag/corpus.json`.
-2. **Question answering**, run for every question: search the stored passages and optionally ask DeepSeek to produce a short explanation. Free-text questions retain environment/body-zone reranking. Structured muscle reports require a matching body region before ranking by condition and present symptoms. Every generated statement must reference a retrieved passage ID.
+2. **Question answering**, run for every question: search the stored passages and optionally ask DeepSeek to produce a short explanation. Free-text questions retain environment/body-zone reranking. Structured muscle reports prefer matching body-region evidence and fall back to explicitly labelled general research when no specific passage exists. Every generated statement must reference a retrieved passage ID.
 
 The app calls NestJS. The DeepSeek key stays in NestJS. Supabase continues to store existing app records; this first RAG does not require database changes.
 
@@ -130,11 +130,15 @@ The web request separates the question from an optional validated `muscleReport`
 }
 ```
 
-The report requires a nonblank condition (maximum 180 characters), integer pain intensity from 0 to 10, boolean symptom flags, and notes up to 700 characters. The ISO timestamp is optional. Unknown nested fields and invalid values are rejected with HTTP 400. Without a usable body zone, a muscle report returns insufficient evidence.
+The report requires a nonblank condition (maximum 180 characters), integer pain intensity from 0 to 10, boolean symptom flags, and notes up to 700 characters. The ISO timestamp is optional. Unknown nested fields and invalid values are rejected with HTTP 400. A missing or uncovered body zone does not block a muscle report when general educational evidence is available.
 
-Search excludes instructions, timestamps and negative symptom flags. Narrow anatomical aliases connect deltoid/shoulder and lower-back/lumbar (including Spanish shoulder/lower-back labels); other regions abstain until their evidence coverage and whole-zone aliases are reviewed. Arbitrary token overlaps such as “back” in “Back of leg” or “upper” in “Upper arm” never select another region's evidence. Region matches are mandatory and strongly weighted; only present symptoms boost ranking. Notes are limited to 200 characters at low weight for retrieval, but all 700 bounded characters reach the generator. No region match means `insufficient_evidence` and no provider call, rather than borrowing research from another body region.
+Search excludes instructions, timestamps and negative symptom flags. Narrow anatomical aliases connect deltoid/shoulder and lower-back/lumbar (including Spanish labels). Specific matches remain strongly weighted; arbitrary overlaps such as “back” in “Back of leg” never select lumbar research. If specific passages are absent, retrieval searches reviewed general muscle/exercise evidence (`english-sprint-2020`), adding movement evidence (`tays-sensorimotor-2021`) when functional limitation is reported. It never fills the gap with a different region's specific study.
 
-The prompt asks for relevant findings followed by their limitations, keeps reported facts distinct from research, and makes swelling/wearable cautions conditional. It preserves population and environment limits and abstains when no relevant explanation is supported. These controls reduce irrelevant answers; citation-ID validation still does not prove semantic entailment or medical correctness.
+Each muscle-report citation carries `evidenceScope: region_specific` or `general`. General responses receive the server-added prefix **General research context — not specific to this body region.** and a scope notice, even if synthesis is disabled or unavailable. The same scope is sent to the generator. The report's symptoms and description remain unconfirmed user data; only present flags boost retrieval. Notes contribute at most 200 characters to low-weight ranking, but all 700 bounded characters reach the generator. No photos, image URLs or image-analysis results are sent.
+
+When the model abstains despite available passages, a muscle report returns `evidence_only` so the user can still read the research; this is not labelled an AI-generated explanation. `insufficient_evidence` remains appropriate when neither specific nor eligible general evidence exists. Free-text questions retain their previous retrieval and abstention behavior.
+
+The prompt asks for useful specific or general findings, their possible relevance to the reported symptoms/activity/description, and explicit uncertainty. It does not require enough evidence to identify the cause before offering educational context. It keeps reported facts distinct from research, makes swelling/wearable cautions conditional, and preserves population and environment limits. It must not invent diagnoses or claim that a photo was analyzed. These controls reduce irrelevant answers; citation-ID validation still does not prove semantic entailment or medical correctness.
 
 ### Backend generation settings
 
@@ -240,7 +244,7 @@ The existing shared dashboard token is prototype access, and Expo public variabl
 - `Wachimoles_Backend/knowledge/sources.json`: curated source catalog.
 - `Wachimoles_Backend/src/rag/corpus.json`: versioned source snapshots and passages.
 - `Wachimoles_Backend/src/rag/retrieval.ts`: BM25 ranking and optional mandatory region gate.
-- `Wachimoles_Backend/src/rag/muscle-retrieval.ts`: structured-report search terms and conservative region aliases.
+- `Wachimoles_Backend/src/rag/muscle-retrieval.ts`: structured-report search terms, conservative region aliases and labelled general-evidence fallback.
 - `Wachimoles_Backend/src/rag/rag.service.ts`: prompt, DeepSeek call, citation validation and fallback.
 - `Wachimoles_Backend/src/rag/rag.controller.ts`: authenticated HTTP endpoints.
 - `TraumaTeamMovil/src/services/assistant-api.ts`: mobile HTTP contract and source validation.

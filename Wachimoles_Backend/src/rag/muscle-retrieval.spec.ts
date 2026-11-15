@@ -24,16 +24,39 @@ describe("Structured symptom retrieval", () => {
   ])("only boosts symptoms actually reported (%#)", (changes, expectedFirst) => {
     const results = retrieveMuscleEvidence(corpus, { ...report, ...changes }, "Right deltoid", "spacecraft");
     expect(results[0].id).toBe(expectedFirst);
+    results.forEach((citation) => expect(citation).toHaveProperty("evidenceScope", "region_specific"));
     expect(results.map((citation) => citation.id)).not.toContain("wrong-region");
     expect(results.every((citation) => citation.excerpt === passages.find(([id]) => id === citation.id)?.[1])).toBe(true);
   });
 
-  it.each(["Left hamstrings (Back of leg)", "lower leg", "Upper arm", "Left hand", "Left thigh (Quadriceps)"])(
-    "rejects generic anatomical tokens in unsupported region %s", (zone) => {
+  it.each(["Right biceps", "Left hamstrings (Back of leg)", "lower leg", "Upper arm", "Left hand", "Left thigh (Quadriceps)", ""])(
+    "offers labelled general evidence without borrowing another region for %s", (zone) => {
       const results = retrieveMuscleEvidence(corpusData, report, zone, "spacecraft");
-      expect(results).toEqual([]);
+      expect(results.length).toBeGreaterThan(0);
+      results.forEach((citation) => expect(citation).toHaveProperty("evidenceScope", "general"));
+      expect(results.map((citation) => citation.id)).not.toContain("chang-lumbar-2016");
+      expect(results.map((citation) => citation.id)).not.toContain("nasa-shoulder-2025");
+      for (const citation of results) {
+        expect(citation.excerpt).toBe(corpusData.chunks.find((chunk) => chunk.id === citation.chunkId)?.text);
+      }
     },
   );
+
+  it("adds general movement research only when functional limitation is reported", () => {
+    const sources = (functionalLimitation: boolean) => retrieveMuscleEvidence(
+      corpusData, { ...report, functionalLimitation }, "Right biceps", "spacecraft",
+    ).map((citation) => citation.id);
+    expect(sources(false)).toContain("english-sprint-2020");
+    expect(sources(false)).not.toContain("tays-sensorimotor-2021");
+    expect(sources(true)).toContain("tays-sensorimotor-2021");
+  });
+
+  it("uses general evidence when a recognized region has no matching passage", () => {
+    const missing = { ...corpusData, chunks: corpusData.chunks.filter((chunk) => chunk.sourceId !== "nasa-shoulder-2025") };
+    const results = retrieveMuscleEvidence(missing, report, "Right deltoid", "spacecraft");
+    expect(results.length).toBeGreaterThan(0);
+    results.forEach((citation) => expect(citation).toHaveProperty("evidenceScope", "general"));
+  });
 
   it("cannot use notes or the environment to supply a missing body-region match", () => {
     expect(retrieveMuscleEvidence(corpus, { ...report, notes: "shoulder pain" }, "Right biceps", "spacecraft")).toEqual([]);

@@ -142,14 +142,51 @@ describe("Muscle-report evidence grounding", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("abstains without a paid call when the indexed passages do not cover the reported zone", async () => {
-    const fetch = jest.spyOn(global, "fetch").mockRejectedValue(new Error("Unexpected provider call"));
+  it("generates labelled general information for symptoms and notes without analyzing photos", async () => {
+    const fetch = jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ choices: [{ finish_reason: "stop",
+      message: { content: JSON.stringify({ statements: [{ text: "The ISS exercise study measured muscle strength and endurance; it does not identify the cause of this pain.", sourceIds: [1] }] }) }
+    }] }));
+    const notes = "Pain after exercise; no photo findings are available.";
     const answer = await new RagService(new ConfigService({ DEEPSEEK_API_KEY: "test-secret", RAG_GENERATION_ENABLED: "true" }))
-      .ask(request("Right biceps"));
-    expect(answer.mode).toBe("insufficient_evidence");
-    expect(answer.citations).toEqual([]);
-    expect(answer.answer).toContain("body region");
+      .ask(request("Right biceps", { notes }));
+    expect(answer.mode).toBe("generated");
+    expect(answer.answer).toMatch(/^General research context/);
+    expect(answer.answer).toContain("[1]");
+    expect(answer.citations.length).toBeGreaterThan(0);
+    answer.citations.forEach((citation) => expect(citation).toHaveProperty("evidenceScope", "general"));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+    const data = JSON.parse(payload.messages[1].content);
+    expect(data.evidenceScope).toBe("general");
+    expect(data.reportedMuscleReport).toEqual({ ...report, notes });
+    expect(data.reportedBodyZone).toBe("Right biceps");
+    expect(payload.messages[0].content).toContain("general educational context");
+    expect(payload.messages[0].content).toContain("No photos or image-analysis results");
+    expect(payload.messages[0].content).toContain("do not diagnose");
+    expect(JSON.stringify(payload)).not.toContain("image_url");
+  });
+
+  it("returns general passages when generation is disabled instead of claiming no region evidence exists", async () => {
+    const fetch = jest.spyOn(global, "fetch").mockRejectedValue(new Error("Unexpected provider call"));
+    const answer = await new RagService(new ConfigService()).ask(request("Right biceps"));
+    expect(answer.mode).toBe("evidence_only");
+    expect(answer.answer).toMatch(/^General research context/);
+    expect(answer.citations.length).toBeGreaterThan(0);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("shows retrieved passages when synthesis abstains on a muscle report, but preserves free-question abstention", async () => {
+    const fetch = jest.spyOn(global, "fetch").mockImplementation(async () => Response.json({ choices: [{ finish_reason: "stop",
+      message: { content: JSON.stringify({ statements: [] }) }
+    }] }));
+    const service = new RagService(new ConfigService({ DEEPSEEK_API_KEY: "test-secret", RAG_GENERATION_ENABLED: "true" }));
+    const result = await service.ask(request("Right biceps"));
+    expect(result.mode).toBe("evidence_only");
+    expect(result.answer).toMatch(/^General research context/);
+    expect(result.citations.length).toBeGreaterThan(0);
+    const generalQuestion = await service.ask(question);
+    expect(generalQuestion.mode).toBe("insufficient_evidence");
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("keeps notes and boilerplate from replacing the reported body zone", async () => {

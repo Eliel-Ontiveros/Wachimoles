@@ -65,6 +65,21 @@ describe("Assistant HTTP API", () => {
     expect(body.citations.map((citation: { id: string }) => citation.id)).toEqual(["chang-lumbar-2016"]);
   });
 
+  it("returns labelled general passages for an uncovered body zone instead of blocking the report", async () => {
+    const response = await fetch(`${base}/ask`, {
+      method: "POST", headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: "Explain this reported muscle problem.", environment: "spacecraft", bodyZone: "Right biceps",
+        muscleReport: { conditionName: "Pain", painIntensity: 5, swelling: false, functionalLimitation: true, notes: "Pain after exercise" } })
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body.mode).toBe("evidence_only");
+    expect(body.answer).toMatch(/^General research context/);
+    expect(body.citations.length).toBeGreaterThan(0);
+    expect(body.citations.every((citation: { evidenceScope: string }) => citation.evidenceScope === "general")).toBe(true);
+  });
+
   it.each([
     { swelling: "false" }, { painIntensity: -1 }, { painIntensity: 11 }, { painIntensity: 1.5 },
     { conditionName: " " }, { conditionName: "x".repeat(181) }, { functionalLimitation: "false" },

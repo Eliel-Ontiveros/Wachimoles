@@ -58,6 +58,15 @@ test('accepts each real backend response mode without fabricating a diagnosis', 
   }
 });
 
+test('accepts labelled general research with valid references and preserves the scope metadata', () => {
+  const value = {
+    ...generated,
+    answer: 'General research context — not specific to this body region. A supported research finding. [1]',
+    citations: [{ ...citation, evidenceScope: 'general' }],
+  };
+  assert.deepEqual(parseAssistantAnswer(value), value);
+});
+
 test('rejects fabricated, missing or duplicate references and untrusted source URLs', () => {
   for (const invalid of [
     { ...generated, citations: [] },
