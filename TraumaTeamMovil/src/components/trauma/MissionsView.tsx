@@ -100,13 +100,18 @@ export function MissionsView() {
   return (
     <View className="px-5 pb-10 pt-5">
       <StreakCheckinHost />
+      {/* Animación de navecita hacia el destino */}
+      <View className="mb-4">
+        <SpaceJourneyTimeline />
+      </View>
+
       {/* Selector de entorno */}
       <View className="mb-4">
         <EnvironmentSelector />
       </View>
 
       {/* Tarjeta de racha estilo Duolingo */}
-      <View className="mb-4 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
+      <View className="mb-5 rounded-2xl border border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night p-4 shadow-sm">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
             <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
@@ -181,11 +186,6 @@ export function MissionsView() {
         </View>
       </View>
 
-      {/* Animación de navecita hacia el destino */}
-      <View className="mb-5">
-        <SpaceJourneyTimeline />
-      </View>
-
       {/* Misiones diarias adaptadas al entorno */}
       <View className="mb-2.5 flex-row items-center justify-between">
         <View>
@@ -205,7 +205,11 @@ export function MissionsView() {
 
       <View className="gap-2.5">
         {missions.map((mission) => {
-          const pct = Math.min(100, Math.round((mission.currentValue / mission.targetValue) * 100));
+          const rawPct =
+            mission.targetValue > 0
+              ? Math.min(100, Math.max(0, Math.round((mission.currentValue / mission.targetValue) * 100)))
+              : 0;
+          const visualPct = mission.completed ? 100 : rawPct;
           const isAutoSteps = mission.category === 'steps';
           const isTreadmill = mission.category === 'treadmill';
           const statusHint = isAutoSteps
@@ -216,55 +220,127 @@ export function MissionsView() {
                 : t('missions.hint.treadmillOff')
               : t('missions.hint.toggle');
 
+          const fillColor = mission.completed
+            ? scheme === 'dark'
+              ? 'rgba(56, 189, 248, 0.16)'
+              : 'rgba(2, 132, 199, 0.10)'
+            : scheme === 'dark'
+              ? 'rgba(56, 189, 248, 0.11)'
+              : 'rgba(88, 213, 247, 0.15)';
+
+          const edgeColor = mission.completed
+            ? colors.accentDeep
+            : visualPct > 0
+              ? '#58d5f7'
+              : scheme === 'dark'
+                ? '#334155'
+                : '#cbd5e1';
+
           return (
             <Pressable
               key={mission.id}
               onPress={() => toggleMission(mission.id)}
-              className={`rounded-2xl border p-3.5 shadow-xs active:opacity-85 ${mission.completed
-                  ? 'border-trauma-cyanEdge bg-sky-50/40 dark:bg-sky-950/40'
-                  : 'border-trauma-line dark:border-trauma-nightLine bg-white dark:bg-trauma-night'
+              className={`relative overflow-hidden rounded-2xl border shadow-xs active:opacity-85 ${mission.completed
+                  ? 'border-sky-300/80 bg-white dark:border-sky-700/80 dark:bg-trauma-night'
+                  : 'border-trauma-line bg-white dark:border-trauma-nightLine dark:bg-trauma-night'
                 }`}>
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 flex-row items-center pr-2">
-                  <View
-                    className={`mr-3 h-9 w-9 items-center justify-center rounded-xl ${mission.completed
-                        ? 'bg-trauma-cyanSoft dark:bg-trauma-nightAlt'
-                        : 'bg-slate-100 dark:bg-trauma-nightAlt'
-                      }`}>
-                    <MissionIcon category={mission.category} completed={mission.completed} />
+              {/* Relleno horizontal sutil integrado al fondo según el avance */}
+              {visualPct > 0 && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    width: `${visualPct}%`,
+                    backgroundColor: fillColor,
+                  }}>
+                  {!mission.completed && visualPct < 100 && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        right: 0,
+                        width: 1.5,
+                        backgroundColor:
+                          scheme === 'dark'
+                            ? 'rgba(125, 211, 252, 0.35)'
+                            : 'rgba(2, 132, 199, 0.25)',
+                      }}
+                    />
+                  )}
+                </View>
+              )}
+
+              {/* Acento vertical sutil en el borde izquierdo */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: 3,
+                  backgroundColor: edgeColor,
+                }}
+              />
+
+              <View className="p-3.5 pl-4">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 flex-row items-center pr-2.5">
+                    <View
+                      className={`mr-3 h-10 w-10 items-center justify-center rounded-xl border ${mission.completed
+                          ? 'border-sky-300/70 bg-white/90 dark:border-sky-700/70 dark:bg-sky-950/80'
+                          : 'border-slate-200/80 bg-white/85 dark:border-trauma-nightLine dark:bg-trauma-nightAlt/90'
+                        }`}>
+                      <MissionIcon category={mission.category} completed={mission.completed} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
+                        {mission.title}
+                      </Text>
+                      <Text className="mt-0.5 font-mono text-[9.5px] leading-[14px] text-slate-500 dark:text-trauma-nightMuted">
+                        {mission.description}
+                      </Text>
+                    </View>
                   </View>
-                  <View className="flex-1">
-                    <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
-                      {mission.title}
-                    </Text>
-                    <Text className="font-mono text-[9.5px] text-slate-500 dark:text-trauma-nightMuted">
-                      {mission.description}
+
+                  <View
+                    className={`flex-row items-center rounded-full border px-2.5 py-1 ${mission.completed
+                        ? 'border-sky-300/80 bg-sky-100/80 dark:border-sky-700/70 dark:bg-sky-900/60'
+                        : 'border-slate-200/90 bg-white/85 dark:border-trauma-nightLine dark:bg-trauma-nightAlt/90'
+                      }`}>
+                    {mission.completed ? (
+                      <CheckCircle2 size={14} color={colors.accentDeep} />
+                    ) : (
+                      <Circle size={12} color={scheme === 'dark' ? colors.border : '#94a3b8'} />
+                    )}
+                    <Text
+                      className={`ml-1 font-mono text-[10px] font-extrabold ${mission.completed
+                          ? 'text-sky-700 dark:text-sky-300'
+                          : 'text-slate-600 dark:text-trauma-nightMuted'
+                        }`}>
+                      {visualPct}%
                     </Text>
                   </View>
                 </View>
 
-                {mission.completed ? (
-                  <CheckCircle2 size={20} color={colors.accentDeep} />
-                ) : (
-                  <Circle size={20} color={scheme === 'dark' ? colors.border : '#cbd5e1'} />
-                )}
-              </View>
-
-              <View className="mt-3">
-                <View className="mb-1 flex-row justify-between">
-                  <Text className="font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
+                <View className="mt-2.5 flex-row items-center justify-between">
+                  <Text
+                    numberOfLines={1}
+                    className="mr-2 flex-1 font-mono text-[9px] text-slate-500 dark:text-trauma-nightSubtle">
                     {statusHint}
                   </Text>
-                  <Text className="font-mono text-[9.5px] font-bold text-slate-700 dark:text-trauma-nightMuted">
+                  <Text
+                    className={`font-mono text-[10px] font-bold ${mission.completed
+                        ? 'text-sky-700 dark:text-sky-300'
+                        : 'text-slate-700 dark:text-trauma-nightMuted'
+                      }`}>
                     {formatNumber(mission.currentValue, locale)} / {formatNumber(mission.targetValue, locale)}{' '}
                     {mission.unit}
                   </Text>
-                </View>
-                <View className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-trauma-nightAlt">
-                  <View
-                    className="h-full rounded-full bg-trauma-cyan"
-                    style={{ width: `${pct}%` }}
-                  />
                 </View>
               </View>
             </Pressable>

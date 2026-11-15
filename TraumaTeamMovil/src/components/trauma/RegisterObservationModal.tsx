@@ -23,6 +23,7 @@ import {
   Layers,
   FileText,
   Check,
+  CheckCircle2,
   RotateCcw,
   Clock,
   PlusCircle,
@@ -37,6 +38,7 @@ import {
   getPainColorHex,
   muscleNameKey,
 } from './BodyModelViewer';
+import { CureConfirmDialog } from './CureConfirmModal';
 import { useMission } from './mission-context';
 import type { InjuryPhoto } from '../../types/mission';
 import {
@@ -236,6 +238,8 @@ export function RegisterObservationModal({
   const [capturedPhoto, setCapturedPhoto] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmCureTargetId, setConfirmCureTargetId] = useState<string | null>(null);
+  const confirmingCure = Boolean(visible && confirmCureTargetId === muscle.id && !isSaving);
 
   const isUpdateMode = (mode ?? (muscle.observation ? 'update' : 'create')) === 'update' && Boolean(muscle.observation);
   const musclePhotos = useMemo(
@@ -404,6 +408,7 @@ export function RegisterObservationModal({
   };
 
   const handleMarkCured = () => {
+    setConfirmCureTargetId(null);
     void persistUpdate(true);
   };
 
@@ -417,8 +422,16 @@ export function RegisterObservationModal({
   // Color gradual actual para el slider (Amarillo en 1 -> Naranja en 5 -> Rojo en 10)
   const currentPainColor = painIntensity > 0 ? getPainColorHex(painIntensity) : colors.accent;
 
+  const handleCloseModal = () => {
+    setConfirmCureTargetId(null);
+    onClose();
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={() => (confirmingCure ? setConfirmCureTargetId(null) : handleCloseModal())}>
       <SafeAreaView style={{ flex: 1, backgroundColor: isDark ? colors.bg : '#f4f8fb' }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -451,7 +464,7 @@ export function RegisterObservationModal({
           <View className="flex-row items-center justify-between px-5 pb-3 pt-4">
             <View className="flex-row items-center">
               <Pressable
-                onPress={onClose}
+                onPress={handleCloseModal}
                 accessibilityLabel={t('body.register.back')}
                 className="mr-3 h-9 w-9 items-center justify-center rounded-full active:bg-slate-200 dark:active:bg-trauma-nightLine">
                 <ArrowLeft size={20} color={isDark ? colors.text : '#1e293b'} strokeWidth={2.2} />
@@ -859,11 +872,11 @@ export function RegisterObservationModal({
             {/* Botón dedicado para curar el malestar ("Ya no siento el síntoma") */}
             {isUpdateMode && painIntensity > 0 && (
               <Pressable
-                onPress={handleMarkCured}
+                onPress={() => setConfirmCureTargetId(muscle.id)}
                 disabled={isSaving}
-                className="mt-3 flex-row items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 py-3.5 active:opacity-80 dark:border-emerald-400/40 dark:bg-emerald-950/60">
-                <Check size={16} color={isDark ? colors.success : '#047857'} strokeWidth={2.4} />
-                <Text className="ml-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                className="mt-3 flex-row items-center justify-center rounded-2xl border border-trauma-cyanEdge bg-trauma-cyanSoft px-4 py-3.5 shadow-xs active:opacity-75 dark:bg-cyan-950">
+                <CheckCircle2 size={16} color={isDark ? colors.text : '#111827'} strokeWidth={2.3} />
+                <Text className="ml-2 text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
                   {t('body.register.cureBtn')}
                 </Text>
               </Pressable>
@@ -883,6 +896,14 @@ export function RegisterObservationModal({
             )}
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {confirmingCure && (
+          <CureConfirmDialog
+            zoneName={t(muscleNameKey(muscle.id))}
+            onCancel={() => setConfirmCureTargetId(null)}
+            onConfirm={handleMarkCured}
+          />
+        )}
       </SafeAreaView>
     </Modal>
   );

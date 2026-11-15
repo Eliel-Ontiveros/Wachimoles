@@ -5,6 +5,7 @@ import {
   Easing,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,7 +14,7 @@ import {
 import Svg, { Polygon } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, usePathname, type Href } from 'expo-router';
-import { Activity, BookOpen, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
+import { Activity, ChevronRight, PersonStanding, Rocket, X } from 'lucide-react-native';
 
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey, VoiceLanguage } from '@/i18n/messages';
@@ -126,7 +127,6 @@ const NAV_ITEMS: {
   { path: '/', label: 'route./', subtitle: 'nav.vitals.subtitle', href: '/', Icon: Activity },
   { path: '/explore', label: 'route./explore', subtitle: 'nav.body.subtitle', href: '/explore', Icon: PersonStanding },
   { path: '/missions', label: 'route./missions', subtitle: 'nav.missions.subtitle', href: '/missions', Icon: Rocket },
-  { path: '/assistant', label: 'nav.assistant', subtitle: 'nav.assistant.subtitle', href: '/assistant', Icon: BookOpen },
 ];
 
 export function HexDrawer() {
@@ -281,74 +281,81 @@ export function HexDrawer() {
           </View>
 
           {/* Sección de Navegación */}
-          <Text className="mb-2 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
-            {t('nav.section')}
-          </Text>
+          <ScrollView
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 16 }}>
+            <Text className="mb-2 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
+              {t('nav.section')}
+            </Text>
 
-          {NAV_ITEMS.map(({ path, label, subtitle, href, Icon }) => {
-            const active = pathname === path;
-            return (
-              <Pressable
-                key={path}
-                onPress={() => {
-                  close();
-                  router.navigate(href);
-                }}
-                className={`mb-2.5 flex-row items-center rounded-2xl border p-3 active:opacity-75 ${active
-                  ? 'border-sky-300 bg-sky-50/70 dark:border-trauma-cyanEdge/50 dark:bg-trauma-nightAlt'
-                  : 'border-slate-100 bg-white dark:border-trauma-nightLine dark:bg-trauma-night'
-                  }`}>
-                <View
-                  className={`mr-3 h-10 w-10 items-center justify-center rounded-xl ${active ? 'bg-sky-500' : 'bg-slate-100 dark:bg-trauma-nightAlt'
+            {NAV_ITEMS.map(({ path, label, subtitle, href, Icon }) => {
+              const active = pathname === path;
+              return (
+                <Pressable
+                  key={path}
+                  onPress={() => {
+                    close();
+                    router.navigate(href);
+                  }}
+                  className={`mb-2.5 flex-row items-center rounded-2xl border p-3 active:opacity-75 ${active
+                    ? 'border-sky-300 bg-sky-50/70 dark:border-trauma-cyanEdge/50 dark:bg-trauma-nightAlt'
+                    : 'border-slate-100 bg-white dark:border-trauma-nightLine dark:bg-trauma-night'
                     }`}>
-                  <Icon size={18} color={active ? '#ffffff' : colors.textMuted} />
-                </View>
-
-                <View className="flex-1">
-                  <Text
-                    className={`font-mono text-xs font-bold ${active ? 'text-sky-900 dark:text-trauma-cyanEdge' : 'text-slate-800 dark:text-trauma-nightInk'
+                  <View
+                    className={`mr-3 h-10 w-10 items-center justify-center rounded-xl ${active ? 'bg-sky-500' : 'bg-slate-100 dark:bg-trauma-nightAlt'
                       }`}>
-                    {t(label)}
-                  </Text>
-                  <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
-                    {t(subtitle)}
-                  </Text>
-                </View>
+                    <Icon size={18} color={active ? '#ffffff' : colors.textMuted} />
+                  </View>
 
-                <ChevronRight size={16} color={active ? colors.accentDeep : colors.textSubtle} />
-              </Pressable>
-            );
-          })}
+                  <View className="flex-1">
+                    <Text
+                      className={`font-mono text-xs font-bold ${active ? 'text-sky-900 dark:text-trauma-cyanEdge' : 'text-slate-800 dark:text-trauma-nightInk'
+                        }`}>
+                      {t(label)}
+                    </Text>
+                    <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                      {t(subtitle)}
+                    </Text>
+                  </View>
 
-          {/* Ajustes: idioma de entrada de voz y tema */}
-          <Text className="mb-2 mt-4 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
-            {t('settings.title')}
-          </Text>
-          <Text className="mb-1.5 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
-            {t('settings.voiceLanguage')}
-          </Text>
-          <SegmentedControl<VoiceLanguage>
-            accessibilityLabel={t('settings.voiceLanguage')}
-            value={voiceLanguage}
-            onChange={setVoiceLanguage}
-            options={[
-              { value: 'en', label: t('settings.lang.en') },
-              { value: 'es', label: t('settings.lang.es') },
-            ]}
-          />
-          <Text className="mb-1.5 mt-3 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
-            {t('settings.theme')}
-          </Text>
-          <SegmentedControl<ThemePreference>
-            accessibilityLabel={t('settings.theme')}
-            value={preference}
-            onChange={setPreference}
-            options={[
-              { value: 'system', label: t('settings.theme.system') },
-              { value: 'light', label: t('settings.theme.light') },
-              { value: 'dark', label: t('settings.theme.dark') },
-            ]}
-          />
+                  <ChevronRight size={16} color={active ? colors.accentDeep : colors.textSubtle} />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Ajustes pegados al fondo del drawer: idioma de entrada de voz y tema */}
+          <View className="border-t border-slate-100 pt-4 dark:border-trauma-nightLine">
+            <Text className="mb-2 font-mono text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
+              {t('settings.title')}
+            </Text>
+            <Text className="mb-1.5 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
+              {t('settings.voiceLanguage')}
+            </Text>
+            <SegmentedControl<VoiceLanguage>
+              accessibilityLabel={t('settings.voiceLanguage')}
+              value={voiceLanguage}
+              onChange={setVoiceLanguage}
+              options={[
+                { value: 'en', label: t('settings.lang.en') },
+                { value: 'es', label: t('settings.lang.es') },
+              ]}
+            />
+            <Text className="mb-1.5 mt-3 font-mono text-[10.5px] font-bold text-slate-600 dark:text-trauma-nightMuted">
+              {t('settings.theme')}
+            </Text>
+            <SegmentedControl<ThemePreference>
+              accessibilityLabel={t('settings.theme')}
+              value={preference}
+              onChange={setPreference}
+              options={[
+                { value: 'system', label: t('settings.theme.system') },
+                { value: 'light', label: t('settings.theme.light') },
+                { value: 'dark', label: t('settings.theme.dark') },
+              ]}
+            />
+          </View>
         </Animated.View>
       </View>
     </View>

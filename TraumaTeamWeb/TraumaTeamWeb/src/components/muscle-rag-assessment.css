@@ -1,0 +1,90 @@
+/* A short reading path within the existing astronaut dashboard. */
+.rag-assessment .rag-assessment-body { gap: 20px; }
+.rag-assessment .ai-slot-head h3 { font-size: 1.125rem; }
+.rag-assessment .research-intro,
+.rag-assessment .rag-empty,
+.rag-assessment .rag-loading p,
+.rag-assessment .rag-error { font-size: 1rem; line-height: 1.65; }
+
+.research-result { min-inline-size: 0; overflow-wrap: anywhere; }
+.research-takeaway { padding-block: 4px 24px; }
+.research-takeaway h4 {
+  margin: 0 0 10px;
+  color: var(--accent-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.rag-assessment .research-takeaway p,
+.rag-assessment .research-explanation p {
+  color: var(--text-main);
+  font-size: 1rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  max-inline-size: 70ch;
+}
+.research-explanation { display: grid; gap: 20px; padding-block: 4px 24px; }
+.research-disclosure { border-top: 1px solid var(--border-color); }
+.research-disclosure > summary,
+.research-source > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-block-size: 52px;
+  padding-block: 14px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-main);
+  list-style: none;
+  cursor: pointer;
+}
+.research-disclosure > summary::-webkit-details-marker,
+.research-source > summary::-webkit-details-marker { display: none; }
+.research-disclosure > summary > svg,
+.research-source > summary > svg { flex-shrink: 0; transition: transform 160ms ease-out; }
+.research-disclosure[open] > summary > svg,
+.research-source[open] > summary > svg { transform: rotate(90deg); }
+.research-disclosure > summary:hover,
+.research-source > summary:hover { color: var(--accent-text); }
+.research-count { color: var(--text-muted); font-size: 0.875rem; font-weight: 400; }
+.research-source-label { display: flex; align-items: center; gap: 8px; }
+.research-source-list { padding-bottom: 16px; }
+.research-source { scroll-margin-block: 20px; }
+.research-source + .research-source { border-top: 1px solid var(--border-color); }
+.research-source > summary { align-items: flex-start; justify-content: flex-start; font-size: 0.875rem; }
+.research-source > summary > svg { margin-inline-start: auto; margin-top: 3px; }
+.research-source-title { display: block; }
+.research-source-number { flex-shrink: 0; white-space: nowrap; color: var(--accent-text); font-variant-numeric: tabular-nums; }
+.research-publisher { display: block; margin-top: 4px; color: var(--text-muted); font-weight: 400; }
+.research-source blockquote {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+.rag-assessment .research-citation {
+  display: inline-block;
+  min-inline-size: 24px;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.research-original { display: inline-block; padding-block: 6px; font-size: 0.875rem; }
+.research-new-tab { color: var(--text-secondary); }
+.rag-assessment .research-source-meta { margin-block: 6px 12px; font-size: 0.8125rem; }
+.research-safety { border-top: 1px solid var(--border-color); padding-top: 20px; }
+.research-safety > strong { font-size: 0.875rem; color: var(--text-main); }
+.rag-assessment .research-safety p { margin-top: 8px; font-size: 0.875rem; line-height: 1.65; }
+.research-safety summary { padding-block: 10px; font-size: 0.875rem; color: var(--text-secondary); cursor: pointer; }
+.rag-assessment .rag-environment { font-size: 0.875rem; gap: 12px; }
+.rag-assessment .rag-environment select { min-block-size: 44px; font-size: 1rem; }
+.rag-assessment .rag-assess-button { font-size: 0.9375rem; }
+.research-sr-only { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .research-disclosure > summary > svg,
+  .research-source > summary > svg { transition: none; }
+}

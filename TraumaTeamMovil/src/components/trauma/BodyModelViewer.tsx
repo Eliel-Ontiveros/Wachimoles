@@ -123,7 +123,7 @@ export const INITIAL_MUSCLES: MuscleData[] = [
     center: [0.0, 0.785, 0.08],
     radii: [0.09, 0.09, 0.075],
     normal: [0, 0, 1],
-    cameraAngles: [0, 78, 1.45],
+    cameraAngles: [0, 78, 1.55],
   },
   {
     id: 'cabeza',
@@ -825,7 +825,8 @@ function buildBodyViewerHtml(
     scene.add(starField);
 
     const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 20);
-    camera.position.set(0, 0.08, 2.35);
+    // Carga inicial enfocada arriba mostrando el rostro del astronauta de frente
+    camera.position.set(0, 0.88, 1.52);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -847,7 +848,7 @@ function buildBodyViewerHtml(
     controls.maxDistance = 3.2;
     controls.maxPolarAngle = Math.PI * 0.88;
     controls.minPolarAngle = Math.PI * 0.12;
-    controls.target.set(0, 0.0, 0);
+    controls.target.set(0, 0.56, 0);
 
     // Iluminación de estudio anatómico sobre fondo espacial
     // Anterior claro: const hemiLight = new THREE.HemisphereLight(0xffffff, 0xcbd5e1, 1.15);
@@ -1161,8 +1162,8 @@ function buildBodyViewerHtml(
     document.getElementById('btn-reset').addEventListener('click', (e) => {
       e.stopPropagation();
       isFrontView = true;
-      animTargetLookAt = new THREE.Vector3(0, 0, 0);
-      animTargetCamPos = new THREE.Vector3(0, 0.08, 2.35);
+      animTargetLookAt = new THREE.Vector3(0, 0.02, 0);
+      animTargetCamPos = new THREE.Vector3(0, 0.14, 2.85);
     });
 
     const togglePinsBtn = document.getElementById('btn-toggle-pins');

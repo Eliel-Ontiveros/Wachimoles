@@ -25,6 +25,30 @@ export function displaySymptom(value: string): string {
   return LEGACY_SYMPTOM_LABELS[normalizeSymptomKey(value)] ?? value;
 }
 
+/** Reviewed translations of legacy report text, applied only when displaying it.
+ * Match complete entries so an unknown note, negation or qualifier is never
+ * partially translated or silently changed. Stored reports remain verbatim.
+ */
+const LEGACY_REPORT_TEXT: Record<string, string> = {
+  'dolor muscular': 'Muscle pain',
+  'dolor en biceps izquierdo': 'Pain in Left biceps',
+  'dolor punzante': 'Sharp pain',
+  'dolencia al mover el cuello a un lado u otro': 'Pain when moving the neck from side to side',
+  'tengo irritado el brazo ademas de tenerlo hinchado, ademas me duele al moverlo':
+    'My arm is irritated and swollen, and it hurts when I move it',
+  'la irritacion se puso un poco mas roja pero ahora me duele menos':
+    'The irritation has become a little redder, but it hurts less now',
+  'ya no siento el sintoma, molestia superada': 'I no longer feel the symptom; discomfort resolved.',
+  'registro fotografico de seguimiento': 'Follow-up photo record',
+  'seguimiento registrado': 'Follow-up recorded',
+  'actualizacion registrada': 'Update recorded',
+};
+
+export function displayReportText(value: string): string {
+  const key = normalizeSymptomKey(value).replace(/\s+/g, ' ').replace(/[.!]+$/, '');
+  return LEGACY_REPORT_TEXT[key] ?? value;
+}
+
 /** True when the stored symptom means "no symptoms" (English or legacy Spanish). */
 export function isNoSymptom(value: string): boolean {
   return displaySymptom(value).trim().toLowerCase() === 'none';

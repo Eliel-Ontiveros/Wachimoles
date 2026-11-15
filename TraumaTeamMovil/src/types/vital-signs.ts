@@ -36,6 +36,8 @@ export interface VitalSignsData {
   stressHistory: DashboardSample[];
   /** Historial diario de duración del sueño */
   sleepHistory: DashboardSample[];
+  /** Historial de muestras de pasos */
+  stepsHistory: DashboardSample[];
 }
 
 /** Estado de conexión con el backend */

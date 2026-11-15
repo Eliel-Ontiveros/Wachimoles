@@ -1,7 +1,11 @@
 import React, { useMemo } from 'react';
-import shipSprite from '../assets/Naveee (1).svg';
+import earthBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/EarthBanner.svg';
+import shipBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/ShipBanner.svg';
+import stationBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/StationBanner.svg';
+import moonBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MoonBanner.svg';
+import marsBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MarsBanner.svg';
 import type { AstronautProfile, VitalSignsData } from '../types/dashboard';
-import { ActivityIcon, HeartIcon } from './Icons';
+import { HeartRateIcon } from './Icons';
 
 interface RealtimeEcgMonitorProps {
   vitals: VitalSignsData;
@@ -16,18 +20,6 @@ const BEAT_TEMPLATE = [
 const BEAT_WIDTH = 96;
 const ECG_HEIGHT = 90;
 
-const MISSION_STARS = [
-  { x: 22, y: 14, r: 1.0, o: 0.7 },
-  { x: 74, y: 10, r: 1.2, o: 0.85 },
-  { x: 122, y: 20, r: 0.9, o: 0.55 },
-  { x: 170, y: 11, r: 1.1, o: 0.75 },
-  { x: 220, y: 17, r: 1.0, o: 0.65 },
-  { x: 274, y: 11, r: 1.3, o: 0.85 },
-  { x: 320, y: 24, r: 0.9, o: 0.5 },
-  { x: 96, y: 64, r: 0.9, o: 0.45 },
-  { x: 248, y: 62, r: 1.0, o: 0.5 },
-];
-
 const LOCATION_LABELS: Record<string, string> = {
   tierra: 'Earth',
   earth: 'Earth',
@@ -40,6 +32,15 @@ const LOCATION_LABELS: Record<string, string> = {
   estacion: 'Space Station (ISS)',
   station: 'Space Station (ISS)',
 };
+
+// Artwork follows the astronaut's current location.
+const LOCATION_ENVIRONMENTS = {
+  tierra: { background: earthBackground, gravity: '1.0g Earth Gravity' },
+  nave: { background: shipBackground, gravity: '0g Microgravity' },
+  estacion: { background: stationBackground, gravity: '0g Microgravity' },
+  luna: { background: moonBackground, gravity: '0.16g Lunar Gravity' },
+  marte: { background: marsBackground, gravity: '0.38g Martian Gravity' },
+} satisfies Record<AstronautProfile['environment'], { background: string; gravity: string }>;
 
 function buildBeatPath(cycles: number): string {
   const pts: string[] = [];
@@ -59,6 +60,7 @@ const ECG_VIEWBOX_WIDTH = BEAT_WIDTH * 5;
 const ECG_CONTINUOUS_PATH = buildBeatPath(5);
 
 export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, astronaut }) => {
+  const locationEnvironment = LOCATION_ENVIRONMENTS[astronaut.environment] ?? LOCATION_ENVIRONMENTS.tierra;
   const bpm = vitals.heartRate !== null && vitals.heartRate > 0 ? vitals.heartRate : null;
   const isAvailable = vitals.isAvailable && bpm !== null;
 
@@ -81,97 +83,11 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
   const beatDurationSec = bpm ? Math.max(0.32, Math.min(1.8, 60 / bpm)) : 3.6;
 
   return (
-    <div className="mission-and-pulse-stack">
-      {/* Tarjeta de Misión Espacial (#060b19 estilo SpaceJourneyTimeline) arriba del Pulso */}
-      <div className="mission-route-card" aria-label="Space mission trajectory">
-        <div className="mission-route-head">
-          <div className="mission-route-title">
-
-            <div>
-              <strong>Mission · {astronaut.shortName}</strong>
-              <span>{LOCATION_LABELS[astronaut.environment] ?? astronaut.environment} · {astronaut.gravityLabel}</span>
-            </div>
-          </div>
-          <span className="mission-dest-pill">
-            HEADING · {(LOCATION_LABELS[astronaut.destination] ?? astronaut.destination).toUpperCase()}
-          </span>
-        </div>
-
-        <svg viewBox="0 0 340 88" className="mission-route-svg" aria-hidden="true">
-          <defs>
-            <clipPath id="mission-ship-clip">
-              <circle cx="170" cy="25" r="14.5" />
-            </clipPath>
-          </defs>
-
-          {MISSION_STARS.map((st, idx) => (
-            <circle key={idx} cx={st.x} cy={st.y} r={st.r} fill="#e0f2fe" opacity={st.o} />
-          ))}
-
-          {/* Órbita punteada completa */}
-          <path
-            d="M 46 44 Q 170 4 294 44"
-            fill="none"
-            stroke="rgba(148, 163, 184, 0.34)"
-            strokeWidth="2.2"
-            strokeDasharray="4 4"
-          />
-          {/* Tramo recorrido */}
-          <path
-            d="M 46 44 Q 108 18 170 25"
-            fill="none"
-            stroke="#58c7f3"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-          />
-
-          {/* Salida: Tierra (más grande y animada) */}
-          <g className="mission-origin-orbit">
-            <circle
-              cx="46"
-              cy="44"
-              r="22.5"
-              fill="none"
-              stroke="rgba(56, 189, 248, 0.5)"
-              strokeWidth="1.2"
-              strokeDasharray="3.5 3.5"
-            />
-            <circle cx="46" cy="21.5" r="2.2" fill="#38bdf8" />
-          </g>
-          <circle cx="46" cy="44" r="16.5" fill="#0284c7" stroke="rgba(125, 211, 252, 0.4)" strokeWidth="1.2" />
-          <path
-            d="M38.5 36.5c3.5 1.2 4.8 4.8 2.8 7.6-1.4 1.8-3.4 3.1-3.4 5.7 3.4 2.2 7.8 3.1 11.6 2.1-1-2.9 1.4-5.8 3.4-7-1.7-4.8-6.5-8.4-14.4-8.4z"
-            fill="#93DEFF"
-          />
-          <text x="46" y="81" textAnchor="middle" className="mission-endpoint-label">
-            SALIDA · {(LOCATION_LABELS[astronaut.origin] ?? astronaut.origin).toUpperCase()}
-          </text>
-
-          {/* Nave espacial en ruta (Naveee (1).svg) con flotación suave */}
-          <g className="mission-ship-marker">
-            <circle cx="170" cy="25" r="18" fill="rgba(115, 203, 244, 0.22)" />
-            <circle cx="170" cy="25" r="15" fill="#060b19" stroke="#73cbf4" strokeWidth="1.8" />
-            <image
-              href={shipSprite}
-              x="158.5"
-              y="17.5"
-              width="23"
-              height="15"
-              preserveAspectRatio="xMidYMid meet"
-            />
-          </g>
-
-          {/* Destino: Luna (más grande con halo) */}
-          <circle cx="294" cy="44" r="22" fill="rgba(56, 189, 248, 0.16)" className="mission-dest-glow" />
-          <circle cx="294" cy="44" r="15.5" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="1.3" />
-          <circle cx="289" cy="39" r="3" fill="#64748b" />
-          <circle cx="299" cy="49" r="2.3" fill="#64748b" />
-          <circle cx="298" cy="38" r="1.6" fill="#64748b" />
-          <circle cx="288" cy="49" r="1.4" fill="#94a3b8" />
-          <text x="294" y="81" textAnchor="middle" className="mission-endpoint-label">
-            DESTINO · {(LOCATION_LABELS[astronaut.destination] ?? astronaut.destination).toUpperCase()}
-          </text>
-        </svg>
+    <div className="environment-and-pulse-stack">
+      <div className="environment-card" data-environment={astronaut.environment} aria-label="Current astronaut location">
+        <img className="environment-card-background" src={locationEnvironment.background} alt="" aria-hidden="true" />
+        <strong className="environment-card-name">{LOCATION_LABELS[astronaut.environment] ?? astronaut.environment}</strong>
+        <span className="environment-card-gravity">{astronaut.gravityLabel.trim() || locationEnvironment.gravity}</span>
       </div>
 
       {/* Tarjeta blanca de Pulso ECG */}
@@ -185,7 +101,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
                 animationDuration: `${beatDurationSec.toFixed(3)}s`,
               }}
             >
-              <HeartIcon size={20} strokeWidth={2.3} />
+              <HeartRateIcon size={20} />
             </span>
 
             {isAvailable && bpm !== null ? (
@@ -200,7 +116,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
 
           <div className="pulse-hero-right">
             <span className="pulse-live-label" style={{ color: statusMeta.color }}>
-              <ActivityIcon size={12} />
+              <HeartRateIcon size={12} />
               <span>{statusMeta.label}</span>
             </span>
             <span className="pulse-time-label">

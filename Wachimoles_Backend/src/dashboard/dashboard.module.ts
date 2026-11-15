@@ -1,3 +1,5 @@
+import { AlertsController } from "../alerts/alerts.controller";
+import { AlertsGuard } from "../alerts/alerts.guard";
 import { Module } from "@nestjs/common";
 import { DashboardController } from "./dashboard.controller";
 import { DashboardTokenGuard } from "./dashboard-token.guard";
@@ -15,6 +17,7 @@ import { WeightsService } from "./weights.service";
 
 @Module({
   controllers: [
+    AlertsController,
     DashboardController,
     DashboardDataController,
     BodyConditionsController,
@@ -26,6 +29,7 @@ import { WeightsService } from "./weights.service";
     WeightsController
   ],
   providers: [
+    AlertsGuard,
     DashboardTokenGuard,
     DashboardWebGuard,
     SupabaseService,

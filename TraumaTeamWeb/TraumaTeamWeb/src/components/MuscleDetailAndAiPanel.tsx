@@ -14,7 +14,7 @@ import type {
   MuscleMedicalKnowledge,
 } from '../types/dashboard';
 import { formatShortUpdateDate, parseConditionUpdates } from '../utils/condition-updates';
-import { displaySymptom, getRegionCategoryLabel, isNoSymptom } from '../utils/display-labels.ts';
+import { displayReportText, displaySymptom, getRegionCategoryLabel, isNoSymptom } from '../utils/display-labels.ts';
 import { toAssistantEnvironment } from '../services/muscle-assessment';
 import { MuscleRagAssessment } from './MuscleRagAssessment';
 import { InjuryPhotosDossier } from './InjuryPhotosDossier';
@@ -308,7 +308,7 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
                 <div className="srb-content">
                   <div className="srb-condition-row">
                     <strong className="srb-condition">
-                      {hasReport ? obs?.conditionName : resolvedRecord?.conditionName}
+                      {displayReportText((hasReport ? obs?.conditionName : resolvedRecord?.conditionName) ?? '')}
                     </strong>
                     <span
                       className="srb-severity-pill"
@@ -406,7 +406,7 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
                                 )}
                               </div>
 
-                              <p className="update-timeline-text">{item.text}</p>
+                              <p className="update-timeline-text">{displayReportText(item.text)}</p>
 
                               {item.photoUri && (
                                 <button

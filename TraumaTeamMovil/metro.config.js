@@ -1,5 +1,6 @@
 const http = require("node:http");
 const https = require("node:https");
+const path = require("node:path");
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
 
@@ -72,6 +73,14 @@ function forwardToTarget(targetBase, targetPath, method, headers, body) {
 }
 
 const config = getDefaultConfig(__dirname);
+config.watchFolders = [...(config.watchFolders || []), path.resolve(__dirname, "../shared")];
+config.resolver = {
+  ...config.resolver,
+  nodeModulesPaths: [
+    ...(config.resolver?.nodeModulesPaths || []),
+    path.resolve(__dirname, "node_modules"),
+  ],
+};
 
 const previousEnhanceMiddleware = config.server?.enhanceMiddleware;
 config.server = {

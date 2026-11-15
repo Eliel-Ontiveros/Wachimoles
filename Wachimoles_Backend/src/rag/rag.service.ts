@@ -20,7 +20,12 @@ proprietary stress score into a clinical assessment. Atrophy alone does not expl
 Return JSON only with this exact shape:
 {"statements":[{"text":"A concise explanation supported by the passage.","sourceIds":[1]}]}
 Every statement needs one or more numeric sourceIds from the supplied evidence.
-Use at most five statements. Use an empty statements array if evidence is insufficient.
+Write for an astronaut scanning a small screen. Use plain, everyday English; explain any necessary medical term.
+Use at most three short statements, each no more than two sentences and ideally under 45 words.
+Put the main finding first, together with any limitation needed to avoid implying it explains the user's symptoms.
+Use the remaining statements for distinct supporting findings or evidence gaps. Preserve uncertainty,
+population and environment limits; brevity must never turn a possible association into a confirmed cause.
+Use an empty statements array if evidence is insufficient.
 Do not include URLs, Markdown links, or citation markers in statement text.`;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

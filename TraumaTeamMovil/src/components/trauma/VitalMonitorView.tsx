@@ -38,6 +38,7 @@ import { DashboardSample } from '../../types/vital-signs';
 import { EnvironmentBannerBackdrop, EnvironmentSelector } from './EnvironmentSelector';
 import { SpaceJourneyTimeline } from './SpaceJourneyTimeline';
 import { useMission } from './mission-context';
+import type { EnvironmentType } from '@/types/mission';
 import { useVoice } from '@/voice/voice-context';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatDate, formatNumber, formatTime } from '@/i18n/format';
@@ -249,7 +250,7 @@ function RealtimeEcgChart({
   );
 }
 
-type HistoryMetric = 'heart_rate' | 'spo2' | 'stress' | 'sleep';
+type HistoryMetric = 'heart_rate' | 'spo2' | 'stress' | 'sleep' | 'steps';
 
 interface DailySummary {
   dateKey: string;
@@ -348,8 +349,17 @@ function groupSamplesByDay(samples: DashboardSample[], locale: Locale, t: TFn): 
   return summaries.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
 }
 
-function formatMetricValue(metric: HistoryMetric, value: number): string {
-  return metric === 'sleep' ? value.toFixed(1) : String(Math.round(value));
+function formatMetricValue(metric: HistoryMetric, value: number, locale?: Locale): string {
+  if (metric === 'sleep') return value.toFixed(1);
+  const rounded = Math.round(value);
+  if (metric === 'steps' && locale) return formatNumber(rounded, locale);
+  return String(rounded);
+}
+
+function formatCompactSteps(steps: number): string {
+  if (steps >= 10000) return `${Math.round(steps / 1000)}k`;
+  if (steps >= 1000) return `${(steps / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(Math.round(steps));
 }
 
 function formatDateTimeShort(iso: string, locale: Locale): string {
@@ -450,6 +460,17 @@ const METRIC_META: Record<
     nominalMax: 9,
     nominalKey: 'vital.nominal.sleep',
   },
+  steps: {
+    titleKey: 'vital.title.steps',
+    tabKey: 'vital.tab.steps',
+    unitKey: 'vital.unit.steps',
+    unit: 'steps',
+    accent: '#0891b2',
+    softBg: '#ecfeff',
+    softBgDark: '#083344',
+    minBound: 0,
+    maxBound: 30000,
+  },
 };
 
 function renderHistoryTabIcon(metric: HistoryMetric, color: string, size = 12) {
@@ -462,6 +483,8 @@ function renderHistoryTabIcon(metric: HistoryMetric, color: string, size = 12) {
       return <Zap size={size} color={color} />;
     case 'sleep':
       return <Moon size={size} color={color} />;
+    case 'steps':
+      return <Footprints size={size} color={color} />;
   }
 }
 
@@ -515,7 +538,7 @@ function HistorySkeleton() {
   );
 }
 
-// Modal Bitácora de Vuelo: historial agrupado y evolución para Pulso, Oxígeno, Estrés y Sueño
+// Modal Bitácora de Vuelo: historial agrupado y evolución para Pulso, Oxígeno, Estrés, Sueño y Pasos
 function VitalHistoryModal({
   visible,
   metric,
@@ -645,6 +668,29 @@ function VitalHistoryModal({
   );
 
   const stats = useMemo(() => {
+    if (metric === 'steps') {
+      if (dailySummaries.length === 0) {
+        return {
+          min: 0,
+          max: currentValue || 0,
+          avg: currentValue || 0,
+          latest: currentValue || 0,
+          latestTime: null as string | null,
+          count: 0,
+        };
+      }
+      const dayTotals = dailySummaries.map((d) => d.max);
+      const latestSample = metricSeries[metricSeries.length - 1];
+      return {
+        min: Math.min(...dayTotals),
+        max: Math.max(...dayTotals),
+        avg: Math.round(dayTotals.reduce((acc, v) => acc + v, 0) / dayTotals.length),
+        latest: currentValue ?? dailySummaries[0].max,
+        latestTime: latestSample?.measuredAt ?? null,
+        count: validSamples.length,
+      };
+    }
+
     if (metricSeries.length === 0) {
       return {
         min: 0,
@@ -675,7 +721,7 @@ function VitalHistoryModal({
       latestTime: latestSample?.measuredAt ?? null,
       count: metricSeries.length,
     };
-  }, [metric, metricSeries, currentValue]);
+  }, [metric, metricSeries, dailySummaries, validSamples.length, currentValue]);
 
   const chartGeometry = useMemo(() => {
     const height = 148;
@@ -842,9 +888,9 @@ function VitalHistoryModal({
                     className="mt-0.5 font-mono text-[10px] text-slate-200">
                     {stats.count > 0 && stats.latestTime
                       ? t('vital.logbook.summary', {
-                          count: stats.count,
-                          time: formatDateTimeShort(stats.latestTime, locale),
-                        })
+                        count: stats.count,
+                        time: formatDateTimeShort(stats.latestTime, locale),
+                      })
                       : t('vital.logbook.noReadings')}
                   </Text>
                 </View>
@@ -853,8 +899,8 @@ function VitalHistoryModal({
 
             {/* Pestañas oscuras estilo Web para alternar entre métricas */}
             <View className="border-b border-slate-200/80 bg-white px-4 py-2.5 dark:bg-trauma-night dark:border-trauma-nightLine">
-              <View className="flex-row gap-1.5 rounded-2xl bg-slate-100 p-1 dark:bg-trauma-nightAlt">
-                {(['heart_rate', 'spo2', 'stress', 'sleep'] as HistoryMetric[]).map((mKey) => {
+              <View className="flex-row gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-trauma-nightAlt">
+                {(['heart_rate', 'spo2', 'stress', 'sleep', 'steps'] as HistoryMetric[]).map((mKey) => {
                   const active = mKey === metric;
                   const tabMeta = METRIC_META[mKey];
                   return (
@@ -873,16 +919,16 @@ function VitalHistoryModal({
                           }
                           : undefined
                       }
-                      className="flex-1 flex-row items-center justify-center gap-1 rounded-xl py-2">
+                      className="flex-1 flex-row items-center justify-center gap-0.5 rounded-xl px-1 py-2">
                       {renderHistoryTabIcon(
                         mKey,
                         active ? tabMeta.accent : colors.textMuted,
-                        12
+                        11
                       )}
                       <Text
                         numberOfLines={1}
                         style={{ color: active ? tabMeta.accent : colors.textMuted }}
-                        className="font-mono text-[10px] font-bold">
+                        className="font-mono text-[9.5px] font-bold">
                         {t(tabMeta.tabKey)}
                       </Text>
                     </Pressable>
@@ -916,7 +962,7 @@ function VitalHistoryModal({
                         <Text
                           style={{ color: meta.accent }}
                           className="mt-0.5 font-mono text-lg font-extrabold">
-                          {stats.latest ? `${formatMetricValue(metric, stats.latest)} ${unitLabel}` : '--'}
+                          {stats.latest ? `${formatMetricValue(metric, stats.latest, locale)} ${unitLabel}` : '--'}
                         </Text>
                       </View>
 
@@ -925,7 +971,45 @@ function VitalHistoryModal({
                           {t('vital.stat.max')}
                         </Text>
                         <Text className="mt-0.5 font-mono text-lg font-extrabold text-slate-900 dark:text-trauma-nightInk">
-                          {stats.max ? `${formatMetricValue(metric, stats.max)} ${unitLabel}` : '--'}
+                          {stats.max ? `${formatMetricValue(metric, stats.max, locale)} ${unitLabel}` : '--'}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : metric === 'steps' ? (
+                    <View className="flex-row justify-between gap-2">
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.current')}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={{ color: meta.accent }}
+                          className="mt-0.5 font-mono text-base font-extrabold">
+                          {stats.latest > 0 || dailySummaries.length > 0
+                            ? formatMetricValue('steps', stats.latest, locale)
+                            : '--'}
+                        </Text>
+                      </View>
+
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.average')}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          className="mt-0.5 font-mono text-base font-extrabold text-sky-600 dark:text-sky-300">
+                          {stats.avg > 0 ? formatMetricValue('steps', stats.avg, locale) : '--'}
+                        </Text>
+                      </View>
+
+                      <View className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-3 dark:bg-trauma-night dark:border-trauma-nightLine">
+                        <Text className="font-mono text-[9.5px] font-semibold text-slate-400 dark:text-trauma-nightSubtle">
+                          {t('vital.stat.max')}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          className="mt-0.5 font-mono text-base font-extrabold text-slate-900 dark:text-trauma-nightInk">
+                          {stats.max > 0 ? formatMetricValue('steps', stats.max, locale) : '--'}
                         </Text>
                       </View>
                     </View>
@@ -939,7 +1023,7 @@ function VitalHistoryModal({
                           numberOfLines={1}
                           style={{ color: meta.accent }}
                           className="mt-0.5 font-mono text-base font-extrabold">
-                          {stats.latest ? `${formatMetricValue(metric, stats.latest)} ${unitLabel}` : '--'}
+                          {stats.latest ? `${formatMetricValue(metric, stats.latest, locale)} ${unitLabel}` : '--'}
                         </Text>
                       </View>
 
@@ -950,7 +1034,7 @@ function VitalHistoryModal({
                         <Text
                           numberOfLines={1}
                           className="mt-0.5 font-mono text-base font-extrabold text-sky-600 dark:text-sky-300">
-                          {stats.avg ? `${formatMetricValue(metric, stats.avg)} ${unitLabel}` : '--'}
+                          {stats.avg ? `${formatMetricValue(metric, stats.avg, locale)} ${unitLabel}` : '--'}
                         </Text>
                       </View>
 
@@ -962,14 +1046,14 @@ function VitalHistoryModal({
                           numberOfLines={1}
                           className="mt-1 font-mono text-xs font-extrabold text-slate-900 dark:text-trauma-nightInk">
                           {stats.min && stats.max
-                            ? `${formatMetricValue(metric, stats.min)}–${formatMetricValue(metric, stats.max)} ${unitLabel}`
+                            ? `${formatMetricValue(metric, stats.min, locale)}–${formatMetricValue(metric, stats.max, locale)} ${unitLabel}`
                             : '--'}
                         </Text>
                       </View>
                     </View>
                   )}
 
-                  {/* Gráfica: barras por día para sueño, curva suavizada interactiva para el resto */}
+                  {/* Gráfica: barras por día para sueño y pasos, curva suavizada interactiva para el resto */}
                   {metric === 'sleep' ? (
                     dailySummaries.length > 0 && (
                       <View className="mt-3.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:bg-trauma-night dark:border-trauma-nightLine">
@@ -1000,7 +1084,7 @@ function VitalHistoryModal({
                                   ? '#dc2626'
                                   : day.max < 7
                                     ? '#d97706'
-                                    : '#059669';
+                                    : '#0284c7';
                               return (
                                 <View key={day.dateKey} className="flex-1 items-center">
                                   <Text className="mb-1 font-mono text-[8.5px] font-bold text-slate-700 dark:text-trauma-nightInk">
@@ -1027,6 +1111,70 @@ function VitalHistoryModal({
                         </View>
                       </View>
                     )
+                  ) : metric === 'steps' ? (
+                    <View className="mt-3.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:bg-trauma-night dark:border-trauma-nightLine">
+                      <View className="mb-3 flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                          <TrendingUp size={13} color={meta.accent} />
+                          <Text className="ml-1.5 font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
+                            {t('vital.steps.perDay')}
+                          </Text>
+                        </View>
+                        <Text className="font-mono text-[9.5px] text-slate-400 dark:text-trauma-nightSubtle">
+                          {Math.min(10, dailySummaries.length)}{' '}
+                          {t(Math.min(10, dailySummaries.length) === 1 ? 'vital.daily.day' : 'vital.daily.days')}
+                        </Text>
+                      </View>
+
+                      {dailySummaries.length === 0 ? (
+                        <View className="items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 py-7 dark:bg-trauma-nightAlt dark:border-trauma-nightLine">
+                          <Footprints size={16} color={colors.textSubtle} />
+                          <Text className="mt-1.5 font-mono text-[11px] text-slate-400 dark:text-trauma-nightSubtle">
+                            {t('vital.trend.noReadings', { metric: t(meta.tabKey).toLowerCase() })}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View className="flex-row items-end justify-between gap-2 pt-1">
+                          {(() => {
+                            const visibleDays = dailySummaries.slice(0, 10).reverse();
+                            const scaleMax = Math.max(
+                              ...visibleDays.map((d) => d.max),
+                              1000
+                            );
+                            return visibleDays.map((day) => {
+                              const barPct = Math.max(
+                                12,
+                                Math.min(100, Math.round((day.max / scaleMax) * 100))
+                              );
+                              return (
+                                <View key={day.dateKey} className="flex-1 items-center">
+                                  <Text
+                                    numberOfLines={1}
+                                    className="mb-1 font-mono text-[8.5px] font-bold text-slate-700 dark:text-trauma-nightInk">
+                                    {formatCompactSteps(day.max)}
+                                  </Text>
+                                  <View className="h-24 w-full max-w-[24px] justify-end overflow-hidden rounded-md bg-slate-100 dark:bg-trauma-nightAlt">
+                                    <View
+                                      style={{
+                                        height: `${barPct}%`,
+                                        backgroundColor: meta.accent,
+                                        borderTopLeftRadius: 5,
+                                        borderTopRightRadius: 5,
+                                      }}
+                                    />
+                                  </View>
+                                  <Text
+                                    numberOfLines={1}
+                                    className="mt-1.5 font-mono text-[8.5px] text-slate-500 dark:text-trauma-nightMuted">
+                                    {getSleepShortDayLabel(day, t)}
+                                  </Text>
+                                </View>
+                              );
+                            });
+                          })()}
+                        </View>
+                      )}
+                    </View>
                   ) : (
                     <View className="mt-3.5 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:bg-trauma-night dark:border-trauma-nightLine">
                       <View className="mb-2.5 flex-row items-center justify-between gap-2">
@@ -1231,7 +1379,7 @@ function VitalHistoryModal({
                                 </Text>
                                 <Text className="mt-0.5 font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
                                   {day.count}{' '}
-                                  {metric === 'sleep'
+                                  {metric === 'sleep' || metric === 'steps'
                                     ? t(day.count === 1 ? 'vital.count.record' : 'vital.count.records')
                                     : t(day.count === 1 ? 'vital.count.reading' : 'vital.count.readings')}
                                 </Text>
@@ -1243,7 +1391,9 @@ function VitalHistoryModal({
                                 <Text
                                   style={{ color: meta.accent }}
                                   className="font-mono text-[10px] font-extrabold">
-                                  {t('vital.daily.avgShort', { value: formatMetricValue(metric, day.avg), unit: unitLabel })}
+                                  {metric === 'steps'
+                                    ? `${formatMetricValue(metric, day.max, locale)} ${unitLabel}`
+                                    : t('vital.daily.avgShort', { value: formatMetricValue(metric, day.avg, locale), unit: unitLabel })}
                                 </Text>
                               </View>
                             </View>
@@ -1254,7 +1404,16 @@ function VitalHistoryModal({
                                   {t('vital.sleep.restRecorded')}
                                 </Text>
                                 <Text className="font-mono text-base font-extrabold text-violet-800 dark:text-violet-200">
-                                  {formatMetricValue(metric, day.max)} h
+                                  {formatMetricValue(metric, day.max, locale)} h
+                                </Text>
+                              </View>
+                            ) : metric === 'steps' ? (
+                              <View className="flex-row items-center justify-between rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5 dark:border-cyan-900 dark:bg-cyan-950/60">
+                                <Text className="font-mono text-xs font-bold text-cyan-900 dark:text-cyan-200">
+                                  {t('vital.steps.dayTotal')}
+                                </Text>
+                                <Text className="font-mono text-base font-extrabold text-cyan-900 dark:text-cyan-100">
+                                  {formatMetricValue(metric, day.max, locale)} {unitLabel}
                                 </Text>
                               </View>
                             ) : (
@@ -1401,6 +1560,87 @@ function SleepSummaryCard({
   );
 }
 
+function StepsSummaryCard({
+  steps,
+  environment,
+  treadmillRoutineActive,
+  onToggleTreadmill,
+  onPress,
+}: {
+  steps: number;
+  environment: EnvironmentType;
+  treadmillRoutineActive: boolean;
+  onToggleTreadmill: () => void;
+  onPress: () => void;
+}) {
+  const { t, locale } = useI18n();
+  const { colors } = useAppTheme();
+  const isOrbit = environment === 'nave' || environment === 'estacion';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={t('vital.steps.a11yHistory')}
+      className="mb-5 rounded-2xl border border-trauma-line bg-white p-4 shadow-md active:opacity-85 dark:bg-trauma-night dark:border-trauma-nightLine">
+      {/* Cabecera simple: nombre y > igual que las demás tarjetas */}
+      <View className="flex-row items-center justify-between">
+        <Text className="font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
+          {t('vital.tab.steps')}
+        </Text>
+        <ChevronRight size={14} color={colors.textSubtle} />
+      </View>
+
+      {/* Pasos acumulados del día */}
+      <View className="mt-2.5 flex-row items-baseline justify-between gap-2">
+        <View className="flex-1">
+          <View className="flex-row items-baseline">
+            <Text className="font-mono text-3xl font-extrabold text-trauma-ink dark:text-trauma-nightInk">
+              {formatNumber(steps, locale)}
+            </Text>
+            <Text className="ml-1 font-mono text-xs font-bold text-trauma-muted dark:text-trauma-nightMuted">
+              {t('vital.unit.steps')}
+            </Text>
+          </View>
+          {!isOrbit && (
+            <Text className="mt-0.5 font-mono text-[9px] text-slate-400 dark:text-trauma-nightSubtle">
+              {steps > 0 ? t('vital.steps.recorded') : t('vital.steps.noRecorded')}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {isOrbit && (
+        <View className="mt-3 flex-row items-center justify-between gap-2.5 border-t border-slate-100 pt-2.5 dark:border-trauma-nightLine">
+          <View className="flex-1 flex-row items-center">
+            <Footprints
+              size={14}
+              color={treadmillRoutineActive ? colors.accentDeep : colors.textMuted}
+            />
+            <Text className="ml-2 flex-1 font-mono text-[9.5px] leading-4 text-slate-500 dark:text-trauma-nightMuted">
+              {treadmillRoutineActive
+                ? t('vital.treadmill.orbitActive')
+                : t('vital.treadmill.orbitNotice')}
+            </Text>
+          </View>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onToggleTreadmill();
+            }}
+            className={`rounded-xl border px-3 py-2 shadow-xs active:opacity-75 ${treadmillRoutineActive
+              ? 'border-slate-300 dark:border-trauma-nightLine bg-slate-100 dark:bg-trauma-nightAlt'
+              : 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-cyan-950'
+              }`}>
+            <Text className="font-mono text-[10px] font-bold text-trauma-ink dark:text-trauma-nightInk">
+              {treadmillRoutineActive ? t('vital.treadmill.finish') : t('vital.treadmill.start')}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 /** El servicio entrega "N sec/min ago" o "At HH:mm" (o el formato heredado en español): se pasa por el diccionario. */
 function localizeLastMeasured(text: string, t: TFn): string {
   const rel = /^(\d+) (sec|min) ago$/.exec(text) ?? /^Hace (\d+) (seg|min)$/.exec(text);
@@ -1451,21 +1691,18 @@ export function VitalMonitorView() {
     vitals,
     getFullHistory,
     streakDays,
-    missions,
     environment,
     treadmillRoutineActive,
     toggleTreadmillRoutine,
   } = useMission();
 
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const { colors } = useAppTheme();
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<HistoryMetric>('heart_rate');
   const [historySamples, setHistorySamples] = useState<DashboardSample[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const historyReqIdRef = useRef(0);
-
-  const completedMissions = missions.filter((m) => m.completed).length;
 
   const [heartBeatAnim] = useState(() => new Animated.Value(1));
 
@@ -1510,6 +1747,7 @@ export function VitalMonitorView() {
         spo2: vitals.spo2History,
         stress: vitals.stressHistory,
         sleep: vitals.sleepHistory,
+        steps: vitals.stepsHistory,
       }[metric];
       setHistorySamples(full.length > 0 ? full : fallback || []);
     } finally {
@@ -1545,11 +1783,6 @@ export function VitalMonitorView() {
             {t('vital.streak.days', { count: streakDays })}
           </Text>
         </Pressable>
-      </View>
-
-      {/* Selector de entorno */}
-      <View className="mb-4">
-        <EnvironmentSelector compact />
       </View>
 
       {/* Tarjeta interactiva de pulso y ECG */}
@@ -1636,78 +1869,28 @@ export function VitalMonitorView() {
         onPress={() => handleOpenMetricHistory('sleep')}
       />
 
-      {/* Resumen de trayectoria y misiones diarias */}
-      <Pressable
-        onPress={() => router.navigate('/missions')}
-        accessibilityLabel={t('vital.missions.a11y')}
-        className="mb-5 active:opacity-90">
-        <SpaceJourneyTimeline compact />
-        <View className="mt-2 flex-row items-center justify-between rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft/60 dark:bg-cyan-950/60 px-3.5 py-2">
-          <Text className="font-mono text-[10.5px] font-bold text-trauma-ink dark:text-trauma-nightInk">
-            {t('vital.missions.today', { done: completedMissions, total: missions.length })}
-          </Text>
-          <ChevronRight size={14} color={colors.accentDeep} />
+      {/* Resumen de trayectoria y acciones de misiones en una fila */}
+      <View className="mb-6">
+        <SpaceJourneyTimeline
+          compact
+          onPress={() => router.navigate('/missions')}
+        />
+        <View className="mt-3.5">
+          <EnvironmentSelector
+            compact
+            onMissionsPress={() => router.navigate('/missions')}
+          />
         </View>
-      </Pressable>
+      </View>
 
-      {/* Pasos en superficie (Luna/Marte/Tierra) o rutina opcional de caminadora en microgravedad (Nave/EEI) */}
-      {environment === 'nave' || environment === 'estacion' ? (
-        <View className="mb-5 flex-row items-center justify-between rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night px-4 py-3 shadow-xs">
-          <View className="flex-1 flex-row items-center pr-3">
-            <View
-              className={`mr-2.5 h-8 w-8 items-center justify-center rounded-xl ${treadmillRoutineActive ? 'bg-sky-50 dark:bg-sky-950' : 'bg-slate-100 dark:bg-trauma-nightAlt'
-                }`}>
-              <Footprints size={16} color={treadmillRoutineActive ? colors.accentDeep : colors.textMuted} />
-            </View>
-            <View className="flex-1">
-              <Text className="font-mono text-[9px] uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
-                {treadmillRoutineActive
-                  ? t('vital.treadmill.active')
-                  : environment === 'estacion'
-                    ? t('vital.treadmill.iss')
-                    : t('vital.treadmill.space')}
-              </Text>
-              <Text className="font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
-                {treadmillRoutineActive
-                  ? t('vital.treadmill.steps', { steps: formatNumber(vitals.steps, locale) })
-                  : t('vital.treadmill.noCount')}
-              </Text>
-            </View>
-          </View>
-
-          <Pressable
-            onPress={toggleTreadmillRoutine}
-            className={`rounded-xl border px-3 py-1.5 active:opacity-75 ${treadmillRoutineActive
-              ? 'border-slate-200 dark:border-trauma-nightLine bg-slate-100 dark:bg-trauma-nightAlt'
-              : 'border-trauma-cyanEdge bg-trauma-cyanSoft dark:bg-cyan-950'
-              }`}>
-            <Text className="font-mono text-[10px] font-bold text-trauma-ink dark:text-trauma-nightInk">
-              {treadmillRoutineActive ? t('vital.treadmill.finish') : t('vital.treadmill.start')}
-            </Text>
-          </Pressable>
-        </View>
-      ) : (
-        vitals.steps > 0 && (
-          <View className="mb-5 flex-row items-center justify-between rounded-2xl border border-slate-100 dark:border-trauma-nightLine bg-white dark:bg-trauma-night px-4 py-3 shadow-xs">
-            <View className="flex-row items-center">
-              <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950">
-                <Footprints size={16} color={colors.accentDeep} />
-              </View>
-              <View>
-                <Text className="font-mono text-[9px] uppercase tracking-wider text-slate-400 dark:text-trauma-nightSubtle">
-                  {t('vital.steps.activity')}
-                </Text>
-                <Text className="font-mono text-xs font-bold text-slate-800 dark:text-trauma-nightInk">
-                  {t('vital.steps.recorded')}
-                </Text>
-              </View>
-            </View>
-            <Text className="font-mono text-base font-extrabold text-slate-900 dark:text-trauma-nightInk">
-              {formatNumber(vitals.steps, locale)}
-            </Text>
-          </View>
-        )
-      )}
+      {/* Tarjeta de pasos diarios y rutina de caminadora en 0g con acceso al historial por día */}
+      <StepsSummaryCard
+        steps={vitals.steps}
+        environment={environment}
+        treadmillRoutineActive={treadmillRoutineActive}
+        onToggleTreadmill={toggleTreadmillRoutine}
+        onPress={() => void handleOpenMetricHistory('steps')}
+      />
 
       {/* Reportar molestia → Navegación a Vista Corporal */}
       <View className="items-center mt-3">
@@ -1719,7 +1902,7 @@ export function VitalMonitorView() {
         </Pressable>
       </View>
 
-      {/* Modal interactivo con el historial agrupado por día (Pulso, Oxígeno y Estrés) */}
+      {/* Modal interactivo con el historial agrupado por día (Pulso, Oxígeno, Estrés, Sueño y Pasos) */}
       <VitalHistoryModal
         visible={historyModalOpen}
         metric={selectedMetric}
@@ -1734,7 +1917,9 @@ export function VitalMonitorView() {
               ? vitals.stress
               : selectedMetric === 'sleep'
                 ? vitals.sleepHours
-                : vitals.heartRate
+                : selectedMetric === 'steps'
+                  ? vitals.steps
+                  : vitals.heartRate
         }
       />
     </View>

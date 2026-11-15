@@ -14,7 +14,6 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import {
   Camera,
-  Check,
   CheckCircle2,
   History,
   Zap,
@@ -45,6 +44,7 @@ import {
   RegionCategoryIcon,
   MinimalPainScaleBar,
 } from './RegisterObservationModal';
+import { CureConfirmDialog, CureConfirmModal } from './CureConfirmModal';
 import { InjuryTimelapseModal } from './InjuryTimelapseModal';
 import { HealthQuestionnaireSection } from './HealthQuestionnaireSection';
 import { useMission } from './mission-context';
@@ -237,7 +237,7 @@ function ProblemDetailModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={handleClose}>
+      onRequestClose={() => (confirmingCure ? setConfirmingCureId(null) : handleClose())}>
       <Pressable
         onPress={handleClose}
         style={{
@@ -513,32 +513,6 @@ function ProblemDetailModal({
                     </Text>
                   </Pressable>
                 </View>
-              ) : confirmingCure ? (
-                <View className="mt-4 rounded-2xl border border-emerald-300 bg-emerald-50 p-3">
-                  <Text className="font-mono text-[11px] font-bold text-emerald-900">
-                    {t('body.detail.cureAsk', { zone: t(muscleNameKey(muscle.id)) })}
-                  </Text>
-                  <Text className="mt-1 font-mono text-[9.5px] leading-4 text-emerald-800">
-                    {t('body.detail.cureNote')}
-                  </Text>
-                  <View className="mt-2.5 flex-row items-center justify-end gap-2">
-                    <Pressable
-                      onPress={() => setConfirmingCureId(null)}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 active:opacity-75 dark:bg-trauma-night dark:border-trauma-nightLine">
-                      <Text className="font-mono text-[10px] font-bold text-slate-600 dark:text-trauma-nightMuted">
-                        {t('common.cancel')}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={handleConfirmCure}
-                      className="flex-row items-center rounded-lg bg-emerald-600 px-3 py-1.5 active:opacity-80">
-                      <Check size={12} color="#ffffff" strokeWidth={2.5} />
-                      <Text className="ml-1 font-mono text-[10px] font-bold text-white">
-                        {t('body.detail.cureYes')}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
               ) : confirmingDelete ? (
                 <View className="mt-4 flex-row items-center justify-between rounded-2xl border border-red-200 bg-red-50/90 p-3">
                   <Text className="flex-1 font-mono text-[10.5px] font-bold text-red-800">
@@ -562,7 +536,7 @@ function ProblemDetailModal({
                   </View>
                 </View>
               ) : (
-                <View className="mt-4 gap-2">
+                <View className="mt-4 gap-2.5">
                   <View className="flex-row items-center justify-between gap-2">
                     <Pressable
                       onPress={onAddUpdate}
@@ -582,9 +556,9 @@ function ProblemDetailModal({
 
                   <Pressable
                     onPress={() => setConfirmingCureId(muscle.id)}
-                    className="flex-row items-center justify-center rounded-xl border border-emerald-400 bg-emerald-50 py-3 active:opacity-80">
-                    <CheckCircle2 size={15} color={colors.success} strokeWidth={2.3} />
-                    <Text className="ml-1.5 font-mono text-xs font-extrabold text-emerald-900">
+                    className="flex-row items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft px-4 py-3 shadow-xs active:opacity-75 dark:bg-cyan-950">
+                    <CheckCircle2 size={15} color={iconInk} strokeWidth={2.2} />
+                    <Text className="ml-1.5 font-mono text-xs font-bold text-trauma-ink dark:text-trauma-nightInk">
                       {t('body.detail.cureBtn')}
                     </Text>
                   </Pressable>
@@ -593,6 +567,14 @@ function ProblemDetailModal({
             </ScrollView>
           </Animated.View>
         </Pressable>
+
+        {confirmingCure && (
+          <CureConfirmDialog
+            zoneName={t(muscleNameKey(muscle.id))}
+            onCancel={() => setConfirmingCureId(null)}
+            onConfirm={handleConfirmCure}
+          />
+        )}
       </Pressable>
     </Modal>
   );
@@ -617,7 +599,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
   useEffect(() => () => reportBodyTab('body'), []);
   const [muscles, setMuscles] = useState<MuscleData[]>(INITIAL_MUSCLES);
   const [resolvedConditions, setResolvedConditions] = useState<BodyConditionRecord[]>([]);
-  const [selectedName, setSelectedName] = useState<string>('Neck');
+  const [selectedName, setSelectedName] = useState<string>('Face / Facial region');
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
   const [observationModalOpen, setObservationModalOpen] = useState(false);
 
@@ -627,6 +609,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
     useState<BodyConditionRecord | null>(null);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [timelapseMuscle, setTimelapseMuscle] = useState<MuscleData | null>(null);
+  const [pendingCureMuscle, setPendingCureMuscle] = useState<MuscleData | null>(null);
   const locallyEditedMuscleIds = useRef(new Set<string>());
 
   useEffect(() => {
@@ -1157,10 +1140,10 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
               </View>
 
               <Pressable
-                onPress={() => handleDirectCureMuscle(selectedMuscle)}
-                className="mt-2 flex-row items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50/90 py-2 active:opacity-75">
-                <CheckCircle2 size={13} color={colors.success} strokeWidth={2.2} />
-                <Text className="ml-1.5 font-mono text-[10.5px] font-extrabold text-emerald-900">
+                onPress={() => setPendingCureMuscle(selectedMuscle)}
+                className="mt-2.5 flex-row items-center justify-center rounded-xl border border-trauma-cyanEdge bg-trauma-cyanSoft px-4 py-2.5 shadow-xs active:opacity-75 dark:bg-cyan-950">
+                <CheckCircle2 size={14} color={iconInk} strokeWidth={2.2} />
+                <Text className="ml-1.5 font-mono text-[11px] font-bold text-trauma-ink dark:text-trauma-nightInk">
                   {t('body.detail.cureBtn')}
                 </Text>
               </Pressable>
@@ -1286,6 +1269,19 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
           setObservationPrefill(undefined);
         }}
         onSave={handleSaveObservation}
+      />
+
+      {/* Modal de confirmación antes de marcar el síntoma como resuelto */}
+      <CureConfirmModal
+        visible={Boolean(pendingCureMuscle)}
+        zoneName={pendingCureMuscle ? t(muscleNameKey(pendingCureMuscle.id)) : ''}
+        onCancel={() => setPendingCureMuscle(null)}
+        onConfirm={() => {
+          if (pendingCureMuscle) {
+            handleDirectCureMuscle(pendingCureMuscle);
+          }
+          setPendingCureMuscle(null);
+        }}
       />
     </View>
   );
