@@ -657,7 +657,7 @@ const SelectedMuscleContent: React.FC<SelectedMuscleContentProps> = ({
             <MuscleRagAssessment
               key={JSON.stringify([muscle.id, muscle.status, muscle.observation, environment])}
               muscle={muscle}
-              initialEnvironment={toAssistantEnvironment(environment)}
+              environment={toAssistantEnvironment(environment)}
             />
 
             {/* Block 3: Compact anatomical explanation of the muscle */}
