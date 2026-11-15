@@ -8,11 +8,10 @@ import './muscle-rag-assessment.css';
 
 interface Props {
   muscle: MuscleData;
-  initialEnvironment: AssistantEnvironment;
+  environment: AssistantEnvironment;
 }
 
-export function MuscleRagAssessment({ muscle, initialEnvironment }: Props) {
-  const [environment, setEnvironment] = useState(initialEnvironment);
+export function MuscleRagAssessment({ muscle, environment }: Props) {
   const [answer, setAnswer] = useState<AssistantAnswer | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,19 +55,6 @@ export function MuscleRagAssessment({ muscle, initialEnvironment }: Props) {
         {!request && <p className="rag-empty">No active symptoms are recorded for this muscle. Select a muscle with an active report to request an assessment.</p>}
         {request && (
           <div className="rag-controls">
-            <label className="rag-environment">
-              Your environment
-              <select value={environment} disabled={loading} onChange={(event) => {
-                setEnvironment(event.target.value as AssistantEnvironment);
-                setAnswer(null);
-                setError(null);
-              }}>
-                <option value="earth">Earth</option>
-                <option value="spacecraft">Spacecraft</option>
-                <option value="moon">Moon</option>
-                <option value="mars">Mars</option>
-              </select>
-            </label>
             <button type="button" className={`rag-assess-button${answer ? ' is-secondary' : ''}`} disabled={loading} onClick={() => void assess()}>
               {loading ? 'Analyzing your symptoms…' : error ? 'Retry assessment' : answer ? 'Review symptoms again' : 'Review your symptoms'}
             </button>

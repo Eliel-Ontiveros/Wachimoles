@@ -2449,27 +2449,6 @@ dialog.history-native-dialog::backdrop {
   gap: 12px;
 }
 
-.rag-environment {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.rag-environment select {
-  background: var(--bg-surface);
-  color: var(--text-main);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  min-block-size: 40px;
-  padding: 8px 12px;
-  font: inherit;
-  max-inline-size: 100%;
-}
-
 .rag-assess-button {
   background: #0b162d;
   color: #f8fafc;
