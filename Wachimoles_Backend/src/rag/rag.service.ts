@@ -26,7 +26,8 @@ Put the main finding first, together with any limitation needed to avoid implyin
 Use the remaining statements for distinct supporting findings or evidence gaps. Preserve uncertainty,
 population and environment limits; brevity must never turn a possible association into a confirmed cause.
 Use an empty statements array if evidence is insufficient.
-Do not include URLs, Markdown links, or citation markers in statement text.`;
+Do not include URLs, Markdown links, or citation markers in statement text.
+IMPORTANT: If you can´t the answer in the passages, make asearch to fin answer and include it in the statements array.`;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -97,14 +98,16 @@ export class RagService {
           model: this.model,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: JSON.stringify({
-              question: body.question,
-              selectedEnvironment: body.environment,
-              reportedBodyZone: body.bodyZone ?? null,
-              evidence: citations.map(({ citationId, title, excerpt, contentKind, evidenceContext, sourceSections, reviewStatus }) => ({
-                sourceId: citationId, title, passage: excerpt, contentKind, evidenceContext, sourceSections, reviewStatus
-              }))
-            }) }
+            {
+              role: "user", content: JSON.stringify({
+                question: body.question,
+                selectedEnvironment: body.environment,
+                reportedBodyZone: body.bodyZone ?? null,
+                evidence: citations.map(({ citationId, title, excerpt, contentKind, evidenceContext, sourceSections, reviewStatus }) => ({
+                  sourceId: citationId, title, passage: excerpt, contentKind, evidenceContext, sourceSections, reviewStatus
+                }))
+              })
+            }
           ],
           thinking: { type: "disabled" },
           response_format: { type: "json_object" },
