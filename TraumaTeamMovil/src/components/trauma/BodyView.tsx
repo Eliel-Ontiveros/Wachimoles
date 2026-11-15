@@ -36,6 +36,7 @@ import {
   getPainColorHex,
   muscleNameKey,
   normalizeBodyRegion,
+  toBackendBodyRegion,
   UPDATED_NOW,
 } from './BodyModelViewer';
 import {
@@ -773,7 +774,7 @@ export function BodyView({ onSetScrollEnabled }: BodyViewProps) {
 
     void syncObservationToBackend({
       muscleId,
-      bodyRegion: muscle.category,
+      bodyRegion: toBackendBodyRegion(muscle.category),
       muscleName: muscle.name,
       resolveAfterSave: isCured,
       observation: observation

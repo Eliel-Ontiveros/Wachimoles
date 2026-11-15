@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsBoolean,
   IsIn,
@@ -13,6 +13,31 @@ import {
 } from "class-validator";
 import { BODY_REGION_CATEGORIES, BodyRegionCategory } from "./dashboard.types";
 
+const BODY_REGION_ALIASES: Record<string, BodyRegionCategory> = {
+  "cabeza y cuello": "Cabeza y cuello",
+  "head and neck": "Cabeza y cuello",
+  "tronco anterior": "Tronco anterior",
+  "front torso": "Tronco anterior",
+  "anterior torso": "Tronco anterior",
+  "tronco posterior": "Tronco posterior",
+  "back torso": "Tronco posterior",
+  "posterior torso": "Tronco posterior",
+  "extremidad superior": "Extremidad superior",
+  "upper limb": "Extremidad superior",
+  "cadera y pelvis": "Cadera y pelvis",
+  "hip and pelvis": "Cadera y pelvis",
+  "extremidad inferior": "Extremidad inferior",
+  "lower limb": "Extremidad inferior"
+};
+
+function normalizeBodyRegionInput(value: unknown): unknown {
+  if (typeof value !== "string") {
+    return value;
+  }
+  const normalized = value.trim().replace(/\s+/g, " ").toLowerCase();
+  return BODY_REGION_ALIASES[normalized] ?? value.trim();
+}
+
 export class BodyConditionParamsDto {
   @Matches(/^[a-z0-9_]{1,60}$/)
   muscleId!: string;
@@ -24,6 +49,7 @@ export class BodyConditionImageParamsDto extends BodyConditionParamsDto {
 }
 
 export class SaveBodyConditionDto {
+  @Transform(({ value }) => normalizeBodyRegionInput(value))
   @IsIn(BODY_REGION_CATEGORIES)
   bodyRegion!: BodyRegionCategory;
 

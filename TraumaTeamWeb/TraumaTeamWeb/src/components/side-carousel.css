@@ -1,0 +1,142 @@
+.side-carousel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+.side-carousel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+}
+
+.side-carousel-title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+.side-carousel-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-carousel-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.side-carousel-dot {
+  inline-size: 8px;
+  block-size: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--text-muted);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+}
+
+.side-carousel-dot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+.side-carousel-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 30px;
+  block-size: 30px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.side-carousel-arrow-prev svg {
+  transform: scaleX(-1);
+}
+
+.side-carousel-arrow:hover,
+.side-carousel-arrow:focus-visible,
+.side-carousel-dot:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.side-carousel-viewport {
+  overflow: hidden;
+  min-inline-size: 0;
+}
+
+.side-carousel-track {
+  display: flex;
+  align-items: flex-start;
+  transition: transform 280ms ease-out;
+}
+
+.side-carousel-slide {
+  flex: 0 0 100%;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Collapse after the slide-out finishes so the column does not scroll into blank space. */
+  max-block-size: 0;
+  overflow: hidden;
+  transition: max-block-size 1ms linear 280ms;
+}
+
+.side-carousel-slide.active {
+  max-block-size: 100000px;
+  overflow: visible;
+  transition-delay: 0s;
+}
+
+/* Only one slide exists while disabled: never clip it. */
+.side-carousel:not(.is-enabled) .side-carousel-slide {
+  max-block-size: none;
+  overflow: visible;
+}
+
+.side-carousel-live {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-carousel-track,
+  .side-carousel-slide,
+  .side-carousel-dot {
+    transition: none;
+  }
+}

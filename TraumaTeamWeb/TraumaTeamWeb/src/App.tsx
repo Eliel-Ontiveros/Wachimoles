@@ -2,6 +2,9 @@ import { HealthAlertsPanel } from './components/HealthAlertsPanel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AstronautProfileBar } from './components/AstronautProfileBar';
 import { BodyModelViewerWeb } from './components/BodyModelViewerWeb';
+import { BodyCompositionCards } from './components/BodyCompositionCards';
+import { SideCarousel } from './components/SideCarousel';
+import { useBodyComposition } from './hooks/use-body-composition';
 import { HealthChartsPanel } from './components/HealthChartsPanel';
 import { HexagonalVaultBackground } from './components/HexagonalVaultBackground';
 import {
@@ -10,6 +13,7 @@ import {
   ChevronRightIcon,
   LayersIcon,
   RegionCategoryIcon,
+  XIcon,
 } from './components/Icons';
 
 function getSeverityTag(intensity: number): string {
@@ -81,6 +85,7 @@ export function App() {
   const [conditions, setConditions] = useState<BodyConditionRecord[]>([]);
   const [healthChecks, setHealthChecks] = useState<DailyHealthCheck[]>([]);
 
+  const bodyComposition = useBodyComposition();
   const [selectedMuscleId, setSelectedMuscleId] = useState<string | null>(null);
   const [zoneSnapshots, setZoneSnapshots] = useState<Record<string, string>>({});
   const [zoneThumbnails, setZoneThumbnails] = useState<Record<string, string>>({});
@@ -373,23 +378,53 @@ export function App() {
         </nav>
 
         <main className={`stage-grid stage-mode-${responsiveStage}`}>
-          {/* Column 1: Mission above Pulse + Vitals/Symptoms + History card */}
+          {/* Column 1: vitals; becomes a Vitals / Body composition carousel while a muscle is selected */}
           <div
             className={`stage-col ${
               responsiveStage === 'all' || responsiveStage === 'signos' ? 'visible' : 'hidden-sm'
             }`}
           >
-            <RealtimeEcgMonitor vitals={vitals} astronaut={selectedAstronaut} />
-            <SymptomPulseCards
-              latestCheck={latestHealthCheck}
-              vitals={vitals}
-            />
-            <HealthChartsPanel
-              vitals={vitals}
-              allSamples={samples}
-              environment={selectedAstronaut.environment}
+            <SideCarousel
+              enabled={selectedMuscle !== null}
+              ariaLabel="Vitals and body composition"
+              slides={[
+                {
+                  id: 'vitals',
+                  label: 'Vitals',
+                  content: (
+                    <>
+                      <RealtimeEcgMonitor vitals={vitals} astronaut={selectedAstronaut} />
+                      <SymptomPulseCards
+                        latestCheck={latestHealthCheck}
+                        vitals={vitals}
+                      />
+                      <HealthChartsPanel
+                        vitals={vitals}
+                        allSamples={samples}
+                        environment={selectedAstronaut.environment}
+                      />
+                    </>
+                  ),
+                },
+                {
+                  id: 'body-composition',
+                  label: 'Body composition',
+                  content: <BodyCompositionCards data={bodyComposition} />,
+                },
+              ]}
             />
           </div>
+
+          {/* Body composition column (no muscle selected). Conditional siblings keep the viewer's position stable. */}
+          {selectedMuscle === null && (
+            <div
+              className={`stage-col stage-col-bodycomp ${
+                responsiveStage === 'all' || responsiveStage === 'signos' ? 'visible' : 'hidden-sm'
+              }`}
+            >
+              <BodyCompositionCards data={bodyComposition} />
+            </div>
+          )}
 
           {/* Column 2: Muscle dropdown + vertically stretched 3D body */}
           <div
@@ -409,11 +444,24 @@ export function App() {
           </div>
 
           {/* Column 3: Zone symptoms + AI space + Photos (read-only) */}
+          {(selectedMuscle !== null || responsiveStage === 'musculo') && (
           <div
-            className={`stage-col ${
+            className={`stage-col stage-col-detail ${
+              selectedMuscle === null ? 'stage-col-picker-only' : ''
+            } ${
               responsiveStage === 'all' || responsiveStage === 'musculo' ? 'visible' : 'hidden-sm'
             }`}
           >
+            {selectedMuscle && (
+              <button
+                type="button"
+                className="muscle-detail-close"
+                aria-label={`Close ${selectedMuscle.name} details`}
+                onClick={() => handleSelectMuscle(null)}
+              >
+                <XIcon size={16} />
+              </button>
+            )}
             <MuscleDetailAndAiPanel
               muscle={selectedMuscle}
               latestHealthCheck={latestHealthCheck}
@@ -579,6 +627,7 @@ export function App() {
               </div>
             </section>
           </div>
+          )}
         </main>
       </div>
       </div>

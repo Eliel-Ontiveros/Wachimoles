@@ -4,16 +4,17 @@ import { MUSCLE_MODEL_BASE64 } from '@/assets/images/muscle-model-base64';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { Locale, MessageKey } from '@/i18n/messages';
 import { formatDate } from '@/i18n/format';
+import {
+  type BackendBodyRegion,
+  type BodyRegionCategory,
+  normalizeBodyRegion,
+  toBackendBodyRegion,
+} from '@/utils/body-region';
+
+export type { BackendBodyRegion, BodyRegionCategory };
+export { normalizeBodyRegion, toBackendBodyRegion };
 
 export type MuscleStatus = 'normal' | 'warning' | 'critical';
-
-export type BodyRegionCategory =
-  | 'Head and neck'
-  | 'Front torso'
-  | 'Back torso'
-  | 'Upper limb'
-  | 'Hip and pelvis'
-  | 'Lower limb';
 
 const CATEGORY_KEYS: Record<BodyRegionCategory, MessageKey> = {
   'Head and neck': 'body.category.head_neck',
@@ -28,23 +29,6 @@ const CATEGORY_KEYS: Record<BodyRegionCategory, MessageKey> = {
 export const muscleNameKey = (id: string) => `body.muscle.${id}` as MessageKey;
 /** Clave i18n de la categoría anatómica (el valor en español es el que se envía al backend). */
 export const categoryNameKey = (category: BodyRegionCategory) => CATEGORY_KEYS[normalizeBodyRegion(category)];
-
-/** Categorías guardadas en español (datos heredados) → categoría en inglés. */
-const LEGACY_REGIONS: Record<string, BodyRegionCategory> = {
-  'cabeza y cuello': 'Head and neck',
-  'tronco anterior': 'Front torso',
-  'tronco posterior': 'Back torso',
-  'extremidad superior': 'Upper limb',
-  'cadera y pelvis': 'Hip and pelvis',
-  'extremidad inferior': 'Lower limb',
-};
-
-/** Acepta una región en inglés o en español heredado; lo desconocido cae en 'Front torso'. */
-export function normalizeBodyRegion(value: string | undefined | null): BodyRegionCategory {
-  const key = (value ?? '').trim();
-  if (key in CATEGORY_KEYS) return key as BodyRegionCategory;
-  return LEGACY_REGIONS[key.toLowerCase()] ?? 'Front torso';
-}
 
 /** Valor de `updatedAt` para "justo ahora" (se traduce al mostrar). */
 export const UPDATED_NOW = '__now__';

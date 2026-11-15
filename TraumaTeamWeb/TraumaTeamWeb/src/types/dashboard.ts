@@ -205,3 +205,45 @@ export interface ConnectionEndpointStatus {
   lastSyncIso: string | null;
   errorMessages: string[];
 }
+
+export type BodySex = 'male' | 'female';
+export type BmiCategory = 'underweight' | 'healthy' | 'overweight' | 'obese';
+
+/** Smart-scale metrics computed by the backend from the weight and the body profile. */
+export interface ExactBodyMetrics {
+  bmi: number;
+  bmiCategory: BmiCategory;
+  healthyWeightMinKg: number;
+  healthyWeightMaxKg: number;
+  overweightMaxKg: number;
+  idealWeightKg: number | null;
+  weightToIdealKg: number | null;
+}
+
+/** Population-formula estimates; null while the profile lacks age or sex. */
+export interface EstimatedBodyMetrics {
+  bodyFatPercent: number;
+  fatMassKg: number;
+  leanMassKg: number;
+  bodyWaterLiters: number;
+  bodyWaterPercent: number;
+  basalMetabolismKcal: number;
+}
+
+export interface WeightRecord {
+  id: number;
+  measurementId: string;
+  weightKg: number;
+  device: string | null;
+  measuredAt: string;
+  receivedAt: string;
+  /** null while no body profile (height) has been set. */
+  metrics: { exact: ExactBodyMetrics; estimated: EstimatedBodyMetrics | null } | null;
+}
+
+export interface BodyProfile {
+  heightCm: number;
+  ageYears: number | null;
+  sex: BodySex | null;
+  updatedAt: string;
+}
