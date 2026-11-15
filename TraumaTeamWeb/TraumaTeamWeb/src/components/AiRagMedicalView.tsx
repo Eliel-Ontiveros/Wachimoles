@@ -11,7 +11,7 @@ import {
   AlertTriangleIcon,
   BookOpenIcon,
   ChevronRightIcon,
-  DropletsIcon,
+  GlucoseIcon,
   FileTextIcon,
   HeartIcon,
   MoonIcon,
@@ -194,7 +194,7 @@ export const AiRagMedicalView: React.FC<AiRagMedicalViewProps> = ({
 
                 <div className="hc-metrics-strip">
                   <span>
-                    <DropletsIcon size={12} /> Glucose:{' '}
+                    <GlucoseIcon size={12} /> Glucose:{' '}
                     <b>{hc.bloodSugarMgDl !== null ? `${hc.bloodSugarMgDl} mg/dL` : '--'}</b>
                   </span>
                   <span>

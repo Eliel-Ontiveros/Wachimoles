@@ -72,6 +72,7 @@ function forwardToTarget(targetBase, targetPath, method, headers, body) {
 }
 
 const config = getDefaultConfig(__dirname);
+config.watchFolders = [...(config.watchFolders || []), require("node:path").resolve(__dirname, "../shared")];
 
 const previousEnhanceMiddleware = config.server?.enhanceMiddleware;
 config.server = {

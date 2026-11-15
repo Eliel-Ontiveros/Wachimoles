@@ -43,8 +43,11 @@ export type MissionCtx = {
   getFullHistory: (metric?: SampleMetric) => Promise<DashboardSample[]>;
   alerts: CriticalAlert[];
   unreadAlertCount: number;
+  alertsError: string | null;
+  refreshAlerts: () => Promise<void>;
   activeToasterAlert: CriticalAlert | null;
   dismissToaster: () => void;
+  markToasterDelivered: () => void;
   acknowledgeAllAlerts: () => void;
   injuryPhotos: Record<string, InjuryPhoto[]>;
   addInjuryPhoto: (

@@ -5,7 +5,7 @@ import stationBackground from '../../../../TraumaTeamMovil/assets/images/fondos/
 import moonBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MoonBanner.svg';
 import marsBackground from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MarsBanner.svg';
 import type { AstronautProfile, VitalSignsData } from '../types/dashboard';
-import { ActivityIcon, HeartIcon } from './Icons';
+import { HeartRateIcon } from './Icons';
 
 interface RealtimeEcgMonitorProps {
   vitals: VitalSignsData;
@@ -101,7 +101,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
                 animationDuration: `${beatDurationSec.toFixed(3)}s`,
               }}
             >
-              <HeartIcon size={20} strokeWidth={2.3} />
+              <HeartRateIcon size={20} />
             </span>
 
             {isAvailable && bpm !== null ? (
@@ -116,7 +116,7 @@ export const RealtimeEcgMonitor: React.FC<RealtimeEcgMonitorProps> = ({ vitals, 
 
           <div className="pulse-hero-right">
             <span className="pulse-live-label" style={{ color: statusMeta.color }}>
-              <ActivityIcon size={12} />
+              <HeartRateIcon size={12} />
               <span>{statusMeta.label}</span>
             </span>
             <span className="pulse-time-label">

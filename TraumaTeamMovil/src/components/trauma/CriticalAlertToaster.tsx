@@ -10,18 +10,20 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 // Pop-up flotante en pantalla exclusivo para anomalías médicas graves
 export function CriticalAlertToaster() {
-  const { activeToasterAlert, dismissToaster } = useMission();
+  const { activeToasterAlert, dismissToaster, markToasterDelivered } = useMission();
   const { t } = useI18n();
   const { colors, scheme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const [slideAnim] = useState(() => new Animated.Value(-140));
 
+  const alertId = activeToasterAlert?.id;
   useEffect(() => {
-    if (!activeToasterAlert) {
+    if (!alertId) {
       slideAnim.setValue(-140);
       return;
     }
 
+    markToasterDelivered();
     Animated.spring(slideAnim, {
       toValue: 0,
       damping: 18,
@@ -41,12 +43,12 @@ export function CriticalAlertToaster() {
     }, 8000);
 
     return () => clearTimeout(timer);
-  }, [activeToasterAlert, slideAnim, dismissToaster]);
+  }, [alertId, slideAnim, dismissToaster, markToasterDelivered]);
 
   if (!activeToasterAlert) return null;
 
   const isCritical = activeToasterAlert.severity === 'critical';
-  const accentColor = isCritical ? colors.danger : colors.warning;
+  const accentColor = isCritical ? colors.danger : scheme === 'dark' ? colors.warning : '#92400e';
 
   return (
     <Animated.View
@@ -59,42 +61,21 @@ export function CriticalAlertToaster() {
         zIndex: 100,
         transform: [{ translateY: slideAnim }],
       }}>
-      <View
-        style={{
-          borderColor: accentColor,
-          borderLeftWidth: 5,
-        }}
-        className="flex-row items-start rounded-2xl border bg-white p-3.5 shadow-xl dark:bg-trauma-night">
-        <View
-          style={{ backgroundColor: isCritical ? colors.dangerSoft : colors.warningSoft }}
-          className="mr-3 h-9 w-9 items-center justify-center rounded-xl">
-          <AlertTriangle size={18} color={accentColor} />
-        </View>
-
-        <View className="flex-1 pr-2">
-          <View className="flex-row items-center justify-between">
-            <Text
-              style={{ color: accentColor }}
-              className="font-mono text-[10px] font-bold uppercase tracking-wider">
-              {isCritical ? t('vital.toaster.critical') : t('vital.toaster.anomaly')}
-            </Text>
-            <Text className="font-mono text-xs font-extrabold text-slate-900 dark:text-trauma-nightInk">
-              {activeToasterAlert.valueLabel}
-            </Text>
-          </View>
-          <Text className="mt-0.5 font-mono text-xs font-bold text-slate-900 dark:text-trauma-nightInk">
-            {activeToasterAlert.title}
+      <View accessibilityRole="alert" accessibilityLiveRegion="assertive"
+        style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14,
+          backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+          shadowColor: colors.shadow, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 }}>
+        <AlertTriangle size={18} color={accentColor} style={{ marginTop: 2 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: accentColor, fontSize: 11, fontWeight: '600', marginBottom: 4 }}>
+            {t(isCritical ? 'alerts.critical' : 'alerts.warning')} · {activeToasterAlert.valueLabel}
           </Text>
-          <Text className="mt-0.5 font-mono text-[10px] text-slate-500 dark:text-trauma-nightMuted">
-            {activeToasterAlert.message}
-          </Text>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', lineHeight: 20 }}>{activeToasterAlert.title}</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 4 }}>{activeToasterAlert.message}</Text>
         </View>
-
-        <Pressable
-          onPress={dismissToaster}
-          accessibilityLabel={t('vital.toaster.close')}
-          className="h-7 w-7 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200 dark:bg-trauma-nightAlt dark:active:bg-trauma-nightLine">
-          <X size={14} color={scheme === 'dark' ? colors.textMuted : '#475569'} />
+        <Pressable onPress={dismissToaster} accessibilityRole="button" accessibilityLabel={t('vital.toaster.close')}
+          style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
+          <X size={16} color={colors.textMuted} />
         </Pressable>
       </View>
     </Animated.View>

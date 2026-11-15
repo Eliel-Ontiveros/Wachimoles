@@ -1,3 +1,4 @@
+import { HealthAlertsPanel } from './components/HealthAlertsPanel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AstronautProfileBar } from './components/AstronautProfileBar';
 import { BodyModelViewerWeb } from './components/BodyModelViewerWeb';
@@ -45,7 +46,7 @@ import {
   formatShortUpdateDate,
   parseConditionUpdates,
 } from './utils/condition-updates';
-import { getGravityLabel } from './utils/display-labels.ts';
+import { displayReportText, getGravityLabel } from './utils/display-labels.ts';
 import type {
   AstronautProfile,
   BodyConditionRecord,
@@ -334,6 +335,7 @@ export function App() {
           selectedAstronautId={selectedAstronautId}
           onSelectAstronaut={(id) => setSelectedAstronautId(id)}
           connectionStatus={{ ...connectionStatus, photosStatus: musclePhotos.status }}
+          notifications={<HealthAlertsPanel astronautName={selectedAstronaut.name} onViewMuscle={(id) => { setSelectedMuscleId(id); setResponsiveStage('musculo'); }} />}
         />
 
       <div className="dashboard-shell">
@@ -485,7 +487,7 @@ export function App() {
                           </span>
                           <div className="record-text-col">
                             <strong>{m.name}</strong>
-                            <span className="record-condition">{m.observation?.conditionName || 'Reported'}</span>
+                            <span className="record-condition">{displayReportText(m.observation?.conditionName || 'Reported')}</span>
                             <div className="record-pain-summary">
                               <span className="record-severity-pill" style={{ color: severityColor,
                                 backgroundColor: `${painColor}16`, borderColor: `${painColor}40` }}>
@@ -555,7 +557,7 @@ export function App() {
                             <strong>{recordMuscle?.name ?? rec.muscleName}</strong>
                             <span className="record-severity-pill resolved-pill">Healed</span>
                           </div>
-                          <span className="record-condition">{rec.conditionName || 'Resolved report'}</span>
+                          <span className="record-condition">{displayReportText(rec.conditionName || 'Resolved report')}</span>
                           <span className="record-subtext">
                             {updates.length} {updates.length === 1 ? 'update' : 'updates'}
                             {isSelected && musclePhotos.status === 'ok' && (

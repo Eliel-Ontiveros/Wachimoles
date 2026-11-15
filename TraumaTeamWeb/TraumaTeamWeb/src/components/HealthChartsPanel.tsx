@@ -5,13 +5,13 @@ import type { DashboardSample, SampleMetric, VitalSignsData } from '../types/das
 import {
   ActivityIcon,
   ChevronRightIcon,
-  DropletsIcon,
+  OxygenIcon,
   FootprintsIcon,
-  HeartIcon,
+  HeartRateIcon,
   MoonIcon,
   OrbitIcon,
   XIcon,
-  ZapIcon,
+  StressIcon,
 } from './Icons';
 
 interface HealthChartsPanelProps {
@@ -98,11 +98,11 @@ const MAX_DISPLAY_SAMPLES = 48;
 function renderMetricIcon(metric: SampleMetric, size = 14) {
   switch (metric) {
     case 'heart_rate':
-      return <HeartIcon size={size} />;
+      return <HeartRateIcon size={size} />;
     case 'spo2':
-      return <DropletsIcon size={size} />;
+      return <OxygenIcon size={size} />;
     case 'stress':
-      return <ZapIcon size={size} />;
+      return <StressIcon size={size} />;
     case 'sleep':
       return <MoonIcon size={size} />;
     case 'steps':
@@ -443,7 +443,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
         <div className="history-card-head">
           <div className="history-head-title">
             <span className="sym-icon-box tone-sky" aria-hidden="true">
-              <OrbitIcon size={14} />
+              <OrbitIcon size={24} />
             </span>
             <div className="history-head-copy">
               <h2>Flight Log</h2>
@@ -470,7 +470,7 @@ export const HealthChartsPanel: React.FC<HealthChartsPanelProps> = ({ vitals, al
               aria-label={`View ${qm.label} history: ${qm.valueText} ${qm.unit}`}
             >
               <span className={`sym-icon-box ${qm.tone}`} aria-hidden="true">
-                {renderMetricIcon(qm.key, 14)}
+                {renderMetricIcon(qm.key, 24)}
               </span>
               <span className="history-metric-label">{qm.label}</span>
               <span className="history-metric-value">

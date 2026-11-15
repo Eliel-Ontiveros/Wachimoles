@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  NotFoundException,
   Injectable,
   Logger,
   PayloadTooLargeException,
@@ -1559,6 +1560,59 @@ export class SupabaseService {
     return mapDailyHealthCheck(rows[0]);
   }
 
+  async getHealthAlerts(userId: string, audience: "mobile" | "monitor") {
+    const ackColumn = audience === "mobile" ? "mobile_acknowledged_at" : "monitor_acknowledged_at";
+    const url = new URL(`${this.supabaseUrl}/rest/v1/health_alerts`);
+    url.searchParams.set("select", `id,user_id,rule,severity,muscle_id,muscle_name,value,threshold,created_at,updated_at,resolved_at,${ackColumn}`);
+    url.searchParams.set("user_id", `eq.${userId}`);
+    // Keep every open episode, even when the resolved history is large.
+    url.searchParams.set("order", "resolved_at.desc.nullsfirst,created_at.desc,id.desc");
+    url.searchParams.set("limit", "500");
+    const response = await this.requestSupabaseTable(url, { method: "GET" }, "health alerts");
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows) || !rows.every(row => isRecord(row) &&
+      typeof row.id === "string" && row.user_id === userId &&
+      (row.rule === "pain_threshold" || row.rule === "active_problems") &&
+      (row.severity === "critical" || row.severity === "warning") &&
+      typeof row.value === "number" && typeof row.threshold === "number" &&
+      typeof row.created_at === "string" && typeof row.updated_at === "string")) {
+      throw new ServiceUnavailableException("Invalid health alerts data.");
+    }
+    return rows.map(row => ({
+      id: row.id as string, astronautId: row.user_id as string,
+      rule: row.rule as "pain_threshold" | "active_problems",
+      severity: row.severity as "critical" | "warning",
+      muscleId: row.muscle_id as string | null, muscleName: row.muscle_name as string | null,
+      value: row.value as number, threshold: row.threshold as number,
+      createdAt: row.created_at as string, updatedAt: row.updated_at as string,
+      resolvedAt: row.resolved_at as string | null, acknowledgedAt: row[ackColumn] as string | null
+    }));
+  }
+
+  async acknowledgeHealthAlert(userId: string, audience: "mobile" | "monitor", id: string) {
+    const column = audience === "mobile" ? "mobile_acknowledged_at" : "monitor_acknowledged_at";
+    const url = new URL(`${this.supabaseUrl}/rest/v1/health_alerts`);
+    url.searchParams.set("user_id", `eq.${userId}`);
+    url.searchParams.set("id", `eq.${id}`);
+    url.searchParams.set("select", "id");
+    // First acknowledgement wins; repeated requests are harmless.
+    url.searchParams.set(column, "is.null");
+    const response = await this.requestSupabaseTable(url, {
+      method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ [column]: new Date().toISOString() })
+    }, "health alert acknowledgement");
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows)) throw new ServiceUnavailableException("Invalid acknowledgement response.");
+    if (!rows.length) {
+      url.searchParams.delete(column);
+      const existing = await this.requestSupabaseTable(url, { method: "GET" }, "health alert");
+      const found: unknown = await existing.json();
+      if (!Array.isArray(found)) throw new ServiceUnavailableException("Invalid health alert response.");
+      if (!found.length) throw new NotFoundException("Health alert not found.");
+    }
+    return { acknowledged: true as const };
+  }
+
   private getBodyConditionsUrl(): URL {
     return new URL(`${this.supabaseUrl}/rest/v1/body_conditions`);
   }
@@ -1744,6 +1798,13 @@ export class SupabaseService {
       this.logger.error(
         `Supabase ${resource} request returned HTTP ${response.status} (${code}): ${message}`
       );
+      if (url.pathname.endsWith("/health_alerts") && (code === "PGRST205" || code === "42P01")) {
+        throw new ServiceUnavailableException({
+          statusCode: 503,
+          code: "HEALTH_ALERTS_NOT_READY",
+          message: "Health alerts are not configured on the server."
+        });
+      }
       throw new ServiceUnavailableException(
         `${resource} data could not be loaded or updated.`
       );

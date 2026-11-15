@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { displaySymptom, getGravityLabel, getRegionCategoryLabel, isNoSymptom } from '../src/utils/display-labels.ts';
+import { displayReportText, displaySymptom, getGravityLabel, getRegionCategoryLabel, isNoSymptom } from '../src/utils/display-labels.ts';
 import {
   appendConditionUpdate,
   parseConditionUpdates,
@@ -18,6 +18,29 @@ test('legacy Spanish symptoms are displayed in English; English values pass thro
   assert.equal(isNoSymptom('Ninguno'), true);
   assert.equal(isNoSymptom('None'), true);
   assert.equal(isNoSymptom('Fatigue'), false);
+});
+
+test('displays the legacy report titles and notes in English without changing stored history', () => {
+  const description = 'Actualización 1 [14/11 13:21] (Dolor 7/10) - Tengo irritado el brazo ademas de tenerlo hinchado, ademas me duele al moverlo\n' +
+    'Actualización 2 [14/11 13:22] (Dolor 5/10) - La irritacion se puso un poco mas roja pero ahora me duele menos';
+  const updates = parseConditionUpdates({ description });
+  assert.equal(displayReportText('Dolor muscular'), 'Muscle pain');
+  assert.equal(displayReportText('Dolor en Bíceps izquierdo'), 'Pain in Left biceps');
+  assert.equal(displayReportText(updates[0].text), 'My arm is irritated and swollen, and it hurts when I move it');
+  assert.equal(displayReportText(updates[1].text), 'The irritation has become a little redder, but it hurts less now');
+  assert.equal(displayReportText('Dolencia al mover el cuello a un lado u otro'), 'Pain when moving the neck from side to side');
+  assert.equal(displayReportText('Dolor punzante'), 'Sharp pain');
+  assert.equal(displayReportText('Ya no siento el síntoma, molestia superada.'), 'I no longer feel the symptom; discomfort resolved.');
+  assert.match(updates[0].text, /^Tengo irritado/);
+  assert.equal(updates[0].painIntensity, 7);
+  assert.equal(updates[1].painIntensity, 5);
+});
+
+test('matches complete legacy notes and preserves unknown text and qualifiers verbatim', () => {
+  assert.equal(displayReportText('  DOLOR EN BÍCEPS IZQUIERDO.  '), 'Pain in Left biceps');
+  for (const text of ['No tengo dolor muscular', 'Dolor muscular sin hinchazón', 'Pain after exercise', 'Jan']) {
+    assert.equal(displayReportText(text), text);
+  }
 });
 
 test('parses both English and legacy Spanish update lines', () => {
