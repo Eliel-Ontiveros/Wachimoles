@@ -709,6 +709,20 @@ h3 {
   .stage-grid.stage-mode-all {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* Phone 'Vitals' stage: vitals and body composition form one continuous
+     scrolling column instead of two half-height panes. */
+  .stage-grid.stage-mode-signos {
+    grid-auto-rows: max-content;
+    align-content: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .stage-grid.stage-mode-signos > .stage-col {
+    block-size: auto;
+    overflow-y: visible;
+  }
 }
 
 /* ==================== COLUMNA 1: UBICACIÓN + PULSO + SÍNTOMAS + HISTORIAL ==================== */
