@@ -30,9 +30,11 @@ Run the configured NestJS backend separately. Its Supabase settings are required
 ## Review muscle symptoms against documents
 
 1. Select an active muscle report in the 3D viewer or the reported-zone list.
-2. In **Document-based assessment**, review the report and selected environment.
-3. Press **Review symptoms against documents**. Each press makes one request to `POST /dashboard/assistant/ask`.
-4. Read the explanation and numbered references. Expand a source to inspect the retrieved passage, snapshot date and original agency URL.
+2. In **Understand your symptoms**, review the selected environment.
+3. Press **Review your symptoms**. Each press makes one request to `POST /dashboard/assistant/ask`.
+4. Read the main finding, then expand **Read the full explanation** for the remaining findings or **Explore sources** for evidence. Numbered citations open and focus the matching passage. Source excerpts, retrieval dates and original URLs remain available.
+
+The result uses 16 px body text and progressive disclosure without truncating the original answer. The backend asks for up to three short findings in everyday English, with the main finding and its essential limitations first. Existing longer answers remain readable in full. If synthesis is disabled or unavailable, the source list starts open. The diagnosis limitation and urgent-symptom guidance stay visible; **About this assessment** retains the complete backend notice. Restart or redeploy the backend for the revised generation instructions to take effect.
 
 The request includes the selected muscle name, reported condition, pain intensity, swelling, functional limitation, report timestamp, notes and selected environment. A reported condition is not treated as a confirmed diagnosis. Free-text notes remain verbatim; the English BM25 corpus may have limited recall for Spanish-only notes. Long condition names and notes are bounded to fit the existing 1,500-character question limit.
 

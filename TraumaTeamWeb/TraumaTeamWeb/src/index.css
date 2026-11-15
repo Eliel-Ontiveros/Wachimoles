@@ -4,6 +4,14 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
+@font-face {
+  font-family: 'A-Space';
+  src: url('../../../TraumaTeamMovil/assets/tipografía/A-Space Regular Demo.otf') format('opentype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light dark;
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -643,123 +651,65 @@ h3 {
   }
 }
 
-/* ==================== COLUMNA 1: MISIÓN + PULSO + SÍNTOMAS + HISTORIAL ==================== */
-.mission-and-pulse-stack {
+/* ==================== COLUMNA 1: UBICACIÓN + PULSO + SÍNTOMAS + HISTORIAL ==================== */
+.environment-and-pulse-stack {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.mission-route-card {
+.environment-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border-radius: 18px;
-  background: radial-gradient(
-      120% 140% at 90% 0%,
-      rgba(115, 203, 244, 0.14) 0%,
-      rgba(6, 11, 25, 0) 60%
-    ),
-    #060b19;
+  background: #060b19;
   color: #f8fafc;
-  padding: 9px 13px 5px;
+  min-block-size: 118px;
+  padding: 20px;
   border: 1px solid rgba(115, 203, 244, 0.28);
-  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'A-Space', var(--font-sans);
 }
 
-.mission-route-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.mission-route-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mission-orbit-icon {
-  inline-size: 28px;
-  block-size: 28px;
-  border-radius: 9px;
-  background: rgba(115, 203, 244, 0.16);
-  color: #73cbf4;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.mission-route-title strong {
-  display: block;
-  font-size: 0.82rem;
-  line-height: 1.15;
-}
-
-.mission-route-title span {
-  display: block;
-  font-size: 0.67rem;
-  color: #94a3b8;
-}
-
-.mission-dest-pill {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(115, 203, 244, 0.14);
-  color: #97d6f7;
-  border: 1px solid rgba(115, 203, 244, 0.34);
-  white-space: nowrap;
-}
-
-.mission-route-svg {
+.environment-card-background,
+.environment-card::before {
+  position: absolute;
+  inset: 0;
   inline-size: 100%;
-  block-size: 68px;
-  display: block;
+  block-size: 100%;
+  pointer-events: none;
 }
 
-.mission-endpoint-label {
-  fill: #cbd5e1;
-  font-family: var(--font-mono);
-  font-size: 0.4625rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.environment-card-background {
+  z-index: -2;
+  object-fit: cover;
+  object-position: center;
 }
 
-.mission-origin-orbit {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: spinRotate 12s linear infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
+.environment-card::before {
+  content: '';
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(6, 11, 25, 0.82), rgba(6, 11, 25, 0.35));
 }
 
-.mission-ship-marker {
-  animation: shipFloatY 2.8s ease-in-out infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
+.environment-card-name {
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
-.mission-dest-glow {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: destPulse 3s ease-in-out infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
+.environment-card-gravity {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #e0f2fe;
 }
 
 @keyframes shipFloatY {
-
   0%,
   100% {
     transform: translate3d(0, 0, 0);
@@ -767,20 +717,6 @@ h3 {
 
   50% {
     transform: translate3d(0, -2.5px, 0);
-  }
-}
-
-@keyframes destPulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.16;
-  }
-
-  50% {
-    transform: scale(1.1);
-    opacity: 0.3;
   }
 }
 
