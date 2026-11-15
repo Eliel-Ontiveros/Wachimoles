@@ -5,6 +5,7 @@
   "description": "Backend NestJS para el dashboard de WachiMoles Movil",
   "scripts": {
     "rag:ingest": "node scripts/ingest-rag.mjs",
+    "body-profile": "node --env-file=.env scripts/set-body-profile.mjs",
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
