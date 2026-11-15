@@ -7,6 +7,26 @@ export interface IconProps {
   strokeWidth?: number;
 }
 
+// Use the supplied artwork as a mask so it inherits the surrounding UI color.
+const CustomHealthIcon: React.FC<Pick<IconProps, 'size' | 'className'> & {
+  file: string;
+}> = ({ file, size = 18, className }) => {
+  const mask = `url("${import.meta.env.BASE_URL}icons/${file}.svg") center / contain no-repeat`;
+
+  return (
+    <span
+      className={['custom-health-icon', className].filter(Boolean).join(' ')}
+      aria-hidden="true"
+      style={{ width: size, height: size, WebkitMask: mask, mask }}
+    />
+  );
+};
+
+export const HeartRateIcon: React.FC<IconProps> = (props) => <CustomHealthIcon {...props} file="Freq" />;
+export const OxygenIcon: React.FC<IconProps> = (props) => <CustomHealthIcon {...props} file="o2" />;
+export const StressIcon: React.FC<IconProps> = (props) => <CustomHealthIcon {...props} file="Estres" />;
+export const GlucoseIcon: React.FC<IconProps> = (props) => <CustomHealthIcon {...props} file="Glucosa" />;
+
 const baseProps = (size: number, strokeWidth: number, className?: string) => ({
   width: size,
   height: size,
@@ -242,20 +262,9 @@ export const ZapIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, class
   </svg>
 );
 
-export const ThermometerIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, className }) => (
-  <svg {...baseProps(size, strokeWidth, className)}>
-    <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" />
-  </svg>
-);
+export const ThermometerIcon: React.FC<IconProps> = (props) => <CustomHealthIcon {...props} file="Termo" />;
 
-export const SmileIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, className }) => (
-  <svg {...baseProps(size, strokeWidth, className)}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-    <line x1="9" x2="9.01" y1="9" y2="9" />
-    <line x1="15" x2="15.01" y1="9" y2="9" />
-  </svg>
-);
+export const SmileIcon: React.FC<IconProps> = (props) => <CustomHealthIcon {...props} file="aNIMO" />;
 
 export const RocketIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, className }) => (
   <svg {...baseProps(size, strokeWidth, className)}>

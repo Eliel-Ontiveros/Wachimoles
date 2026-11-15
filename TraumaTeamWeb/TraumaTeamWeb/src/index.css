@@ -60,6 +60,13 @@ h3 {
   text-wrap: balance;
 }
 
+.custom-health-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  background-color: currentColor;
+}
+
 /* ==================== TEMAS ==================== */
 .app-root.theme-light {
   color-scheme: light;
@@ -945,12 +952,12 @@ h3 {
 .sym-card-head {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
 .sym-icon-box {
-  inline-size: 22px;
-  block-size: 22px;
+  inline-size: 30px;
+  block-size: 30px;
   border-radius: 7px;
   display: grid;
   place-items: center;
@@ -978,7 +985,9 @@ h3 {
 }
 
 .sym-title {
-  font-size: 1rem;
+  min-inline-size: 0;
+  font-size: 1.125rem;
+  line-height: 1.25;
   font-weight: 700;
   color: var(--text-secondary);
   margin-right: auto;
@@ -1214,13 +1223,12 @@ h3 {
 .history-head-title {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   min-inline-size: 0;
 }
 
 .history-head-title > .sym-icon-box {
-  align-self: flex-start;
-  margin-block-start: 1px;
+  align-self: center;
 }
 
 .history-head-copy {
@@ -1232,7 +1240,7 @@ h3 {
 
 .history-head-copy h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--text-secondary);
   line-height: 1.4;
@@ -1280,7 +1288,7 @@ h3 {
   border-radius: 8px;
   padding: 8px 0;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto 14px;
+  grid-template-columns: 30px minmax(0, 1fr) auto 14px;
   align-items: center;
   gap: 8px;
   color: var(--text-main);
@@ -1292,12 +1300,13 @@ h3 {
   background: var(--bg-elevated);
 }
 
-.history-metric-row > svg {
+.history-metric-row > svg,
+.history-metric-row > .custom-health-icon {
   color: var(--text-muted);
 }
 
 .history-metric-label {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-secondary);
 }
