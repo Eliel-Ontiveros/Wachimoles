@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
-type Props = { size: number; listening: boolean; thinking: boolean; level: Animated.Value };
+type Props = { size: number; listening: boolean; thinking: boolean; level: Animated.Value; subtle?: boolean };
 
 type Blob = { color: string; dur: number; dir: 1 | -1; ox: number; oy: number; r: number };
 
@@ -58,7 +58,7 @@ function SpinningBlob({ blob, size, index, fast }: { blob: Blob; size: number; i
 }
 
 /** Esfera luminosa estilo Siri: reacciona a la voz (level), respira en reposo y gira rápido al pensar. */
-export function VoiceOrb({ size, listening, thinking, level }: Props) {
+export function VoiceOrb({ size, listening, thinking, level, subtle = false }: Props) {
   const [breath] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -83,14 +83,17 @@ export function VoiceOrb({ size, listening, thinking, level }: Props) {
     return () => loop.stop();
   }, [breath, thinking]);
 
-  const halo = size * 1.7;
+  const halo = subtle ? size * 1.24 : size * 1.7;
   const breathScale = breath.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.06] });
   const haloScale = listening
     ? level.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.3], extrapolate: 'clamp' })
     : breathScale;
   const haloOpacity = listening
     ? level.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.9], extrapolate: 'clamp' })
-    : breath.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.45] });
+    : breath.interpolate({
+        inputRange: [0, 1],
+        outputRange: subtle ? [0.06, 0.14] : [0.2, 0.45],
+      });
   const coreScale = listening
     ? level.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08], extrapolate: 'clamp' })
     : breathScale;
@@ -100,15 +103,15 @@ export function VoiceOrb({ size, listening, thinking, level }: Props) {
       <Animated.View
         style={{
           position: 'absolute',
-          width: size * 1.35,
-          height: size * 1.35,
+          width: subtle ? size * 1.18 : size * 1.35,
+          height: subtle ? size * 1.18 : size * 1.35,
           borderRadius: size,
           backgroundColor: thinking ? 'rgba(139,92,246,0.5)' : 'rgba(88,213,247,0.45)',
           opacity: haloOpacity,
           transform: [{ scale: haloScale }],
           shadowColor: '#58d5f7',
-          shadowOpacity: 0.9,
-          shadowRadius: size * 0.35,
+          shadowOpacity: subtle ? 0.25 : 0.9,
+          shadowRadius: subtle ? size * 0.16 : size * 0.35,
           shadowOffset: { width: 0, height: 0 },
         }}
       />
@@ -118,9 +121,9 @@ export function VoiceOrb({ size, listening, thinking, level }: Props) {
           height: size,
           borderRadius: size / 2,
           overflow: 'hidden',
-          backgroundColor: '#05070f',
+          backgroundColor: subtle ? 'rgba(5,7,15,0.72)' : '#05070f',
           borderWidth: 1,
-          borderColor: 'rgba(125,211,252,0.45)',
+          borderColor: subtle ? 'rgba(125,211,252,0.28)' : 'rgba(125,211,252,0.45)',
           transform: [{ scale: coreScale }],
         }}>
         {BLOBS.map((b, i) => (

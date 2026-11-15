@@ -294,6 +294,7 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
   const spo2History: DashboardSample[] = [];
   const stressHistory: DashboardSample[] = [];
   const sleepHistory: DashboardSample[] = [];
+  const stepsHistory: DashboardSample[] = [];
 
   for (const s of samples) {
     if (s.metric === 'heart_rate') {
@@ -326,8 +327,11 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
         sleepHours = s.value;
       }
     }
-    if (s.metric === 'steps' && steps === 0) {
-      steps = Math.round(s.value);
+    if (s.metric === 'steps') {
+      stepsHistory.push(s);
+      if (steps === 0) {
+        steps = Math.round(s.value);
+      }
     }
   }
 
@@ -358,6 +362,7 @@ export function extractLatestVitals(samples: DashboardSample[]): VitalSignsData 
     spo2History,
     stressHistory,
     sleepHistory,
+    stepsHistory,
   };
 }
 
@@ -375,5 +380,6 @@ export function getInitialEmptyVitals(): VitalSignsData {
     spo2History: [],
     stressHistory: [],
     sleepHistory: [],
+    stepsHistory: [],
   };
 }

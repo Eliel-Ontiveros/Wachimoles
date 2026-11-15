@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { Calendar, ClockPlus, X } from 'lucide-react-native';
+import { ClockPlus, X } from 'lucide-react-native';
 import {
   formatRouteDays,
   getDelayPresetDays,
@@ -190,7 +190,6 @@ export function SpaceJourneyTimeline({
     daysUntilDeparture,
     totalMissionDays,
     flightPlanAccepted,
-    openMissionSetup,
     cancelFlightPlan,
     arriveEarly,
     delayMission,
@@ -341,13 +340,6 @@ export function SpaceJourneyTimeline({
                 routeSpec.promedioDias === 1 ? 'missions.plan.avgOne' : 'missions.plan.avgMany',
                 { n: formatRouteDays(routeSpec.promedioDias) }
               )}
-              {routeSpec.esperaRetornoDiasMin !== undefined &&
-              routeSpec.esperaRetornoDiasMax !== undefined
-                ? ` · ${t('missions.plan.marsWait', {
-                    min: routeSpec.esperaRetornoDiasMin,
-                    max: routeSpec.esperaRetornoDiasMax,
-                  })}`
-                : ''}
             </Text>
           )}
         </View>
@@ -460,22 +452,6 @@ export function SpaceJourneyTimeline({
           <View className="ml-1.5 h-2 w-2 rounded-full bg-slate-500" />
         </View>
       </View>
-
-      {isStandby && (
-        <Pressable
-          onPress={openMissionSetup}
-          accessibilityLabel={t('missions.timeline.configurePlanA11y')}
-          style={{
-            backgroundColor: 'rgba(56, 189, 248, 0.14)',
-            borderColor: 'rgba(56, 189, 248, 0.4)',
-          }}
-          className="mt-3 flex-row items-center justify-center rounded-xl border px-3 py-2.5 active:opacity-80">
-          <Calendar size={13} color="#7dd3fc" />
-          <Text className="ml-2 font-mono text-[11px] font-bold text-sky-200">
-            {t('missions.timeline.configurePlan')}
-          </Text>
-        </Pressable>
-      )}
 
       {canShowActiveControls && (
         <View className="mt-3 gap-2">

@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Platform,
+  Pressable,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -344,7 +345,8 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
   const { t } = useI18n();
   const webContainerRef = useRef<HTMLDivElement | null>(null);
   const onCompleteRef = useRef(onComplete);
-  const startExitRef = useRef<(reduceMotion: boolean) => void>(() => {});
+  const startExitRef = useRef<(reduceMotion: boolean, immediate?: boolean) => void>(() => {});
+  const skipRef = useRef<() => void>(() => {});
   const hasCompletedRef = useRef(false);
   const [isDissolving, setIsDissolving] = useState(false);
   const [wordmarkVisible, setWordmarkVisible] = useState(false);
@@ -427,6 +429,12 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
     startExitRef.current = beginHexDissolve;
 
     let currentReduceMotion = false;
+    const triggerSkip = () => {
+      anim?.pause();
+      beginHexDissolve(currentReduceMotion, true);
+    };
+    skipRef.current = triggerSkip;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
       if (
@@ -437,8 +445,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
       ) {
         return;
       }
-      anim?.pause();
-      beginHexDissolve(currentReduceMotion, true);
+      triggerSkip();
     };
 
     const hasWindowKeyListener =
@@ -588,8 +595,15 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
   return (
     <View
       style={styles.overlay}
-      pointerEvents={isDissolving ? 'none' : 'auto'}
-      accessibilityLabel={t('vital.splash.a11y')}>
+      pointerEvents={isDissolving ? 'none' : 'auto'}>
+      <Pressable
+        onPress={() => skipRef.current()}
+        disabled={isDissolving}
+        accessibilityRole="button"
+        accessibilityLabel={t('vital.splash.a11y')}
+        style={styles.skipHitArea}
+      />
+
       {/* Malla de hexágonos que se disuelve radialmente para revelar la app */}
       <View style={styles.hexLayer} pointerEvents="none">
         {hexGrid.tiles.map((tile) => (
@@ -612,6 +626,7 @@ export function StartupSplashAnimation({ onComplete }: StartupSplashAnimationPro
 
       {/* Escenario de animación Lottie */}
       <Animated.View
+        pointerEvents="none"
         style={[
           styles.stageContainer,
           { opacity: stageOpacity, transform: [{ scale: stageScale }] },
@@ -701,6 +716,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     overflow: 'hidden',
+  },
+  skipHitArea: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 10,
   },
   hexLayer: {
     position: 'absolute',

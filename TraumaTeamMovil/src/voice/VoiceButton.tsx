@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -10,7 +10,7 @@ import { useVoice } from './voice-context';
 import { VoiceOrb } from './VoiceOrb';
 
 const ORB_BIG = 120;
-const ORB_SMALL = 58;
+const ORB_SMALL = 42;
 
 /** Botón flotante (esfera) + overlay espacial estilo Siri con transcripción arriba de la esfera. */
 export function VoiceFab() {
@@ -18,12 +18,36 @@ export function VoiceFab() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const [typed, setTyped] = useState('');
-  const [mounted, setMounted] = useState(v.panelOpen);
+  const [exiting, setExiting] = useState(false);
+  const [prevPanelOpen, setPrevPanelOpen] = useState(v.panelOpen);
+  if (prevPanelOpen !== v.panelOpen) {
+    setPrevPanelOpen(v.panelOpen);
+    setExiting(!v.panelOpen);
+  }
+  const mounted = v.panelOpen || exiting;
   const [enter] = useState(() => new Animated.Value(v.panelOpen ? 1 : 0));
+  const [intro] = useState(() => new Animated.Value(v.panelOpen ? 0 : 1));
+  const initialPanelOpenRef = useRef(v.panelOpen);
+
+  useEffect(() => {
+    if (initialPanelOpenRef.current) return;
+    const introAnim = Animated.sequence([
+      Animated.delay(450),
+      Animated.timing(intro, {
+        toValue: 0,
+        duration: 820,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+    introAnim.start();
+    return () => introAnim.stop();
+  }, [intro]);
 
   useEffect(() => {
     if (v.panelOpen) {
-      setMounted(true);
+      intro.stopAnimation();
+      intro.setValue(0);
       enter.stopAnimation();
       Animated.timing(enter, {
         toValue: 1,
@@ -34,7 +58,7 @@ export function VoiceFab() {
       return;
     }
 
-    if (!mounted) return;
+    if (!exiting) return;
     enter.stopAnimation();
     Animated.timing(enter, {
       toValue: 0,
@@ -43,10 +67,10 @@ export function VoiceFab() {
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
-        setMounted(false);
+        setExiting(false);
       }
     });
-  }, [v.panelOpen, mounted, enter]);
+  }, [v.panelOpen, exiting, enter, intro]);
 
   const status = v.thinking
     ? t('voice.thinking')
@@ -70,14 +94,49 @@ export function VoiceFab() {
   const idle = !v.listening && !v.thinking && v.transcript === '' && !fb && !v.question;
 
   if (!mounted) {
+    const dockedTranslateX = intro.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -46],
+    });
+    const dockedTranslateY = intro.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -24],
+    });
+    const dockedScale = intro.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 2.3],
+    });
+    const dockedOpacity = intro.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.34, 0.96],
+    });
+
     return (
-      <Pressable
-        onPress={v.startCommand}
-        accessibilityRole="button"
-        accessibilityLabel={t('voice.talk')}
-        style={{ position: 'absolute', right: 16 - ORB_SMALL * 0.35, bottom: insets.bottom + 20 - ORB_SMALL * 0.35 }}>
-        <VoiceOrb size={ORB_SMALL} listening={false} thinking={false} level={v.level} />
-      </Pressable>
+      <Animated.View
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          right: -ORB_SMALL * 0.48,
+          bottom: insets.bottom + 16,
+          zIndex: 40,
+          opacity: dockedOpacity,
+          transform: [
+            { translateX: dockedTranslateX },
+            { translateY: dockedTranslateY },
+            { scale: dockedScale },
+          ],
+        }}>
+        <Pressable
+          onPress={v.startCommand}
+          hitSlop={{ top: 14, bottom: 14, left: 22, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('voice.talk')}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.85 : 1,
+          })}>
+          <VoiceOrb size={ORB_SMALL} listening={false} thinking={false} level={v.level} subtle />
+        </Pressable>
+      </Animated.View>
     );
   }
 
@@ -245,11 +304,10 @@ export function DictationButton({ onText, label }: { onText: (text: string) => v
       onPress={() => (active ? v.stop() : v.startDictation(onText))}
       accessibilityRole="button"
       accessibilityLabel={text}
-      className={`flex-row items-center self-start rounded-full border px-3 py-1.5 active:opacity-70 ${
-        active
-          ? 'border-red-300 bg-red-50 dark:border-red-400/50 dark:bg-red-950'
-          : 'border-sky-200 bg-sky-50 dark:border-sky-300/40 dark:bg-sky-950'
-      }`}>
+      className={`flex-row items-center self-start rounded-full border px-3 py-1.5 active:opacity-70 ${active
+        ? 'border-red-300 bg-red-50 dark:border-red-400/50 dark:bg-red-950'
+        : 'border-sky-200 bg-sky-50 dark:border-sky-300/40 dark:bg-sky-950'
+        }`}>
       <Mic size={13} color={active ? colors.danger : colors.accentDeep} />
       <Text className={`ml-1.5 font-mono text-[10.5px] font-bold ${active ? 'text-red-600 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'}`}>
         {active ? t('voice.listening') : text}
