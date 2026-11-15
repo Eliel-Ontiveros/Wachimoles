@@ -24,7 +24,12 @@ El endpoint SSE vuelve a consultar Supabase cada cinco segundos.
 5. Ejecuta
    `supabase/migrations/20261113_add_sleep_samples.sql` para permitir las
    muestras diarias de duración del sueño del reloj.
-6. Las filas previas y las que siga insertando el endpoint actual del reloj
+6. Ejecuta
+   `supabase/migrations/20261114_add_weight_measurements_and_body_profile.sql`
+   para crear `weight_measurements` (pesajes de la báscula Bluetooth, módulo
+   `Wachimoles_Bascula`) y `user_body_profiles` (estatura del usuario activo y, opcionalmente,
+   edad y sexo: entradas de las fórmulas corporales).
+7. Las filas previas y las que siga insertando el endpoint actual del reloj
    tendrán `user_id` nulo. La API las excluye. Asigna cada fila al usuario fijo
    solo después de comprobar que le pertenece.
 
@@ -124,11 +129,28 @@ frontend a `CORS_ORIGINS` y publica ambos servicios detrás de HTTPS.
   del usuario fijo.
 - `PUT /dashboard/health-checks/:dateIso` — crea o actualiza el cuestionario
   de esa fecha (`YYYY-MM-DD`).
+- `GET /dashboard/weights?limit=100` — pesajes del usuario activo, del más
+  reciente al más antiguo. Cada uno trae `metrics` (o `null` si todavía no hay
+  perfil): `exact` (IMC, rangos de peso, peso ideal; cuentas directas) y
+  `estimated` (grasa %, masa grasa y magra, agua, metabolismo basal; fórmulas de
+  población, **no** mediciones: la báscula solo entrega el peso). Con el perfil
+  incompleto no se suponen datos: sin sexo `idealWeightKg` y `weightToIdealKg`
+  son `null`, y sin edad o sexo `estimated` es `null`.
+- `GET /dashboard/body-profile` — estatura, edad y sexo del usuario activo
+  (404 si no existe).
+- `PUT /dashboard/body-profile` `{ "heightCm": 177, "ageYears"?: 25, "sex"?: "male" | "female" }`
+  — crea o reemplaza ese perfil; solo la estatura es obligatoria y lo que no se
+  envíe queda en `null`. Las métricas de `/dashboard/weights` se recalculan con
+  él, también para pesajes anteriores. Para cargarlo sin armar la petición:
+  `npm run body-profile -- --height 177 [--age 25] [--sex male]` (usa
+  `DASHBOARD_API_TOKEN` del `.env` y `BACKEND_URL`, por defecto
+  `http://localhost:3000`).
 - `GET /dashboard/data?limit=500` — datos para el frontend independiente,
   protegidos con la contraseña web.
 
 `/dashboard/samples`, `/dashboard/samples/stream` y todas las rutas
-`/dashboard/body-conditions` y `/dashboard/health-checks` requieren
+`/dashboard/body-conditions`, `/dashboard/health-checks`, `/dashboard/weights` y
+`/dashboard/body-profile` requieren
 `Authorization: Bearer <DASHBOARD_API_TOKEN>`. No requieren inicio de sesión.
 `/dashboard/data` usa la contraseña web independiente. Cada consulta de datos
 del usuario filtra explícitamente por `DASHBOARD_USER_ID`; la clave

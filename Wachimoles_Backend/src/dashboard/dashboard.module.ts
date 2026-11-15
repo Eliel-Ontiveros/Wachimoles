@@ -10,6 +10,8 @@ import { AstronautMissionController } from "./astronaut-mission.controller";
 import { AstronautLocationController } from "./astronaut-location.controller";
 import { DashboardWebGuard } from "./dashboard-web.guard";
 import { SupabaseService } from "./supabase.service";
+import { WeightsController } from "./weights.controller";
+import { WeightsService } from "./weights.service";
 
 @Module({
   controllers: [
@@ -20,8 +22,14 @@ import { SupabaseService } from "./supabase.service";
     DailyHealthChecksController,
     MissionsController,
     AstronautMissionController,
-    AstronautLocationController
+    AstronautLocationController,
+    WeightsController
   ],
-  providers: [DashboardTokenGuard, DashboardWebGuard, SupabaseService]
+  providers: [
+    DashboardTokenGuard,
+    DashboardWebGuard,
+    SupabaseService,
+    WeightsService
+  ]
 })
 export class DashboardModule {}
