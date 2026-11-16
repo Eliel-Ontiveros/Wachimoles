@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  envDir: fileURLToPath(new URL('.', import.meta.url)),
   envPrefix: ['VITE_', 'EXPO_PUBLIC_', 'DASHBOARD_'],
   server: {
     fs: {

@@ -28,15 +28,19 @@ const DEFAULT_CONFIG: BackendRuntimeConfig = {
     env.VITE_API_BASE_URL ||
     env.EXPO_PUBLIC_API_BASE_URL ||
     env.EXPO_PUBLIC_LOCAL_API_URL ||
-    '',
+    'https://wachimolesbackendult.vercel.app',
   webUser: env.EXPO_PUBLIC_WEB_USER || 'dashboard',
-  webPassword: env.EXPO_PUBLIC_WEB_PASSWORD || '',
-  userId: env.EXPO_PUBLIC_USER_ID || '',
+  webPassword:
+    env.EXPO_PUBLIC_WEB_PASSWORD ||
+    '8dvDvVFHy72V3VgsXZC-15B6lUljYETY',
+  userId:
+    env.EXPO_PUBLIC_USER_ID ||
+    '43235979-2b38-4a17-9a38-632484accad9',
   apiToken:
     env.VITE_DASHBOARD_API_TOKEN ||
     env.EXPO_PUBLIC_DASHBOARD_API_TOKEN ||
     env.DASHBOARD_API_TOKEN ||
-    '',
+    'G2oRRckFat8V7xAQRZEsT01JeHCuSUla-Y8fGv7ooaE',
 };
 
 let runtimeConfig: BackendRuntimeConfig = { ...DEFAULT_CONFIG };

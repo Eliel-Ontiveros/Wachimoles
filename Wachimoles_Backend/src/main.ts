@@ -18,7 +18,10 @@ async function bootstrap(): Promise<void> {
         /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(
           origin
         );
-      if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin) {
+      const isVercelOrigin =
+        typeof origin === "string" &&
+        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+      if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin || isVercelOrigin) {
         callback(null, true);
         return;
       }

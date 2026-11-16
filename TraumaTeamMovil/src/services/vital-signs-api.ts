@@ -6,17 +6,21 @@ export const API_CONFIG = {
   apiBaseUrl: (
     process.env.EXPO_PUBLIC_API_BASE_URL ||
     process.env.EXPO_PUBLIC_LOCAL_API_URL ||
-    ''
+    'https://wachimolesbackendult.vercel.app'
   ).trim(),
   dashboardApiToken: (
-    process.env.EXPO_PUBLIC_DASHBOARD_API_TOKEN || ''
+    process.env.EXPO_PUBLIC_DASHBOARD_API_TOKEN ||
+    'G2oRRckFat8V7xAQRZEsT01JeHCuSUla-Y8fGv7ooaE'
   ).trim(),
 
   // Conservados para los servicios de misiones que aún usan esta configuración.
   localUrls: process.env.EXPO_PUBLIC_LOCAL_API_URL
     ? [process.env.EXPO_PUBLIC_LOCAL_API_URL.trim()]
-    : ([] as string[]),
-  userId: (process.env.EXPO_PUBLIC_USER_ID || '').trim(),
+    : ['https://wachimolesbackendult.vercel.app'],
+  userId: (
+    process.env.EXPO_PUBLIC_USER_ID ||
+    '43235979-2b38-4a17-9a38-632484accad9'
+  ).trim(),
 
   timeoutMs: 5000,
 };
