@@ -1,8 +1,8 @@
-import earthBanner from '../../../../TraumaTeamMovil/assets/images/fondos/banners/EarthBanner.svg';
-import marsBanner from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MarsBanner.svg';
-import moonBanner from '../../../../TraumaTeamMovil/assets/images/fondos/banners/MoonBanner.svg';
-import shipBanner from '../../../../TraumaTeamMovil/assets/images/fondos/banners/ShipBanner.svg';
-import stationBanner from '../../../../TraumaTeamMovil/assets/images/fondos/banners/StationBanner.svg';
+import earthBanner from '../../../TraumaTeamMovil/assets/images/fondos/banners/EarthBanner.svg';
+import marsBanner from '../../../TraumaTeamMovil/assets/images/fondos/banners/MarsBanner.svg';
+import moonBanner from '../../../TraumaTeamMovil/assets/images/fondos/banners/MoonBanner.svg';
+import shipBanner from '../../../TraumaTeamMovil/assets/images/fondos/banners/ShipBanner.svg';
+import stationBanner from '../../../TraumaTeamMovil/assets/images/fondos/banners/StationBanner.svg';
 import type { EnvironmentType } from '../types/dashboard';
 
 export interface EnvironmentBannerConfig {

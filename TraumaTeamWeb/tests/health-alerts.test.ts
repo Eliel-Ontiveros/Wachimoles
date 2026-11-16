@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
-import { parseHealthAlerts, pendingHealthAlertIds, type HealthAlert } from '../../../shared/health-alerts.ts';
+import { parseHealthAlerts, pendingHealthAlertIds, type HealthAlert } from '../../shared/health-alerts.ts';
 import { fetchHealthAlerts, acknowledgeHealthAlert, updateBackendConfig, resetBackendConfig } from '../src/services/backend-api.ts';
 const alert: HealthAlert = {
   id: 'episode', astronautId: 'subject', rule: 'pain_threshold', severity: 'critical', muscleId: 'cuello', muscleName: 'Neck',

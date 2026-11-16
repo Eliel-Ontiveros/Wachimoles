@@ -1,4 +1,4 @@
-import { parseHealthAlerts, HealthAlertsNotReadyError, isHealthAlertsNotReadyResponse, type HealthAlert } from '../../../../shared/health-alerts.ts';
+import { parseHealthAlerts, HealthAlertsNotReadyError, isHealthAlertsNotReadyResponse, type HealthAlert } from '../../../shared/health-alerts.ts';
 import type {
   BodyConditionImageRecord,
   BodyConditionRecord,

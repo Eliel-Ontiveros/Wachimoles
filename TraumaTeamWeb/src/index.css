@@ -6,7 +6,7 @@
 
 @font-face {
   font-family: 'A-Space';
-  src: url('../../../TraumaTeamMovil/assets/tipografía/A-Space Regular Demo.otf') format('opentype');
+  src: url('../../TraumaTeamMovil/assets/tipografía/A-Space Regular Demo.otf') format('opentype');
   font-style: normal;
   font-weight: 400;
   font-display: swap;

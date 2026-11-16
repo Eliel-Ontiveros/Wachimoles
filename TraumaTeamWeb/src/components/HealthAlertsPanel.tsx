@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { HEALTH_ALERTS_NOT_READY_MESSAGE, HealthAlertsNotReadyError, type HealthAlert } from '../../../../shared/health-alerts.ts';
+import { HEALTH_ALERTS_NOT_READY_MESSAGE, HealthAlertsNotReadyError, type HealthAlert } from '../../../shared/health-alerts.ts';
 import { acknowledgeHealthAlert, fetchHealthAlerts } from '../services/backend-api';
 import { BellIcon } from './Icons';
 import { displayReportText } from '../utils/display-labels.ts';
